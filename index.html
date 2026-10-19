@@ -10,7 +10,7 @@
       --brand:#315efb;--brand-2:#1737a6;--green:#1d9a68;--amber:#c57a12;--red:#c54242;
       --shadow:0 12px 30px rgba(30,43,78,.08);--radius:16px;
     }
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 Inter,"PingFang SC","Microsoft YaHei",sans-serif}
+    *{box-sizing:border-box} [hidden]{display:none!important} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 Inter,"PingFang SC","Microsoft YaHei",sans-serif}
     button,input,select,textarea{font:inherit} button{cursor:pointer;border:0}
     .app{display:flex;min-height:100vh}.sidebar{width:248px;background:#101a36;color:#dce4ff;padding:22px 14px;display:flex;flex-direction:column;gap:18px}
     .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;padding:4px 10px}.brand-mark{width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,#7e9cff,#315efb);display:grid;place-items:center;color:#fff}
@@ -59,8 +59,8 @@
   <div id="toast" class="toast"></div>
   <div id="authModal" class="modal" hidden>
     <div class="modal-card">
-      <h3 id="authTitle">商家登录</h3>
-      <p id="authHint">登录后，订单和包裹会保存到 Supabase 数据库。</p>
+      <h3 id="authTitle">账号登录</h3>
+      <p id="authHint">商家、仓库操作员和管理员均从这里登录，系统按账号权限进入对应工作台。</p>
       <div class="field"><label>邮箱</label><input id="authEmail" type="email" placeholder="name@company.com" /></div>
       <div class="field"><label>密码</label><input id="authPassword" type="password" placeholder="至少 6 位" /></div>
       <div class="field" id="companyField" hidden><label>公司名称</label><input id="authCompany" placeholder="跨境商家名称" /></div>
@@ -136,8 +136,8 @@
     function closeAuth(){$('#authModal').hidden=true}
     function updateAuthMode(){
       const signup=state.auth.mode==='signup';
-      $('#authTitle').textContent=signup?'注册商家账号':'商家登录';
-      $('#authHint').textContent=signup?'注册后即可创建真实订单并保存包裹信息。':'登录后，订单和包裹会保存到 Supabase 数据库。';
+      $('#authTitle').textContent=signup?'注册商家账号':'账号登录';
+      $('#authHint').textContent=signup?'新注册账号默认是跨境商家；仓库操作员和管理员账号由平台管理员授权。':'商家、仓库操作员和管理员均从这里登录，系统按账号权限进入对应工作台。';
       $('#companyField').hidden=!signup;
       $('#authSubmit').textContent=signup?'注册并继续':'登录';
       $('#authMode').textContent=signup?'返回登录':'注册账号';
