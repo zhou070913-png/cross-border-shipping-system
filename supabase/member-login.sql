@@ -76,5 +76,28 @@ $$;
 revoke all on function public.resolve_login_email(text) from public;
 grant execute on function public.resolve_login_email(text) to anon, authenticated;
 
+create or replace function public.member_no_by_email(p_email text)
+returns text
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_member_no text;
+begin
+  select p.member_no
+    into v_member_no
+    from auth.users as u
+    join public.profiles as p on p.id = u.id
+   where lower(u.email) = lower(trim(p_email))
+     and p.is_active = true
+   limit 1;
+  return v_member_no;
+end;
+$$;
+
+revoke all on function public.member_no_by_email(text) from public;
+grant execute on function public.member_no_by_email(text) to anon, authenticated;
+
 commit;
 

@@ -64,6 +64,15 @@
     return data;
   }
 
+  async function memberNoByEmail(email) {
+    const instance = await requireClient();
+    const { data, error } = await instance.rpc('member_no_by_email', {
+      p_email: String(email || '').trim()
+    });
+    if (error) throw error;
+    return data;
+  }
+
   async function signInByMemberNo(memberNo, password) {
     const normalized = String(memberNo || '').trim().toUpperCase();
     if (!normalized) throw new Error('请输入会员号');
@@ -292,6 +301,7 @@
     currentProfile,
     signIn,
     signInByMemberNo,
+    memberNoByEmail,
     signUp,
     resendConfirmation,
     signOut,

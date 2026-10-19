@@ -101,7 +101,7 @@
     };
     const $ = s=>document.querySelector(s);
     const esc = s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+    function toast(msg,duration=2200){const el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),duration)}
     function status(text,kind='blue'){return '<span class="status '+kind+'">'+esc(text)+'</span>'}
     const roleLabels={merchant:'商家端',warehouse_operator:'仓库端',admin:'运营后台'};
     const statusLabels={draft:'草稿',submitted:'待仓库收货',warehouse_received:'仓库已收货',measuring:'确认实重尺寸中',awaiting_payment:'待付款',paid:'已付款待打包',ready_to_ship:'待出货',shipped:'运输中',delivered:'已签收',cancelled:'已取消',exception:'异常'};
@@ -182,7 +182,13 @@
         const result=state.auth.mode==='signup'
           ? await window.MospaceSupabase.signUp(identifier,password)
           : await window.MospaceSupabase.signInByMemberNo(identifier,password);
-        if(state.auth.mode==='signup'&&!result.session){closeAuth();toast('注册成功，请查收邮箱完成验证后再登录');return}
+        if(state.auth.mode==='signup'&&!result.session){
+          let memberNo=null;
+          try{memberNo=await window.MospaceSupabase.memberNoByEmail(identifier)}catch(memberError){console.info('注册后暂时无法读取会员号',memberError.message)}
+          closeAuth();
+          toast(memberNo?`注册成功，你的会员号是 ${memberNo}。请先完成邮箱验证，再用会员号登录。`:'注册成功，请查收邮箱完成验证；验证后可向管理员查询会员号。',7000);
+          return;
+        }
         state.auth.user=result.user; closeAuth(); toast(state.auth.mode==='signup'?'注册成功，已登录':'登录成功'); await syncAuth();
       }catch(error){toast('操作失败：'+(error.message||'请检查邮箱和密码'))}
     }
