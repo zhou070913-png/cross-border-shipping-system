@@ -16,8 +16,10 @@ https://zhou070913-png.github.io/cross-border-shipping-system/
 
 如果创建订单时出现 `new row violates row-level security policy for table "orders"`，请执行 `supabase/fix-order-insert.sql`。这是已有账号缺少商家档案时的兼容补丁。
 
+订单创建后，继续执行 `supabase/warehouse-operations.sql`，页面才会把仓库入库、确认实重尺寸、打包和出货写入数据库。仓库操作必须使用 `profiles.role = 'warehouse_operator'` 且绑定 `warehouse_id` 的账号；商家账号只能查看自己的订单并完成一次付款。
+
 业务规则已经写入数据结构：商家先发货到深圳仓；仓库确认实重和尺寸后进入待付款；每个订单只有一条付款记录，付款后费用锁定，不设计待补款或二次付款。
 
 ## 当前边界
 
-GitHub Pages 仍是前端演示版本，页面暂时使用内存状态。执行 SQL 后，下一步再把订单创建、包裹查询和物流追踪逐个改为 Supabase 读写。
+订单创建、订单列表、包裹列表和物流轨迹已经接入 Supabase。仓库作业补丁使用初版印尼空运计费规则：首重 0.5kg ¥68，续重 ¥42/kg，仓库操作费 ¥18；后续可再把运价规则抽成管理员配置表。当前付款按钮记录的是一次“人工收款/线下转账”结果，还没有接微信支付或银行卡支付网关。

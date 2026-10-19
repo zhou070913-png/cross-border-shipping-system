@@ -35,6 +35,19 @@
     return data.user;
   }
 
+  async function currentProfile() {
+    const instance = await requireClient();
+    const user = await currentUser();
+    if (!user) return null;
+    const { data, error } = await instance
+      .from('profiles')
+      .select('id, role, company_name, display_name, warehouse_id, is_active')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
   async function signIn(email, password) {
     const instance = await requireClient();
     const { data, error } = await instance.auth.signInWithPassword({ email, password });
@@ -137,11 +150,53 @@
     return data;
   }
 
+  async function warehouseReceiveOrder(orderId) {
+    const instance = await requireClient();
+    const { data, error } = await instance.rpc('warehouse_receive_order', {
+      p_order_id: orderId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function warehouseConfirmMeasurements(orderId, measurements) {
+    const instance = await requireClient();
+    const { data, error } = await instance.rpc('warehouse_confirm_measurements', {
+      p_order_id: orderId,
+      p_measurements: measurements
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function warehousePackOrder(orderId, boxNo, note) {
+    const instance = await requireClient();
+    const { data, error } = await instance.rpc('warehouse_pack_order', {
+      p_order_id: orderId,
+      p_box_no: boxNo || null,
+      p_package_note: note || null
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function warehouseShipOrder(orderId, carrier, trackingNo) {
+    const instance = await requireClient();
+    const { data, error } = await instance.rpc('warehouse_ship_order', {
+      p_order_id: orderId,
+      p_carrier: carrier,
+      p_tracking_no: trackingNo
+    });
+    if (error) throw error;
+    return data;
+  }
+
   global.MospaceSupabase = {
     config,
     isConfigured,
     getClient,
     currentUser,
+    currentProfile,
     signIn,
     signUp,
     resendConfirmation,
@@ -151,6 +206,10 @@
     createOrder,
     createMerchantOrder,
     confirmOrderFee,
-    recordOrderPayment
+    recordOrderPayment,
+    warehouseReceiveOrder,
+    warehouseConfirmMeasurements,
+    warehousePackOrder,
+    warehouseShipOrder
   };
 })(window);
