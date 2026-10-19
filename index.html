@@ -107,7 +107,13 @@
     }
     function merchantParcels(){
       return shell('我的包裹','查看预报、入库、测量和异常状态。','<button class="btn primary" data-page="order-create">+ 预报包裹</button>')+
-      '<div class="card"><div class="card-title"><h3>包裹列表</h3><div class="head-actions"><input class="btn ghost" style="padding:8px 11px" placeholder="搜索快递单号" /><button class="btn ghost small">状态筛选⌄</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>快递单号</th><th>品名</th><th>状态</th><th>实际重量</th><th>尺寸</th><th>操作</th></tr></thead><tbody>'+state.parcels.map(p=>'<tr class="clickable"><td class="mono">'+p.no+'</td><td>'+p.name+'</td><td>'+status(p.status,p.status==='待预报'?'amber':p.status==='已测量'?'green':'blue')+'</td><td>'+p.weight+'</td><td>'+p.size+'</td><td><button class="btn small ghost" data-page="parcels">查看详情</button></td></tr>').join('')+'</tbody></table></div></div>';
+      '<div class="card"><div class="card-title"><h3>包裹列表</h3><div class="head-actions"><input class="btn ghost" style="padding:8px 11px" placeholder="搜索快递单号" /><button class="btn ghost small">状态筛选⌄</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>快递单号</th><th>品名</th><th>状态</th><th>实际重量</th><th>尺寸</th><th>操作</th></tr></thead><tbody>'+state.parcels.map(p=>'<tr class="clickable"><td class="mono">'+p.no+'</td><td>'+p.name+'</td><td>'+status(p.status,p.status==='待预报'?'amber':p.status==='已测量'?'green':'blue')+'</td><td>'+p.weight+'</td><td>'+p.size+'</td><td><button class="btn small ghost" data-page="parcel-detail" data-parcel-no="'+p.no+'">查看详情</button></td></tr>').join('')+'</tbody></table></div></div>';
+    }
+    function merchantParcelDetail(){
+      const p=state.parcels.find(x=>x.no===state.selectedParcelNo)||state.parcels[0];
+      const statusTone=p.status==='待预报'?'amber':p.status==='已测量'?'green':'blue';
+      return shell('包裹详情','查看单个包裹的入库、测量和异常处理记录。','<button class="btn ghost" data-page="parcels">返回我的包裹</button>')+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>包裹信息</h3>'+status(p.status,statusTone)+'</div><div class="metric"><span>快递单号</span><b class="mono">'+p.no+'</b></div><div class="metric"><span>品名</span><b>'+p.name+'</b></div><div class="metric"><span>实际重量</span><b>'+p.weight+'</b></div><div class="metric"><span>尺寸</span><b>'+p.size+'</b></div><div class="metric"><span>所属订单</span><b class="mono">'+state.order.id+'</b></div></div><div class="card"><div class="card-title"><h3>处理时间线</h3><span class="muted">实时更新</span></div><div class="timeline"><div class="event"><div></div><div><h4>已预报</h4><p>商家提交包裹信息 · 10月16日 09:20</p></div></div><div class="event"><div></div><div><h4>'+ (p.status==='待预报'?'等待仓库收货':'已入库') +'</h4><p>'+ (p.status==='待预报'?'包裹入库后将自动更新':'日本仓收货中心已扫描入库') +' · '+ (p.status==='待预报'?'待处理':'10月16日 11:18') +'</p></div></div><div class="event"><div></div><div><h4>'+ (p.status==='已测量'?'已测量':'待测量') +'</h4><p>'+ (p.status==='已测量'?'已完成称重和尺寸确认':'仓库确认后显示实重与尺寸') +'</p></div></div></div></div></div>';
     }
     function merchantOrders(){
       const o=state.order; return shell('我的订单','跟踪订单状态、费用和出货进度。','<button class="btn primary" data-page="order-create">+ 创建集运订单</button>')+
@@ -168,7 +174,7 @@
     function render(){
       renderNav(); let html='';
       if(state.role==='merchant'){
-        const views={dashboard:merchantDashboard,'order-create':merchantCreate,parcels:merchantParcels,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress};
+        const views={dashboard:merchantDashboard,'order-create':merchantCreate,parcels:merchantParcels,'parcel-detail':merchantParcelDetail,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress};
         html=(views[state.page]||merchantDashboard)();
       }else if(state.role==='warehouse'){
         const views={dashboard:warehouseDashboard,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,exceptions:warehouseExceptions};
@@ -182,7 +188,7 @@
     }
     function bind(){
       document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{state.role=b.dataset.role;state.page='dashboard';render()});
-      document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{state.page=b.dataset.page;render()});
+      document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{if(b.dataset.parcelNo)state.selectedParcelNo=b.dataset.parcelNo;state.page=b.dataset.page;render()});
       const create=$('#createOrderBtn');if(create)create.onclick=()=>{toast('订单已创建，参考费用 ¥'+state.order.estimated+'，等待仓库确认');state.page='fee';render()};
       const confirm=$('#confirmBtn');if(confirm)confirm.onclick=()=>{state.order.confirmed=3;state.order.confirmedAmount=292;state.order.status='已确认待付款';state.events[1]={title:'仓库已完成确认',desc:'3 个包裹已核对实重和尺寸',time:'刚刚',done:true};toast('已确认 3 个包裹，生成唯一应付金额 ¥292');state.role='merchant';state.page='fee';render()};
       const pay=$('#payBtn');if(pay)pay.onclick=()=>{state.order.payment='已付款';state.order.paidAmount=state.order.confirmedAmount;state.order.status='已付款待打包';toast('付款成功，费用已锁定');render()};
