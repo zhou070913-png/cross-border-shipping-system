@@ -138,7 +138,7 @@
         const result=state.auth.mode==='signup'
           ? await window.MospaceSupabase.signUp(email,password,company)
           : await window.MospaceSupabase.signIn(email,password);
-        if(state.auth.mode==='signup'&&!result.user){closeAuth();toast('注册成功，请查收邮箱完成验证');return}
+        if(state.auth.mode==='signup'&&!result.session){closeAuth();toast('注册成功，请查收邮箱完成验证后再登录');return}
         state.auth.user=result.user; closeAuth(); toast(state.auth.mode==='signup'?'注册成功，已登录':'登录成功'); render();
       }catch(error){toast('操作失败：'+(error.message||'请检查邮箱和密码'))}
     }
