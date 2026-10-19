@@ -293,6 +293,113 @@ returns boolean language sql stable security definer set search_path = public as
   select public.is_admin() or public.owns_order(p_order_id) or public.can_operate_order(p_order_id);
 $$;
 
+-- 仓库确认实重/尺寸后调用：生成订单唯一最终费用，并把订单推进到待付款。
+create or replace function public.confirm_order_fee(
+  p_order_id uuid,
+  p_actual_weight_kg numeric,
+  p_volume_weight_kg numeric,
+  p_shipping_fee numeric,
+  p_handling_fee numeric
+)
+returns public.fees
+language plpgsql security definer set search_path = public as $$
+declare
+  v_order public.orders;
+  v_fee public.fees;
+  v_total numeric(12,2);
+  v_billable numeric(10,3);
+begin
+  if not (public.is_admin() or public.can_operate_order(p_order_id)) then
+    raise exception '无权确认该订单费用';
+  end if;
+  if p_actual_weight_kg is null or p_actual_weight_kg < 0
+     or coalesce(p_volume_weight_kg, 0) < 0
+     or p_shipping_fee < 0 or p_handling_fee < 0 then
+    raise exception '重量和费用必须为有效的非负数';
+  end if;
+
+  select * into v_order from public.orders where id = p_order_id for update;
+  if v_order.id is null then raise exception '订单不存在'; end if;
+  if v_order.status not in ('warehouse_received', 'measuring') then
+    raise exception '当前订单状态不可确认费用';
+  end if;
+
+  v_billable := greatest(p_actual_weight_kg, coalesce(p_volume_weight_kg, 0));
+  v_total := round(p_shipping_fee + p_handling_fee, 2);
+  insert into public.fees (
+    order_id, actual_weight_kg, volume_weight_kg, billable_weight_kg,
+    shipping_fee, handling_fee, total_amount, confirmed_by, confirmed_at
+  ) values (
+    p_order_id, p_actual_weight_kg, p_volume_weight_kg, v_billable,
+    round(p_shipping_fee, 2), round(p_handling_fee, 2), v_total, auth.uid(), now()
+  )
+  on conflict (order_id) do update set
+    actual_weight_kg = excluded.actual_weight_kg,
+    volume_weight_kg = excluded.volume_weight_kg,
+    billable_weight_kg = excluded.billable_weight_kg,
+    shipping_fee = excluded.shipping_fee,
+    handling_fee = excluded.handling_fee,
+    total_amount = excluded.total_amount,
+    confirmed_by = excluded.confirmed_by,
+    confirmed_at = excluded.confirmed_at,
+    updated_at = now()
+  returning * into v_fee;
+
+  update public.orders
+  set status = 'awaiting_payment', updated_at = now()
+  where id = p_order_id;
+
+  insert into public.tracking_events (order_id, event_code, event_title, event_description, location, created_by)
+  values (p_order_id, 'fee_confirmed', '仓库已确认费用', '已完成实重和尺寸确认，等待商家一次付款', v_order.origin_warehouse_name, auth.uid());
+  return v_fee;
+end;
+$$;
+
+-- 商家付款调用：金额必须等于最终费用，订单只能生成一条已付款记录。
+create or replace function public.record_order_payment(
+  p_order_id uuid,
+  p_payment_method text,
+  p_provider text default null,
+  p_provider_transaction_id text default null
+)
+returns public.payments
+language plpgsql security definer set search_path = public as $$
+declare
+  v_order public.orders;
+  v_fee public.fees;
+  v_payment public.payments;
+begin
+  if not (public.is_admin() or public.owns_order(p_order_id)) then
+    raise exception '无权支付该订单';
+  end if;
+  select * into v_order from public.orders where id = p_order_id for update;
+  select * into v_fee from public.fees where order_id = p_order_id;
+  if v_order.id is null then raise exception '订单不存在'; end if;
+  if v_order.status <> 'awaiting_payment' then raise exception '当前订单不可付款'; end if;
+  if v_fee.total_amount is null or v_fee.total_amount <= 0 then raise exception '订单尚未生成最终费用'; end if;
+  if exists(select 1 from public.payments where order_id = p_order_id) then raise exception '该订单已存在付款记录'; end if;
+
+  insert into public.payments (
+    order_id, merchant_id, amount, currency, status, payment_method,
+    provider, provider_transaction_id, paid_at
+  ) values (
+    p_order_id, v_order.merchant_id, v_fee.total_amount, v_fee.currency,
+    'paid', p_payment_method, p_provider, p_provider_transaction_id, now()
+  ) returning * into v_payment;
+
+  update public.fees set locked_at = now(), updated_at = now() where id = v_fee.id;
+  update public.orders set status = 'paid', paid_at = now(), updated_at = now() where id = p_order_id;
+  insert into public.tracking_events (order_id, event_code, event_title, event_description, location, created_by)
+  values (p_order_id, 'payment_received', '付款成功', '费用已锁定，仓库进入待出货', v_order.origin_warehouse_name, auth.uid());
+  return v_payment;
+end;
+$$;
+
+revoke all on function public.confirm_order_fee(uuid, numeric, numeric, numeric, numeric) from public;
+grant execute on function public.confirm_order_fee(uuid, numeric, numeric, numeric, numeric) to authenticated;
+revoke all on function public.record_order_payment(uuid, text, text, text) from public;
+grant execute on function public.record_order_payment(uuid, text, text, text) to authenticated;
+
 -- 新用户默认只能作为商家使用；仓库操作员和管理员由管理员在后台授予。
 alter table public.profiles enable row level security;
 alter table public.warehouses enable row level security;
@@ -387,3 +494,5 @@ on conflict (code) do update set name = excluded.name, address = excluded.addres
 comment on table public.orders is '商家创建的跨境集运订单；仓库确认后进入 awaiting_payment，付款后费用锁定，不支持补款。';
 comment on table public.fees is '每个订单只有一条费用记录；confirmed_at 后为最终费用，locked_at 后禁止修改。';
 comment on table public.payments is '每个订单最多一条付款记录，支付金额必须等于最终费用。';
+comment on function public.confirm_order_fee(uuid, numeric, numeric, numeric, numeric) is '仓库确认实重和尺寸，生成唯一最终费用并进入待付款。';
+comment on function public.record_order_payment(uuid, text, text, text) is '商家一次付款；订单已有付款记录或金额不一致时拒绝。';
