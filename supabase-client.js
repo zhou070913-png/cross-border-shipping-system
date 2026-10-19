@@ -191,6 +191,82 @@
     return data;
   }
 
+  async function warehouseFindOrderByTracking(trackingNo) {
+    const instance = await requireClient();
+    const value = String(trackingNo || '').trim();
+    if (!value) throw new Error('请输入快递单号');
+    const { data: parcel, error: parcelError } = await instance
+      .from('parcels').select('id, parcel_no, tracking_no, item_name, status, actual_weight_kg, length_cm, width_cm, height_cm').eq('tracking_no', value).maybeSingle();
+    if (parcelError) throw parcelError;
+    if (!parcel) throw new Error('未找到匹配的预报包裹');
+    const { data: relation, error: relationError } = await instance.from('order_parcels').select('order_id').eq('parcel_id', parcel.id).limit(1).maybeSingle();
+    if (relationError) throw relationError;
+    if (!relation) throw new Error('该包裹尚未关联集运订单');
+    const { data: order, error: orderError } = await instance.from('orders').select('*, fees(*), payments(*), order_parcels(parcel_id, parcels(*))').eq('id', relation.order_id).single();
+    if (orderError) throw orderError;
+    return { parcel, order };
+  }
+
+  async function listAddresses() {
+    const instance = await requireClient();
+    const { data, error } = await instance.from('merchant_addresses').select('*').order('is_default', { ascending: false }).order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function saveAddress(address) {
+    const instance = await requireClient();
+    const payload = { ...address };
+    if (payload.id) {
+      const { data, error } = await instance.from('merchant_addresses').update(payload).eq('id', payload.id).select().single();
+      if (error) throw error;
+      return data;
+    }
+    const { data: userData, error: userError } = await instance.auth.getUser();
+    if (userError) throw userError;
+    payload.merchant_id = userData.user.id;
+    const { data, error } = await instance.from('merchant_addresses').insert(payload).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function adminOrders() {
+    const instance = await requireClient();
+    const { data, error } = await instance.from('orders').select('*, fees(*), payments(*)').order('created_at', { ascending: false }).limit(100);
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function adminAuditLogs() {
+    const instance = await requireClient();
+    const { data, error } = await instance.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getRoutePricing(routeCode = 'ID-AIR') {
+    const instance = await requireClient();
+    const { data, error } = await instance.from('route_pricing').select('*').eq('route_code', routeCode).maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function updateRoutePricing(payload) {
+    const instance = await requireClient();
+    const { data, error } = await instance.rpc('admin_update_route_pricing', {
+      p_route_code: payload.routeCode,
+      p_route_name: payload.routeName,
+      p_first_weight_kg: Number(payload.firstWeightKg),
+      p_first_price: Number(payload.firstPrice),
+      p_additional_price_per_kg: Number(payload.additionalPricePerKg),
+      p_volume_divisor: Number(payload.volumeDivisor),
+      p_handling_fee: Number(payload.handlingFee),
+      p_notes: payload.notes || null
+    });
+    if (error) throw error;
+    return data;
+  }
+
   global.MospaceSupabase = {
     config,
     isConfigured,
@@ -210,6 +286,13 @@
     warehouseReceiveOrder,
     warehouseConfirmMeasurements,
     warehousePackOrder,
-    warehouseShipOrder
+    warehouseShipOrder,
+    warehouseFindOrderByTracking,
+    listAddresses,
+    saveAddress,
+    adminOrders,
+    adminAuditLogs,
+    getRoutePricing,
+    updateRoutePricing
   };
 })(window);
