@@ -35,6 +35,30 @@
     return data.user;
   }
 
+  async function signIn(email, password) {
+    const instance = await requireClient();
+    const { data, error } = await instance.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+  }
+
+  async function signUp(email, password, companyName) {
+    const instance = await requireClient();
+    const { data, error } = await instance.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: companyName || '跨境商家' } }
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function signOut() {
+    const instance = await requireClient();
+    const { error } = await instance.auth.signOut();
+    if (error) throw error;
+  }
+
   async function myOrders() {
     const instance = await requireClient();
     const { data, error } = await instance
@@ -61,6 +85,66 @@
     const { data, error } = await instance.from('orders').insert(payload).select().single();
     if (error) throw error;
     return data;
+  }
+
+  async function createMerchantOrder(payload) {
+    const instance = await requireClient();
+    const user = await currentUser();
+    const { data: warehouse, error: warehouseError } = await instance
+      .from('warehouses')
+      .select('*')
+      .eq('code', 'SZ-LG-01')
+      .single();
+    if (warehouseError) throw warehouseError;
+
+    const orderNo = 'MO' + new Date().toISOString().slice(0, 10).replace(/-/g, '') +
+      Math.random().toString(36).slice(2, 8).toUpperCase();
+    const orderPayload = {
+      order_no: orderNo,
+      merchant_id: user.id,
+      warehouse_id: warehouse.id,
+      status: 'submitted',
+      destination_country: payload.destinationCountry || '印度尼西亚',
+      destination_city: payload.destinationCity || '雅加达',
+      destination_address: payload.destinationAddress,
+      recipient_name: payload.recipientName,
+      recipient_phone: payload.recipientPhone,
+      route_code: payload.routeCode || 'ID-AIR',
+      route_name: payload.routeName || '印尼空运专线',
+      origin_warehouse_name: warehouse.name,
+      origin_warehouse_address: warehouse.address,
+      estimated_weight_kg: payload.estimatedWeightKg || 4.2,
+      parcel_count: (payload.parcels || []).length,
+      merchant_note: payload.merchantNote || null,
+      submitted_at: new Date().toISOString()
+    };
+    const { data: order, error: orderError } = await instance
+      .from('orders').insert(orderPayload).select().single();
+    if (orderError) throw orderError;
+
+    const parcels = payload.parcels || [];
+    for (const parcel of parcels) {
+      const { data: row, error: parcelError } = await instance.from('parcels').insert({
+        parcel_no: parcel.no,
+        merchant_id: user.id,
+        warehouse_id: warehouse.id,
+        status: 'pre_advised',
+        tracking_no: parcel.no,
+        item_name: parcel.name || '未填写品名'
+      }).select().single();
+      if (parcelError) throw parcelError;
+      const { error: linkError } = await instance.from('order_parcels').insert({
+        order_id: order.id,
+        parcel_id: row.id
+      });
+      if (linkError) throw linkError;
+    }
+    await instance.from('fees').insert({
+      order_id: order.id,
+      estimated_shipping_fee: payload.estimatedFee || 268,
+      estimated_total: payload.estimatedFee || 268
+    });
+    return order;
   }
 
   async function confirmOrderFee(orderId, actualWeightKg, volumeWeightKg, shippingFee, handlingFee) {
@@ -93,9 +177,13 @@
     isConfigured,
     getClient,
     currentUser,
+    signIn,
+    signUp,
+    signOut,
     myOrders,
     orderTracking,
     createOrder,
+    createMerchantOrder,
     confirmOrderFee,
     recordOrderPayment
   };
