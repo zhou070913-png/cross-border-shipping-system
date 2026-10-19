@@ -81,6 +81,12 @@
     return signIn(email, password);
   }
 
+  async function signInWithIdentifier(identifier, password) {
+    const value = String(identifier || '').trim();
+    if (!value) throw new Error('请输入会员号或邮箱');
+    return value.includes('@') ? signIn(value, password) : signInByMemberNo(value, password);
+  }
+
   async function signUp(email, password) {
     const instance = await requireClient();
     const { data, error } = await instance.auth.signUp({
@@ -301,6 +307,7 @@
     currentProfile,
     signIn,
     signInByMemberNo,
+    signInWithIdentifier,
     memberNoByEmail,
     signUp,
     resendConfirmation,

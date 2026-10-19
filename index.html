@@ -61,14 +61,14 @@
     <div class="modal-card">
       <h3 id="authTitle">账号登录</h3>
       <p id="authHint">商家、仓库操作员和管理员均从这里登录，系统按账号权限进入对应工作台。</p>
-      <div class="field"><label id="authIdentifierLabel">会员号</label><input id="authIdentifier" type="text" placeholder="例如 M12345678" autocomplete="username" /></div>
+      <div class="field"><label id="authIdentifierLabel">会员号 / 邮箱</label><input id="authIdentifier" type="text" placeholder="M12345678 或 name@company.com" autocomplete="username" /></div>
       <div class="field"><label>密码</label><input id="authPassword" type="password" placeholder="至少 6 位" /></div>
-      <p id="authSignupNote" class="muted" hidden style="margin:12px 0 0;font-size:12px">注册仅需邮箱和密码；注册成功后系统会生成会员号，请用会员号登录。</p>
+      <p id="authSignupNote" class="muted" hidden style="margin:12px 0 0;font-size:12px">注册仅需邮箱和密码；注册成功后系统会生成会员号，之后可用会员号或邮箱登录。</p>
       <div class="modal-actions"><button class="btn ghost" id="authCancel">取消</button><button class="btn ghost" id="authResend">重发验证邮件</button><button class="btn ghost" id="authMode">注册账号</button><button class="btn primary" id="authSubmit">登录</button></div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-client.js?v=6a2cc23"></script>
+  <script src="supabase-client.js?v=auth-identifier"></script>
   <script>
     const state = {
       role:'merchant', page:'dashboard',
@@ -138,9 +138,9 @@
       const signup=state.auth.mode==='signup';
       $('#authTitle').textContent=signup?'注册商家账号':'账号登录';
       $('#authHint').textContent=signup?'新注册账号默认是跨境商家；仓库操作员和管理员账号由平台管理员授权。':'商家、仓库操作员和管理员均从这里登录，系统按账号权限进入对应工作台。';
-      $('#authIdentifierLabel').textContent=signup?'注册邮箱':'会员号';
+      $('#authIdentifierLabel').textContent=signup?'注册邮箱':'会员号 / 邮箱';
       $('#authIdentifier').type=signup?'email':'text';
-      $('#authIdentifier').placeholder=signup?'name@company.com':'例如 M12345678';
+      $('#authIdentifier').placeholder=signup?'name@company.com':'M12345678 或 name@company.com';
       $('#authIdentifier').autocomplete=signup?'email':'username';
       $('#authSignupNote').hidden=!signup;
       $('#authResend').hidden=!signup;
@@ -177,11 +177,11 @@
     }
     async function submitAuth(){
       const identifier=$('#authIdentifier').value.trim(), password=$('#authPassword').value;
-      if(!identifier||password.length<6){toast(state.auth.mode==='signup'?'请输入注册邮箱和至少 6 位密码':'请输入会员号和至少 6 位密码');return}
+      if(!identifier||password.length<6){toast(state.auth.mode==='signup'?'请输入注册邮箱和至少 6 位密码':'请输入会员号或邮箱和至少 6 位密码');return}
       try{
         const result=state.auth.mode==='signup'
           ? await window.MospaceSupabase.signUp(identifier,password)
-          : await window.MospaceSupabase.signInByMemberNo(identifier,password);
+          : await window.MospaceSupabase.signInWithIdentifier(identifier,password);
         if(state.auth.mode==='signup'&&!result.session){
           let memberNo=null;
           try{memberNo=await window.MospaceSupabase.memberNoByEmail(identifier)}catch(memberError){console.info('注册后暂时无法读取会员号',memberError.message)}
