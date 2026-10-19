@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mospace 集运系统｜产品原型</title>
+  <style>
+    :root{
+      --bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#6d7890;--line:#e6eaf1;
+      --brand:#315efb;--brand-2:#1737a6;--green:#1d9a68;--amber:#c57a12;--red:#c54242;
+      --shadow:0 12px 30px rgba(30,43,78,.08);--radius:16px;
+    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 Inter,"PingFang SC","Microsoft YaHei",sans-serif}
+    button,input,select,textarea{font:inherit} button{cursor:pointer;border:0}
+    .app{display:flex;min-height:100vh}.sidebar{width:248px;background:#101a36;color:#dce4ff;padding:22px 14px;display:flex;flex-direction:column;gap:18px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;padding:4px 10px}.brand-mark{width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,#7e9cff,#315efb);display:grid;place-items:center;color:#fff}
+    .role-switch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;background:#1a2750;border-radius:12px;padding:4px}.role-switch button{padding:8px 3px;color:#aebcf0;background:transparent;border-radius:9px;font-size:12px}.role-switch button.active{background:#fff;color:#18326f;font-weight:700}
+    .side-section{padding:0 8px}.side-label{font-size:11px;color:#8998cf;margin:4px 0 8px}.side-nav{display:grid;gap:3px}.side-nav button{background:transparent;color:#c3cff4;text-align:left;padding:9px 11px;border-radius:9px}.side-nav button:hover,.side-nav button.active{background:#23366c;color:#fff}.side-nav button .count{float:right;color:#91a7f2;font-size:12px}
+    .side-footer{margin-top:auto;color:#8b9bd0;padding:0 10px;font-size:12px}.side-footer strong{display:block;color:#dbe4ff;margin-bottom:4px}
+    .main{flex:1;min-width:0}.topbar{height:68px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 34px;position:sticky;top:0;z-index:3}.crumb{color:var(--muted);font-size:13px}.top-actions{display:flex;align-items:center;gap:12px}.user{display:flex;gap:9px;align-items:center}.avatar{width:32px;height:32px;border-radius:50%;background:#e5ecff;color:#315efb;display:grid;place-items:center;font-weight:700}
+    .content{max-width:1240px;padding:30px 34px 60px;margin:auto}.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:26px}.eyebrow{color:var(--brand);font-size:12px;font-weight:800;letter-spacing:.08em}.page-head h1{margin:5px 0 4px;font-size:28px;letter-spacing:-.02em}.page-head p{margin:0;color:var(--muted)}.head-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+    .btn{border-radius:10px;padding:10px 15px;font-weight:700;background:#eef2ff;color:#2449cd}.btn.primary{background:var(--brand);color:#fff;box-shadow:0 5px 14px rgba(49,94,251,.2)}.btn.ghost{background:#fff;border:1px solid var(--line);color:#53617a}.btn.danger{background:#fff0f0;color:var(--red)}.btn.small{padding:7px 10px;font-size:12px}
+    .grid{display:grid;gap:16px}.kpis{grid-template-columns:repeat(4,1fr);margin-bottom:18px}.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}.kpi .label{color:var(--muted);font-size:13px}.kpi .value{font-size:28px;font-weight:800;margin-top:7px}.kpi .trend{font-size:12px;color:var(--green);margin-top:4px}.layout-2{grid-template-columns:1.35fr .9fr}.layout-3{grid-template-columns:repeat(3,1fr)}
+    .card-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.card-title h3{font-size:16px;margin:0}.card-title a{color:var(--brand);font-size:12px;cursor:pointer}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;white-space:nowrap}.table th{text-align:left;color:#8290a8;font-size:12px;font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line)}.table td{padding:13px 12px;border-bottom:1px solid #f0f2f6}.table tr:last-child td{border-bottom:0}.table tr.clickable{cursor:pointer}.table tr.clickable:hover{background:#f8faff}.muted{color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+    .status{display:inline-flex;align-items:center;gap:5px;border-radius:99px;padding:4px 9px;font-size:12px;font-weight:700}.status.blue{color:#2f58d1;background:#e9efff}.status.green{color:#147a52;background:#e5f8ef}.status.amber{color:#9a5e0b;background:#fff2da}.status.gray{color:#66738a;background:#eef1f5}.status.red{color:#ad3535;background:#ffe8e8}
+    .notice{display:flex;gap:11px;align-items:flex-start;background:#f0f5ff;border:1px solid #d9e3ff;color:#3555a9;padding:13px 14px;border-radius:12px;margin-bottom:16px}.notice strong{display:block;color:#1f3e9e}.notice p{margin:2px 0 0;font-size:13px}
+    .steps{display:flex;align-items:flex-start;margin:8px 0 22px}.step{flex:1;position:relative;text-align:center;color:#96a2b7;font-size:12px}.step:before{content:"";width:27px;height:27px;border-radius:50%;display:grid;place-items:center;margin:0 auto 7px;background:#eef1f6;border:2px solid #dce1ea;color:#7d889b;font-weight:800}.step:after{content:"";position:absolute;top:13px;left:50%;right:-50%;height:2px;background:#e4e8ef;z-index:-1}.step:last-child:after{display:none}.step.done{color:#206c4e}.step.done:before{content:"✓";background:#dcf4e8;border-color:#8fd4b2;color:#17764b}.step.current{color:#2e54d0;font-weight:700}.step.current:before{content:"•";background:#e8edff;border-color:#7994ff;color:#315efb;font-size:24px;line-height:10px}.step.done:after{background:#99d8b8}
+    .order-card{border:1px solid var(--line);border-radius:14px;padding:15px 16px;background:#fff}.order-row{display:flex;justify-content:space-between;gap:12px;align-items:center}.order-id{font-weight:800}.amount{font-size:20px;font-weight:800}.subrow{display:flex;gap:15px;color:var(--muted);font-size:12px;margin-top:7px;flex-wrap:wrap}.tag{background:#f1f4f8;color:#61708a;padding:3px 8px;border-radius:6px;font-size:12px}
+    .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.field{display:grid;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:#6d7890;font-weight:700}.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 11px;background:#fff;color:var(--ink);outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:#7893ff;box-shadow:0 0 0 3px #eaf0ff}.form-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
+    .timeline{display:grid;gap:0}.event{display:grid;grid-template-columns:24px minmax(0,1fr);gap:11px;position:relative;padding-bottom:20px;min-width:0}.event:last-child{padding-bottom:0}.event:before{display:none}.event>div:first-child{width:10px;height:10px;background:#315efb;border:3px solid #dce5ff;border-radius:50%;margin:4px 0 0 2px;z-index:1}.event:not(:last-child):after{content:"";position:absolute;top:14px;bottom:0;left:7px;width:2px;background:#e1e6f1}.event>div:last-child{min-width:0}.event h4{margin:0;font-size:13px;overflow-wrap:anywhere}.event p{margin:3px 0 0;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+    .split{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}.check-list{display:grid;gap:10px}.check{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:10px}.check input{accent-color:var(--brand)}.photo{height:118px;border:1px dashed #b9c6e9;border-radius:12px;background:#f4f7ff;display:grid;place-items:center;color:#6f83c1}.metric{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f2f6}.metric:last-child{border:0}.metric b{font-size:16px}
+    .empty{padding:36px;text-align:center;color:var(--muted)}.empty .icon{font-size:32px;margin-bottom:5px}.callout{border-radius:13px;background:linear-gradient(135deg,#f1f5ff,#fafbff);border:1px solid #dbe5ff;padding:18px}.callout h3{margin:0 0 5px}.callout p{margin:0;color:#60709a;font-size:13px}
+    .toast{position:fixed;right:24px;bottom:24px;background:#132044;color:#fff;padding:12px 16px;border-radius:10px;box-shadow:var(--shadow);opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;z-index:10}.toast.show{opacity:1;transform:translateY(0)}
+    @media(max-width:980px){.sidebar{width:210px}.content{padding:24px}.kpis{grid-template-columns:repeat(2,1fr)}.layout-2,.split{grid-template-columns:1fr}}
+    @media(max-width:680px){.app{display:block}.sidebar{width:100%;padding:12px;gap:10px}.side-section,.side-footer{display:none}.role-switch{max-width:360px}.topbar{padding:0 16px}.content{padding:20px 15px}.page-head{display:block}.head-actions{margin-top:15px}.kpis{grid-template-columns:1fr 1fr;gap:10px}.card{padding:15px}.form-grid{grid-template-columns:1fr}.layout-3{grid-template-columns:1fr}.table th,.table td{padding:10px 8px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">M</span><span>Mospace 集运</span></div>
+      <div class="role-switch">
+        <button data-role="merchant" class="active">商家端</button>
+        <button data-role="warehouse">仓库端</button>
+        <button data-role="admin">运营后台</button>
+      </div>
+      <div class="side-section">
+        <div class="side-label">工作台</div>
+        <div id="nav" class="side-nav"></div>
+      </div>
+      <div class="side-footer"><strong>试运营原型 v0.5</strong>仓库确认后付款 · 一次付款 · 费用锁定</div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted">演示环境</span><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
+      <section id="content" class="content"></section>
+    </main>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script>
+    const state = {
+      role:'merchant', page:'dashboard',
+      order:{id:'SH20261016001', status:'待仓库确认', payment:'待付款', parcels:3, confirmed:0, estimated:268, confirmedAmount:null, paidAmount:null, packed:false, shipped:false},
+      parcels:[
+        {no:'YT238901221',name:'服装样品',status:'已入库',weight:'1.20 kg',size:'32×24×10 cm'},
+        {no:'SF102993845',name:'家居配件',status:'已测量',weight:'0.85 kg',size:'28×18×12 cm'},
+        {no:'JD882310114',name:'美妆用品',status:'待预报',weight:'—',size:'—'}
+      ],
+      events:[
+        {title:'已创建集运订单',desc:'商家提交了目的地、线路和 3 个预报包裹',time:'10月16日 09:20',done:true},
+        {title:'仓库确认中',desc:'等待仓库核对包裹、实际重量和尺寸',time:'当前',current:true},
+        {title:'确认费用并付款',desc:'确认后展示唯一应付金额，商家只需付款一次',time:'待处理'},
+        {title:'打包出货',desc:'仓库打包完成后进入待出货',time:'待处理'},
+        {title:'运输与签收',desc:'商家在线查看物流节点',time:'待处理'}
+      ]
+    };
+    const navs = {
+      merchant:[
+        ['dashboard','商家控制台'],['order-create','创建集运订单'],['parcels','我的包裹'],['orders','我的订单'],['fee','费用明细与付款'],['tracking','物流追踪'],['address','仓库地址与收件人']
+      ],
+      warehouse:[
+        ['dashboard','仓库工作台'],['inbound','入库扫描'],['confirm','包裹确认'],['packing','拣货 / 合包 / 打包'],['ship','出货登记'],['exceptions','异常处理']
+      ],
+      admin:[
+        ['dashboard','运营看板'],['orders','订单与异常'],['config','渠道 / 箱型 / 运价'],['audit','审计日志'],['accounts','商家与仓库账号']
+      ]
+    };
+    const $ = s=>document.querySelector(s);
+    const esc = s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+    function status(text,kind='blue'){return '<span class="status '+kind+'">'+esc(text)+'</span>'}
+    function renderNav(){ $('#nav').innerHTML=navs[state.role].map(([id,label])=>'<button class="'+(state.page===id?'active':'')+'" data-page="'+id+'">'+label+(id==='orders'&&state.role==='merchant'?'<span class="count">3</span>':'')+'</button>').join(''); document.querySelectorAll('[data-role]').forEach(b=>b.classList.toggle('active',b.dataset.role===state.role)) }
+    function shell(title,desc,actions=''){ $('#crumb').textContent=title; return '<div class="page-head"><div><div class="eyebrow">'+(state.role==='merchant'?'MERCHANT WORKSPACE':state.role==='warehouse'?'WAREHOUSE OPERATIONS':'PLATFORM OPERATIONS')+'</div><h1>'+title+'</h1><p>'+desc+'</p></div><div class="head-actions">'+actions+'</div></div>' }
+    function kpi(label,value,trend){return '<div class="card kpi"><div class="label">'+label+'</div><div class="value">'+value+'</div><div class="trend">'+trend+'</div></div>'}
+    function merchantDashboard(){
+      const o=state.order;
+      return shell('商家控制台','今天的包裹和集运订单都在这里处理。','<button class="btn primary" data-page="order-create">+ 创建集运订单</button>')+
+      '<div class="notice"><div>⚡</div><div><strong>下一步：等待仓库确认</strong><p>订单 '+o.id+' 已生成参考费用 ¥'+o.estimated+'。仓库确认实际重量和尺寸后，才会生成可支付金额。</p></div></div>'+
+      '<div class="grid kpis">'+kpi('待仓库确认','1','订单正在核验中')+kpi('待付款',o.confirmedAmount?'1':'0',o.confirmedAmount?'确认后可一次付款':'确认后显示')+kpi('运输中','0','暂无运输订单')+kpi('我的包裹','3','1 个待预报')+'</div>'+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>当前集运订单</h3><a data-page="orders">查看全部</a></div><div class="order-card"><div class="order-row"><div><div class="order-id">'+o.id+'</div><div class="subrow"><span>日本仓 · 空运专线</span><span>3 个包裹</span><span>预估 4.2 kg</span></div></div>'+status(o.status,o.confirmedAmount?'amber':'blue')+'</div><div class="steps">'+['创建订单','仓库确认','一次付款','打包出货','运输签收'].map((x,i)=>'<div class="step '+(i===0?'done ':'')+(i===1&&!o.confirmedAmount?'current ':'')+(o.shipped&&i>=3?'done ':'')+(o.payment==='已付款'&&i===2?'done ':'')+'">'+x+'</div>').join('')+'</div><div class="order-row"><span class="muted">参考费用</span><strong>¥'+o.estimated+'</strong><button class="btn small" data-page="fee">查看费用明细</button></div></div></div>'+
+      '<div class="card"><div class="card-title"><h3>包裹动态</h3><a data-page="parcels">查看包裹</a></div><div class="timeline">'+state.events.slice(0,4).map(e=>'<div class="event"><div></div><div><h4>'+e.title+' '+(e.current?status('进行中','blue'):'')+'</h4><p>'+e.desc+' · '+e.time+'</p></div></div>').join('')+'</div></div></div>';
+    }
+    function merchantCreate(){
+      return shell('创建集运订单','先选择目的地、线路、收件人和包裹；仓库确认后再付款。','<button class="btn ghost" data-page="orders">返回订单</button>')+
+      '<div class="notice"><div>ⓘ</div><div><strong>付款规则</strong><p>现在只生成参考费用，不收款。仓库确认包裹、重量和尺寸后，系统生成唯一应付金额，商家只付款一次。</p></div></div>'+
+      '<div class="card"><div class="card-title"><h3>订单信息</h3><span class="tag">P-05</span></div><div class="form-grid"><div class="field"><label>目的国家 / 地区</label><select><option>日本</option><option>美国</option><option>英国</option></select></div><div class="field"><label>运输线路</label><select><option>空运专线 · 7-10 天</option><option>海运经济线 · 20-30 天</option></select></div><div class="field"><label>收件人地址</label><select><option>东京 · 佐藤物流仓（默认）</option><option>大阪 · 东部仓</option></select></div><div class="field"><label>商家备注</label><input placeholder="可填写合包、加固等要求" /></div></div></div>'+
+      '<div class="card" style="margin-top:16px"><div class="card-title"><h3>选择预报包裹</h3><span class="muted">已选 2 / 3</span></div><div class="check-list">'+state.parcels.map((p,i)=>'<label class="check"><input type="checkbox" '+(i<2?'checked':'')+'><span style="flex:1"><b>'+p.no+'</b><span class="muted"> · '+p.name+'</span><br><small class="muted">'+p.status+' · 预估 '+p.weight+'</small></span>'+status(p.status,p.status==='待预报'?'amber':'green')+'</label>').join('')+'</div><div class="form-actions"><button class="btn ghost">保存草稿</button><button class="btn primary" id="createOrderBtn">提交订单并查看参考费用</button></div></div>';
+    }
+    function merchantParcels(){
+      return shell('我的包裹','查看预报、入库、测量和异常状态。','<button class="btn primary" data-page="order-create">+ 预报包裹</button>')+
+      '<div class="card"><div class="card-title"><h3>包裹列表</h3><div class="head-actions"><input class="btn ghost" style="padding:8px 11px" placeholder="搜索快递单号" /><button class="btn ghost small">状态筛选⌄</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>快递单号</th><th>品名</th><th>状态</th><th>实际重量</th><th>尺寸</th><th>操作</th></tr></thead><tbody>'+state.parcels.map(p=>'<tr class="clickable"><td class="mono">'+p.no+'</td><td>'+p.name+'</td><td>'+status(p.status,p.status==='待预报'?'amber':p.status==='已测量'?'green':'blue')+'</td><td>'+p.weight+'</td><td>'+p.size+'</td><td><button class="btn small ghost" data-page="parcels">查看详情</button></td></tr>').join('')+'</tbody></table></div></div>';
+    }
+    function merchantOrders(){
+      const o=state.order; return shell('我的订单','跟踪订单状态、费用和出货进度。','<button class="btn primary" data-page="order-create">+ 创建集运订单</button>')+
+      '<div class="card"><div class="card-title"><h3>订单列表</h3><div><span class="tag">全部 3</span> <span class="tag">待付款 0</span></div></div><div class="table-wrap"><table class="table"><thead><tr><th>订单号</th><th>线路</th><th>包裹</th><th>金额</th><th>状态</th><th></th></tr></thead><tbody><tr class="clickable"><td class="mono">'+o.id+'</td><td>日本空运专线</td><td>'+o.parcels+' 个</td><td>¥'+(o.confirmedAmount||o.estimated)+'</td><td>'+status(o.status,o.confirmedAmount?'amber':'blue')+'</td><td><button class="btn small" data-page="fee">查看</button></td></tr><tr><td class="mono">SH20261012008</td><td>美国海运经济线</td><td>5 个</td><td>¥680</td><td>'+status('运输中','green')+'</td><td><button class="btn small ghost" data-page="tracking">追踪</button></td></tr><tr><td class="mono">SH20260930003</td><td>英国空运专线</td><td>2 个</td><td>¥320</td><td>'+status('已签收','gray')+'</td><td><button class="btn small ghost">查看</button></td></tr></tbody></table></div></div>';
+    }
+    function merchantFee(){
+      const o=state.order, confirmed=!!o.confirmedAmount, paid=o.payment==='已付款';
+      return shell('费用明细与一次付款','参考费用和仓库确认后的应付费用分开显示。','<button class="btn ghost" data-page="orders">返回订单</button>')+
+      '<div class="notice"><div>💡</div><div><strong>'+ (paid?'费用已锁定':'付款节点') +'</strong><p>'+(paid?'商家已完成唯一一次付款，后续打包不会重新计费，也不会出现补款入口。':confirmed?'仓库已完成确认，请核对金额后一次付款。':'仓库确认前不可付款，当前金额仅供参考。')+'</p></div></div>'+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>订单 '+o.id+'</h3>'+status(o.status,paid?'green':confirmed?'amber':'blue')+'</div><div class="metric"><span>运输费用</span><b>¥'+(confirmed?'228':'210')+'</b></div><div class="metric"><span>派送费</span><b>¥'+(confirmed?'46':'40')+'</b></div><div class="metric"><span>服务费</span><b>¥'+(confirmed?'18':'18')+'</b></div><div class="metric"><span>附加费</span><b>¥'+(confirmed?'0':'0')+'</b></div><div class="metric"><span>优惠</span><b style="color:var(--green)">-¥'+(confirmed?'8':'0')+'</b></div><div class="metric" style="padding-top:17px"><span><strong>'+ (confirmed?'确认应付金额':'参考总额') +'</strong></span><b style="font-size:24px;color:var(--brand)">¥'+(confirmed?o.confirmedAmount:o.estimated)+'</b></div></div>'+
+      '<div class="card"><div class="card-title"><h3>仓库确认进度</h3><span class="tag">'+o.confirmed+'/3 已确认</span></div><div class="check-list">'+state.parcels.map((p,i)=>'<div class="check"><span style="flex:1"><b>'+p.no+'</b><br><small class="muted">'+p.name+' · '+p.weight+' · '+p.size+'</small></span>'+status(i<o.confirmed?'已确认':'待确认',i<o.confirmed?'green':'gray')+'</div>').join('')+'</div>'+(!confirmed?'<p class="muted" style="margin:15px 0 0;font-size:12px">仓库完成全部包裹确认后，系统自动生成唯一应付金额。</p>':'')+'</div></div>'+
+      (paid?'<div class="card" style="margin-top:16px"><div class="card-title"><h3>付款记录</h3>'+status('已付款','green')+'</div><div class="metric"><span>付款金额</span><b>¥'+o.paidAmount+'</b></div><div class="metric"><span>付款时间</span><span class="muted">2026-10-16 15:42</span></div><div class="metric"><span>费用状态</span><span>'+status('已锁定','green')+'</span></div></div>':confirmed?'<div class="card" style="margin-top:16px"><div class="form-actions" style="justify-content:space-between;align-items:center"><div><strong>确认金额后一次付款</strong><p class="muted" style="margin:3px 0;font-size:12px">付款后进入已付款/待打包，后续不会二次收费。</p></div><button class="btn primary" id="payBtn">一次付款 ¥'+o.confirmedAmount+'</button></div></div>':'');
+    }
+    function merchantTracking(){
+      const o=state.order, shipped=o.shipped;
+      return shell('物流追踪','按时间查看订单从入库到签收的全过程。','<button class="btn ghost" data-page="orders">返回订单</button>')+
+      '<div class="card"><div class="card-title"><h3>订单 '+o.id+'</h3>'+status(shipped?'运输中':o.status,shipped?'green':'blue')+'</div><div class="steps">'+['已创建','仓库确认','已付款','待出货','运输中','已签收'].map((x,i)=>'<div class="step '+(i< (shipped?5:o.payment==='已付款'?3:2)?'done ':'')+(i===(shipped?4:o.payment==='已付款'?3:1)?'current':'')+'">'+x+'</div>').join('')+'</div></div>'+
+      '<div class="grid layout-2" style="margin-top:16px"><div class="card"><div class="card-title"><h3>包裹时间线</h3><span class="muted">自动更新</span></div><div class="timeline">'+(shipped?[
+        ['已预报','商家提交 3 个包裹','10月16日 09:20'],['仓库已收到','日本仓收货中心','10月16日 11:18'],['已测量','完成称重与尺寸确认','10月16日 14:06'],['已打包','箱号 JP-BOX-001','10月16日 16:10'],['已出货','承运商：EMS · 单号 EM123456789JP','10月16日 18:30'],['运输中','离开东京转运中心','10月17日 08:45']
+      ]:state.events).map(e=>Array.isArray(e)?'<div class="event"><div></div><div><h4>'+e[0]+'</h4><p>'+e[1]+' · '+e[2]+'</p></div></div>':'<div class="event"><div></div><div><h4>'+e.title+' '+(e.current?status('进行中','blue'):'')+'</h4><p>'+e.desc+' · '+e.time+'</p></div></div>').join('')+'</div></div><div class="card"><div class="card-title"><h3>收件信息</h3><span class="tag">已加密</span></div><div class="metric"><span>目的地</span><b>日本 · 东京</b></div><div class="metric"><span>收件人</span><b>佐藤物流仓</b></div><div class="metric"><span>线路</span><b>空运专线</b></div><div class="metric"><span>预计时效</span><b>7-10 天</b></div></div></div>';
+    }
+    function warehouseDashboard(){
+      return shell('仓库工作台','按优先级处理入库、确认、打包和出货任务。','<button class="btn primary" data-page="inbound">扫描入库</button>')+
+      '<div class="grid kpis">'+kpi('待入库','12','今日新增 +4')+kpi('待确认','3','需要录入实重尺寸')+kpi('待打包','2','均已付款锁费')+kpi('待出货','5','无异常可出货')+'</div>'+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>待处理任务</h3><span class="tag">按 SLA 排序</span></div><div class="order-card" style="margin-bottom:10px"><div class="order-row"><div><div class="order-id">包裹确认 · YT238901221</div><div class="subrow"><span>订单 '+state.order.id+'</span><span>日本仓</span></div></div>'+status('待确认','amber')+'</div><div class="form-actions" style="margin-top:12px"><button class="btn small" data-page="confirm">开始确认</button></div></div><div class="order-card"><div class="order-row"><div><div class="order-id">打包任务 · SH20261015009</div><div class="subrow"><span>4 个包裹</span><span>费用已锁定</span></div></div>'+status('待打包','blue')+'</div><div class="form-actions" style="margin-top:12px"><button class="btn small" data-page="packing">开始作业</button></div></div></div><div class="card"><div class="card-title"><h3>仓库作业规则</h3></div><div class="check-list"><div class="check">✓ <span><b>确认包裹后才生成应付金额</b><br><small class="muted">商家确认前不可付款</small></span></div><div class="check">✓ <span><b>付款成功后费用锁定</b><br><small class="muted">打包不重新计费</small></span></div><div class="check">✓ <span><b>未付款 / 有异常不可出货</b><br><small class="muted">出货按钮自动门禁</small></span></div></div></div></div>';
+    }
+    function warehouseInbound(){
+      return shell('入库扫描','扫描快递单号，匹配商家预报并进入确认队列。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>扫描 / 手工录入</h3><span class="tag">WH-02</span></div><div class="field"><label>快递单号</label><input id="trackingInput" placeholder="请扫描或输入快递单号" value="YT238901221" /></div><div class="form-actions"><button class="btn primary" id="matchBtn">匹配包裹</button></div><div id="matchResult" style="margin-top:15px"></div></div><div class="card"><div class="card-title"><h3>最近入库</h3><span class="muted">12 条</span></div><div class="table-wrap"><table class="table"><tbody><tr><td class="mono">YT238901221</td><td>服装样品</td><td>'+status('待确认','amber')+'</td></tr><tr><td class="mono">SF102993845</td><td>家居配件</td><td>'+status('已测量','green')+'</td></tr><tr><td class="mono">JD882310114</td><td>美妆用品</td><td>'+status('待预报','gray')+'</td></tr></tbody></table></div></div></div>';
+    }
+    function warehouseConfirm(){
+      const o=state.order;
+      return shell('包裹确认','核对照片、实重、尺寸和库位；全部确认后自动生成应付金额。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+
+      '<div class="split"><div class="card"><div class="card-title"><h3>确认订单 '+o.id+'</h3><span class="tag">WH-03</span></div><div class="table-wrap"><table class="table"><thead><tr><th>快递单号</th><th>预报品名</th><th>实重 kg</th><th>尺寸 cm</th><th>确认</th></tr></thead><tbody>'+state.parcels.map((p,i)=>'<tr><td class="mono">'+p.no+'</td><td>'+p.name+'</td><td><input style="width:72px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(i<2?(i===0?'1.35':'0.92'):'')+'" /></td><td><input style="width:115px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(i<2?(i===0?'34×25×11':'29×19×13'):'')+'" /></td><td><input type="checkbox" '+(i<o.confirmed?'checked':'')+' /></td></tr>').join('')+'</tbody></table></div><div class="form-actions"><button class="btn ghost">保存草稿</button><button class="btn primary" id="confirmBtn">确认包裹并生成费用</button></div></div><div class="card"><div class="card-title"><h3>入库照片</h3><span class="muted">每个包裹至少 1 张</span></div><div class="photo">📷 拖入或上传包裹照片</div><div class="photo" style="margin-top:10px">📦 YT238901221 · 已上传 2 张</div><div class="notice" style="margin-top:14px;margin-bottom:0"><div>!</div><div><strong>提交后商家才可付款</strong><p>确认数据会写入订单费用快照，商家付款后费用锁定。</p></div></div></div></div>';
+    }
+    function warehousePacking(){
+      const paid=state.order.payment==='已付款';
+      return shell('拣货 / 合包 / 打包','仅处理已付款且没有未解决异常的订单。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+
+      '<div class="notice"><div>🔒</div><div><strong>付款门禁：'+(paid?'订单已付款，可开始打包':'订单尚未付款')+'</strong><p>'+(paid?'费用已锁定，打包过程中不重新计费。':'仓库确认后仍需等待商家一次付款，当前不可出货。')+'</p></div></div>'+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>订单 '+state.order.id+'</h3>'+status(paid?'已付款待打包':'待付款',paid?'green':'amber')+'</div><div class="check-list">'+state.parcels.map(p=>'<div class="check"><span style="flex:1"><b>'+p.no+'</b><br><small class="muted">'+p.name+' · '+p.weight+'</small></span>'+status('已拣货','green')+'</div>').join('')+'</div><div class="form-actions"><button class="btn primary" id="packBtn" '+(paid?'':'disabled style="opacity:.45"')+'>确认打包完成</button></div></div><div class="card"><div class="card-title"><h3>包装信息</h3><span class="tag">箱号待录入</span></div><div class="form-grid"><div class="field"><label>箱号</label><input value="JP-BOX-001" /></div><div class="field"><label>包装方式</label><select><option>标准纸箱</option><option>加固纸箱</option></select></div><div class="field full"><label>作业备注</label><textarea rows="3">已按商家要求合包，外箱加贴防水标签。</textarea></div></div></div></div>';
+    }
+    function warehouseShip(){
+      const ready=state.order.packed;
+      return shell('出货登记','录入承运商和物流单号，完成出货后商家可在线追踪。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+
+      '<div class="split"><div class="card"><div class="card-title"><h3>出货订单</h3>'+status(ready?'待出货':'待打包',ready?'amber':'gray')+'</div><div class="metric"><span>订单</span><b class="mono">'+state.order.id+'</b></div><div class="metric"><span>箱号</span><b>JP-BOX-001</b></div><div class="metric"><span>费用</span><b>¥'+(state.order.paidAmount||'—')+'</b></div><div class="form-grid" style="margin-top:15px"><div class="field"><label>承运商</label><select><option>EMS</option><option>DHL</option><option>顺丰国际</option></select></div><div class="field"><label>物流单号</label><input value="EM123456789JP" /></div></div><div class="form-actions"><button class="btn primary" id="shipBtn" '+(ready?'':'disabled style="opacity:.45"')+'>确认出货并生成物流节点</button></div></div><div class="card"><div class="card-title"><h3>出货校验</h3></div><div class="check-list"><div class="check">✓ <span>订单已付款且费用已锁定</span></div><div class="check">'+(ready?'✓':'○')+' <span>已完成打包并录入箱号</span></div><div class="check">○ <span>承运商和物流单号完整</span></div></div></div></div>';
+    }
+    function warehouseExceptions(){return shell('异常处理','集中处理单号匹配失败、超重超尺寸和出货拦截。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+'<div class="card"><div class="card-title"><h3>异常列表</h3><span class="status red">2 个待处理</span></div><div class="table-wrap"><table class="table"><thead><tr><th>异常编号</th><th>关联对象</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody><tr><td>EX-20261018-01</td><td class="mono">JD882310114</td><td>无法匹配入库单号</td><td>'+status('待人工确认','red')+'</td><td><button class="btn small">处理</button></td></tr><tr><td>EX-20261017-03</td><td class="mono">SH20261015009</td><td>超尺寸</td><td>'+status('待商家确认','amber')+'</td><td><button class="btn small ghost">查看</button></td></tr></tbody></table></div></div>'}
+    function adminDashboard(){
+      return shell('运营看板','查看商家订单、仓库处理、收款和异常情况。','<button class="btn primary" data-page="config">维护运价配置</button>')+
+      '<div class="grid kpis">'+kpi('今日订单','28','较昨日 +12%')+kpi('待仓库确认','9','3 个超过 2 小时')+kpi('待付款','6','确认费用 ¥3,280')+kpi('异常订单','2','需要跟进')+'</div>'+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>订单状态分布</h3><span class="muted">实时</span></div><div class="metric"><span>待仓库确认</span><b>9</b></div><div class="metric"><span>已确认待付款</span><b>6</b></div><div class="metric"><span>已付款待打包</span><b>4</b></div><div class="metric"><span>待出货</span><b>5</b></div><div class="metric"><span>运输中</span><b>12</b></div></div><div class="card"><div class="card-title"><h3>最近操作</h3><a data-page="audit">查看审计日志</a></div><div class="timeline"><div class="event"><div></div><div><h4>仓库确认了订单 SH20261016001</h4><p>仓库操作员 林师傅 · 2 分钟前</p></div></div><div class="event"><div></div><div><h4>商家完成一次付款 ¥292</h4><p>跨境商家账号 CUST-001 · 18 分钟前</p></div></div><div class="event"><div></div><div><h4>管理员更新日本空运运价</h4><p>平台运营管理员 周玉 · 1 小时前</p></div></div></div></div></div>';
+    }
+    function adminOrders(){return shell('订单与异常','查看全平台订单，协助处理异常和权限问题。','<button class="btn ghost" data-page="dashboard">返回看板</button>')+'<div class="card"><div class="card-title"><h3>订单监控</h3><div class="head-actions"><input class="btn ghost" style="padding:8px 11px" placeholder="订单号 / 商家账号" /><button class="btn ghost small">筛选⌄</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>订单号</th><th>商家</th><th>仓库</th><th>金额</th><th>状态</th><th>风险</th></tr></thead><tbody><tr><td class="mono">'+state.order.id+'</td><td>CUST-001</td><td>日本仓</td><td>¥'+(state.order.confirmedAmount||state.order.estimated)+'</td><td>'+status(state.order.status,'amber')+'</td><td>'+status('正常','green')+'</td></tr><tr><td class="mono">SH20261015009</td><td>CUST-013</td><td>美国仓</td><td>¥680</td><td>'+status('待出货','blue')+'</td><td>'+status('超尺寸','red')+'</td></tr></tbody></table></div></div>'}
+    function adminConfig(){return shell('平台配置与审计','平台运营管理员维护渠道、箱型、运价，并保留变更记录。','<button class="btn primary" id="saveConfigBtn">保存配置</button>')+'<div class="grid layout-2"><div class="card"><div class="card-title"><h3>日本空运专线 · 运价</h3><span class="tag">启用中</span></div><div class="form-grid"><div class="field"><label>首重（kg）</label><input value="0.5" /></div><div class="field"><label>首重价（CNY）</label><input value="68" /></div><div class="field"><label>续重价（CNY/kg）</label><input value="42" /></div><div class="field"><label>体积重系数</label><input value="6000" /></div><div class="field full"><label>计费说明</label><textarea rows="3">实际重量与体积重取大值，仓库确认后生成费用快照。</textarea></div></div></div><div class="card"><div class="card-title"><h3>配置变更规则</h3></div><div class="check-list"><div class="check">✓ <span>新订单使用最新运价</span></div><div class="check">✓ <span>已创建订单保留 rate_snapshot</span></div><div class="check">✓ <span>所有变更写入审计日志</span></div><div class="check">✓ <span>管理员不能直接修改已付款金额</span></div></div></div></div>'}
+    function adminAudit(){return shell('审计日志','记录订单、费用、权限和平台配置的关键变更。','<button class="btn ghost" data-page="dashboard">返回看板</button>')+'<div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>时间</th><th>操作人</th><th>角色</th><th>动作</th><th>对象</th><th>结果</th></tr></thead><tbody><tr><td>10-18 15:42</td><td>林师傅</td><td>仓库操作员</td><td>确认包裹实重尺寸</td><td class="mono">SH20261016001</td><td>'+status('成功','green')+'</td></tr><tr><td>10-18 15:18</td><td>CUST-001</td><td>商家用户</td><td>一次付款</td><td class="mono">SH20261016001</td><td>'+status('成功','green')+'</td></tr><tr><td>10-18 14:55</td><td>周玉</td><td>平台运营管理员</td><td>修改日本空运运价</td><td>channel: JP-AIR</td><td>'+status('已记录','blue')+'</td></tr></tbody></table></div></div>'}
+    function adminAccounts(){return shell('商家与仓库账号','平台内部维护账号和仓库权限，外部客户类型只有跨境商家。','<button class="btn primary">+ 新增账号</button>')+'<div class="card"><div class="card-title"><h3>账号列表</h3><span class="tag">3 个角色</span></div><div class="table-wrap"><table class="table"><thead><tr><th>账号</th><th>名称</th><th>角色</th><th>范围</th><th>状态</th></tr></thead><tbody><tr><td class="mono">CUST-001</td><td>跨境商家 A</td><td>'+status('商家用户','blue')+'</td><td>仅本人订单</td><td>'+status('正常','green')+'</td></tr><tr><td class="mono">WH-001</td><td>日本仓操作组</td><td>'+status('仓库操作员','amber')+'</td><td>日本仓</td><td>'+status('正常','green')+'</td></tr><tr><td class="mono">ADM-001</td><td>周玉</td><td>'+status('平台运营管理员','gray')+'</td><td>全平台配置</td><td>'+status('正常','green')+'</td></tr></tbody></table></div></div>'}
+    function merchantAddress(){return shell('仓库地址与收件人','维护仓库收货地址和最终收件信息。','<button class="btn primary">+ 新增地址</button>')+'<div class="grid layout-2"><div class="card"><div class="card-title"><h3>我的仓库地址</h3><button class="btn small">复制地址</button></div><div class="callout"><h3>日本仓 · 东京收货中心</h3><p class="mono">〒135-0061 東京都江東区豊洲 3-2-24<br>收件人：CUST-001 + 商家名称<br>电话：03-1234-5678</p></div></div><div class="card"><div class="card-title"><h3>收件人地址</h3><button class="btn small primary">+ 新增地址</button></div><div class="metric"><span>佐藤物流仓（默认）</span><b>东京</b></div><div class="metric"><span>大阪中转仓</span><b>大阪</b></div></div></div>'}
+    function render(){
+      renderNav(); let html='';
+      if(state.role==='merchant'){
+        const views={dashboard:merchantDashboard,'order-create':merchantCreate,parcels:merchantParcels,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress};
+        html=(views[state.page]||merchantDashboard)();
+      }else if(state.role==='warehouse'){
+        const views={dashboard:warehouseDashboard,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,exceptions:warehouseExceptions};
+        html=(views[state.page]||warehouseDashboard)();
+      }else{
+        const views={dashboard:adminDashboard,orders:adminOrders,config:adminConfig,audit:adminAudit,accounts:adminAccounts};
+        html=(views[state.page]||adminDashboard)();
+      }
+      $('#content').innerHTML=html; $('#avatar').textContent=state.role==='merchant'?'商':state.role==='warehouse'?'仓':'管'; $('#userName').textContent=state.role==='merchant'?'跨境商家':state.role==='warehouse'?'日本仓操作员':'平台运营管理员';
+      bind();
+    }
+    function bind(){
+      document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{state.role=b.dataset.role;state.page='dashboard';render()});
+      document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{state.page=b.dataset.page;render()});
+      const create=$('#createOrderBtn');if(create)create.onclick=()=>{toast('订单已创建，参考费用 ¥'+state.order.estimated+'，等待仓库确认');state.page='fee';render()};
+      const confirm=$('#confirmBtn');if(confirm)confirm.onclick=()=>{state.order.confirmed=3;state.order.confirmedAmount=292;state.order.status='已确认待付款';state.events[1]={title:'仓库已完成确认',desc:'3 个包裹已核对实重和尺寸',time:'刚刚',done:true};toast('已确认 3 个包裹，生成唯一应付金额 ¥292');state.role='merchant';state.page='fee';render()};
+      const pay=$('#payBtn');if(pay)pay.onclick=()=>{state.order.payment='已付款';state.order.paidAmount=state.order.confirmedAmount;state.order.status='已付款待打包';toast('付款成功，费用已锁定');render()};
+      const pack=$('#packBtn');if(pack)pack.onclick=()=>{state.order.packed=true;state.order.status='待出货';toast('打包完成，订单进入待出货');state.page='ship';render()};
+      const ship=$('#shipBtn');if(ship)ship.onclick=()=>{state.order.shipped=true;state.order.status='运输中';toast('出货登记成功，已生成物流节点');state.role='merchant';state.page='tracking';render()};
+      const match=$('#matchBtn');if(match)match.onclick=()=>{$('#matchResult').innerHTML='<div class="notice" style="margin:0"><div>✓</div><div><strong>匹配成功：YT238901221</strong><p>商家：CUST-001 · 订单：'+state.order.id+' · 下一步：包裹确认</p></div></div>'};
+      const save=$('#saveConfigBtn');if(save)save.onclick=()=>toast('配置已保存，变更已写入审计日志');
+    }
+    render();
+  </script>
+</body>
+</html>
