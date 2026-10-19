@@ -8,7 +8,7 @@
 (function (global) {
   const config = {
     url: 'https://bdxqphmzwojamyuboqmz.supabase.co',
-    anonKey: ''
+    anonKey: 'sb_publishable_dyUMy5vmLknsuJIAXmzSYA_0OIc1nb4'
   };
   let client = null;
 
