@@ -41,7 +41,7 @@
     if (!user) return null;
     const { data, error } = await instance
       .from('profiles')
-      .select('id, role, company_name, display_name, warehouse_id, is_active')
+      .select('id, member_no, role, company_name, display_name, warehouse_id, is_active')
       .eq('id', user.id)
       .maybeSingle();
     if (error) throw error;
@@ -55,12 +55,29 @@
     return data;
   }
 
-  async function signUp(email, password, companyName) {
+  async function resolveLoginEmail(memberNo) {
+    const instance = await requireClient();
+    const { data, error } = await instance.rpc('resolve_login_email', {
+      p_member_no: memberNo
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function signInByMemberNo(memberNo, password) {
+    const normalized = String(memberNo || '').trim().toUpperCase();
+    if (!normalized) throw new Error('请输入会员号');
+    const email = await resolveLoginEmail(normalized);
+    if (!email) throw new Error('会员号不存在或账号已停用');
+    return signIn(email, password);
+  }
+
+  async function signUp(email, password) {
     const instance = await requireClient();
     const { data, error } = await instance.auth.signUp({
       email,
       password,
-      options: { data: { full_name: companyName || '跨境商家' } }
+      options: { data: { full_name: '跨境商家' } }
     });
     if (error) throw error;
     return data;
@@ -274,6 +291,7 @@
     currentUser,
     currentProfile,
     signIn,
+    signInByMemberNo,
     signUp,
     resendConfirmation,
     signOut,

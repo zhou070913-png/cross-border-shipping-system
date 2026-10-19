@@ -44,6 +44,7 @@ create table if not exists public.warehouses (
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  member_no text not null unique default ('M' || lpad((floor(random() * 100000000))::bigint::text, 8, '0')),
   role public.app_role not null default 'merchant',
   company_name text,
   display_name text,
