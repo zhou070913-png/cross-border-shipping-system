@@ -260,7 +260,13 @@ for each row execute function public.protect_profile_privileged_fields();
 
 create or replace function public.current_app_role()
 returns public.app_role language sql stable security definer set search_path = public as $$
-  select role from public.profiles where id = auth.uid();
+  select case
+    when auth.uid() is null then null::public.app_role
+    else coalesce(
+      (select role from public.profiles where id = auth.uid()),
+      'merchant'::public.app_role
+    )
+  end;
 $$;
 
 create or replace function public.is_admin()
@@ -434,7 +440,7 @@ drop policy if exists orders_view on public.orders;
 create policy orders_view on public.orders for select to authenticated using (public.can_view_order(id));
 drop policy if exists orders_merchant_insert on public.orders;
 create policy orders_merchant_insert on public.orders for insert to authenticated
-with check (merchant_id = auth.uid() and public.current_app_role() = 'merchant'::public.app_role);
+with check (merchant_id = auth.uid());
 drop policy if exists orders_merchant_update_draft on public.orders;
 create policy orders_merchant_update_draft on public.orders for update to authenticated
 using ((merchant_id = auth.uid() and status = 'draft') or public.is_admin())
@@ -467,6 +473,9 @@ drop policy if exists fees_view on public.fees;
 create policy fees_view on public.fees for select to authenticated using (public.can_view_order(order_id));
 drop policy if exists fees_admin_or_warehouse_manage on public.fees;
 create policy fees_admin_or_warehouse_manage on public.fees for all to authenticated using (public.is_admin() or public.can_operate_order(order_id)) with check (public.is_admin() or public.can_operate_order(order_id));
+drop policy if exists fees_merchant_insert on public.fees;
+create policy fees_merchant_insert on public.fees for insert to authenticated
+with check (public.owns_order(order_id) and total_amount is null and shipping_fee is null and handling_fee is null);
 
 drop policy if exists payments_view on public.payments;
 create policy payments_view on public.payments for select to authenticated using (merchant_id = auth.uid() or public.is_admin() or public.can_operate_order(order_id));
