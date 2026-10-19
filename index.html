@@ -206,13 +206,31 @@
     }
     function shell(title,desc,actions=''){ $('#crumb').textContent=title; return '<div class="page-head"><div><div class="eyebrow">'+(state.role==='merchant'?'MERCHANT WORKSPACE':state.role==='warehouse'?'WAREHOUSE OPERATIONS':'PLATFORM OPERATIONS')+'</div><h1>'+title+'</h1><p>'+desc+'</p></div><div class="head-actions">'+actions+'</div></div>' }
     function kpi(label,value,trend){return '<div class="card kpi"><div class="label">'+label+'</div><div class="value">'+value+'</div><div class="trend">'+trend+'</div></div>'}
+    function merchantProgress(o){
+      const s=o.status;
+      const received=['warehouse_received','measuring','awaiting_payment','paid','ready_to_ship','shipped','delivered'].includes(s)||o.confirmed>0;
+      const paid=o.payment==='已付款'||['paid','ready_to_ship','shipped','delivered'].includes(s);
+      const packed=Boolean(o.packed)||['ready_to_ship','shipped','delivered'].includes(s);
+      const shipped=Boolean(o.shipped)||['shipped','delivered'].includes(s);
+      const delivered=s==='delivered';
+      const current=!received?1:!paid?2:!shipped?3:!delivered?4:-1;
+      return {received,paid,packed,shipped,delivered,current};
+    }
     function merchantDashboard(){
       const o=state.order;
+      const p=merchantProgress(o);
+      const timeline=[
+        {title:'已创建集运订单',desc:'商家提交目的地、线路和预报包裹',done:true},
+        {title:'深圳仓入库',desc:p.received?'仓库已收到并完成包裹确认':'等待仓库收货和确认',done:p.received,current:p.current===1},
+        {title:'确认费用并付款',desc:p.paid?'商家已完成一次付款，费用已锁定':'确认后展示唯一应付金额，商家只需付款一次',done:p.paid,current:p.current===2},
+        {title:'打包出货',desc:p.shipped?'仓库已打包并完成出货登记':p.packed?'仓库已完成打包，等待出货登记':'付款后由仓库合包、打包并登记出货',done:p.shipped,current:p.current===3},
+        {title:'运输与签收',desc:p.delivered?'包裹已签收':'出货后在线查看物流节点',done:p.delivered,current:p.current===4}
+      ];
       return shell('商家控制台','今天的包裹和集运订单都在这里处理。','<button class="btn primary" data-page="order-create">+ 创建集运订单</button>')+
       '<div class="notice"><div>⚡</div><div><strong>当前状态：'+esc(o.statusLabel||orderStatusLabel(o.status))+'</strong><p>订单 '+esc(o.id)+' 的费用和物流节点会从数据库实时刷新。</p></div></div>'+
-      '<div class="grid kpis">'+kpi('待仓库确认','1','订单正在核验中')+kpi('待付款',o.confirmedAmount?'1':'0',o.confirmedAmount?'确认后可一次付款':'确认后显示')+kpi('运输中','0','暂无运输订单')+kpi('我的包裹','3','1 个待预报')+'</div>'+
-      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>当前集运订单</h3><a data-page="orders">查看全部</a></div><div class="order-card"><div class="order-row"><div><div class="order-id">'+esc(o.id)+'</div><div class="subrow"><span>深圳仓 → 印尼空运专线</span><span>'+o.parcels+' 个包裹</span><span>费用以仓库实测为准</span></div></div>'+status(o.statusLabel||orderStatusLabel(o.status),statusTone(o.status))+'</div><div class="steps">'+['创建订单','深圳仓入库','一次付款','离港出境','运输签收'].map((x,i)=>'<div class="step '+(i===0?'done ':'')+(i===1&&!['warehouse_received','measuring','awaiting_payment','paid','ready_to_ship','shipped','delivered'].includes(o.status)?'current ':'')+(o.payment==='已付款'&&i===2?'done ':'')+(o.shipped&&i>=3?'done ':'')+'">'+x+'</div>').join('')+'</div><div class="order-row"><span class="muted">'+(o.confirmedAmount?'最终应付':'参考费用')+'</span><strong>¥'+(o.confirmedAmount||o.estimated||0)+'</strong><button class="btn small" data-page="fee">查看费用明细</button></div></div></div>'+
-      '<div class="card"><div class="card-title"><h3>包裹动态</h3><a data-page="parcels">查看包裹</a></div><div class="timeline">'+state.events.slice(0,4).map(e=>'<div class="event"><div></div><div><h4>'+e.title+' '+(e.current?status('进行中','blue'):'')+'</h4><p>'+e.desc+' · '+e.time+'</p></div></div>').join('')+'</div></div></div>';
+      '<div class="grid kpis">'+kpi('待仓库确认',p.received?'0':'1',p.received?'仓库已完成确认':'订单正在核验中')+kpi('待付款',p.paid?'0':(o.confirmedAmount?'1':'0'),p.paid?'已完成一次付款':o.confirmedAmount?'确认后可一次付款':'确认后显示')+kpi('运输中',p.shipped&&!p.delivered?'1':'0',p.shipped?(p.delivered?'已签收':'物流节点运输中'):'暂无运输订单')+kpi('我的包裹',String(state.parcels.length||o.parcels||0),state.parcels.filter(x=>x.status==='待预报'||x.status==='pre_advised').length+' 个待预报')+'</div>'+
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>当前集运订单</h3><a data-page="orders">查看全部</a></div><div class="order-card"><div class="order-row"><div><div class="order-id">'+esc(o.id)+'</div><div class="subrow"><span>深圳仓 → 印尼空运专线</span><span>'+o.parcels+' 个包裹</span><span>费用以仓库实测为准</span></div></div>'+status(o.statusLabel||orderStatusLabel(o.status),statusTone(o.status))+'</div><div class="steps">'+['创建订单','深圳仓入库','一次付款','离港出境','运输签收'].map((x,i)=>'<div class="step '+((i===0||[1,2,3,4].some(n=>n===i&&((i===1&&p.received)||(i===2&&p.paid)||(i===3&&p.shipped)||(i===4&&p.delivered))))?'done ':'')+(p.current===i?'current ':'')+'">'+x+'</div>').join('')+'</div><div class="order-row"><span class="muted">'+(o.confirmedAmount?'最终应付':'参考费用')+'</span><strong>¥'+(o.confirmedAmount||o.estimated||0)+'</strong><button class="btn small" data-page="fee">查看费用明细</button></div></div></div>'+
+      '<div class="card"><div class="card-title"><h3>包裹动态</h3><a data-page="parcels">查看包裹</a></div><div class="timeline">'+timeline.map(e=>'<div class="event"><div></div><div><h4>'+e.title+' '+(e.done?status('已完成','green'):e.current?status('进行中','blue'):status('待处理','gray'))+'</h4><p>'+e.desc+'</p></div></div>').join('')+'</div></div></div>';
     }
     function merchantCreate(){
       return shell('创建集运订单','先选择目的地、国内送仓地址、线路和包裹；仓库确认后再付款。','<button class="btn ghost" data-page="orders">返回订单</button>')+
