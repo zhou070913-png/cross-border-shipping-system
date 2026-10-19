@@ -53,6 +53,16 @@
     return data;
   }
 
+  async function resendConfirmation(email) {
+    const instance = await requireClient();
+    const { error } = await instance.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) throw error;
+  }
+
   async function signOut() {
     const instance = await requireClient();
     const { error } = await instance.auth.signOut();
@@ -179,6 +189,7 @@
     currentUser,
     signIn,
     signUp,
+    resendConfirmation,
     signOut,
     myOrders,
     orderTracking,
