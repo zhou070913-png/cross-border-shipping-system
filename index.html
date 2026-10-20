@@ -32,12 +32,15 @@
     .empty{padding:36px;text-align:center;color:var(--muted)}.empty .icon{font-size:32px;margin-bottom:5px}.callout{border-radius:13px;background:linear-gradient(135deg,#f1f5ff,#fafbff);border:1px solid #dbe5ff;padding:18px}.callout h3{margin:0 0 5px}.callout p{margin:0;color:#60709a;font-size:13px}
     .toast{position:fixed;right:24px;bottom:24px;background:#132044;color:#fff;padding:12px 16px;border-radius:10px;box-shadow:var(--shadow);opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;z-index:10}.toast.show{opacity:1;transform:translateY(0)}
     .modal{position:fixed;inset:0;background:rgba(15,25,52,.45);display:grid;place-items:center;z-index:20;padding:18px}.modal[hidden]{display:none}.modal-card{width:min(420px,100%);background:#fff;border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(15,25,52,.25)}.modal-card h3{margin:0 0 6px;font-size:20px}.modal-card p{margin:0 0 18px;color:var(--muted);font-size:13px}.modal-card .field{margin-top:12px}.modal-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}
+    .login-mode .sidebar,.login-mode .topbar{display:none}.login-mode .main{width:100%}.login-mode .content{max-width:none;padding:0}
+    .login-page{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);background:linear-gradient(135deg,#0f1b3d 0%,#1d3c91 58%,#315efb 100%);color:#fff}.login-intro{display:flex;flex-direction:column;justify-content:center;padding:clamp(36px,8vw,110px);background:radial-gradient(circle at 18% 12%,rgba(126,156,255,.32),transparent 35%),linear-gradient(145deg,rgba(10,20,53,.22),rgba(25,61,152,.08))}.login-brand{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800}.login-brand .brand-mark{background:linear-gradient(135deg,#aebdff,#fff);color:#1737a6}.login-intro h1{font-size:clamp(32px,4vw,58px);line-height:1.08;letter-spacing:-.04em;max-width:560px;margin:34px 0 16px}.login-intro>p{max-width:530px;color:#c9d5ff;font-size:16px;margin:0}.login-flow{display:grid;gap:12px;max-width:560px;margin-top:42px}.login-flow-item{display:flex;gap:12px;align-items:center;color:#e4eaff}.login-flow-item b{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.16);color:#fff}.login-panel{display:flex;align-items:center;justify-content:center;padding:28px;background:rgba(255,255,255,.96);color:var(--ink)}.login-card{width:min(430px,100%);padding:clamp(22px,4vw,40px);background:#fff;border:1px solid #e7ebf5;border-radius:24px;box-shadow:0 22px 70px rgba(7,18,53,.22)}.login-card h2{margin:0 0 7px;font-size:26px}.login-card>p{margin:0;color:var(--muted);font-size:13px}.login-roles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:5px;background:#f2f5fb;border-radius:12px;margin:23px 0 18px}.login-roles button{padding:10px 4px;border-radius:9px;background:transparent;color:#6d7890;font-size:12px}.login-roles button.active{background:#fff;color:#2148cf;font-weight:800;box-shadow:0 3px 10px rgba(35,61,130,.12)}.login-submit{width:100%;margin-top:20px}.login-links{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;font-size:12px}.login-links button{background:transparent;color:#315efb;padding:0}.login-note{margin-top:22px;padding:11px 12px;border-radius:10px;background:#f5f7fc;color:#6d7890;font-size:12px}
+    .flow-list{display:grid;gap:10px}.flow-item{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);border-radius:12px;background:#fff}.flow-item.current{border-color:#b8c8ff;background:#f7f9ff}.flow-item.done{border-color:#b8e2cb;background:#f3fbf6}.flow-index{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#eef1f6;color:#7d889b;font-weight:800}.flow-item.current .flow-index{background:#e8edff;color:#315efb}.flow-item.done .flow-index{background:#dcf4e8;color:#17764b}.flow-copy{flex:1}.flow-copy b{display:block}.flow-copy span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
     @media(max-width:980px){.sidebar{width:210px}.content{padding:24px}.kpis{grid-template-columns:repeat(2,1fr)}.layout-2,.split{grid-template-columns:1fr}}
-    @media(max-width:680px){.app{display:block}.sidebar{width:100%;padding:12px;gap:10px}.side-section,.side-footer{display:none}.role-switch{max-width:360px}.topbar{padding:0 16px}.content{padding:20px 15px}.page-head{display:block}.head-actions{margin-top:15px}.kpis{grid-template-columns:1fr 1fr;gap:10px}.card{padding:15px}.form-grid{grid-template-columns:1fr}.layout-3{grid-template-columns:1fr}.table th,.table td{padding:10px 8px}}
+    @media(max-width:680px){.app{display:block}.sidebar{width:100%;padding:12px;gap:10px}.side-section,.side-footer{display:none}.role-switch{max-width:360px}.topbar{padding:0 16px}.content{padding:20px 15px}.page-head{display:block}.head-actions{margin-top:15px}.kpis{grid-template-columns:1fr 1fr;gap:10px}.card{padding:15px}.form-grid{grid-template-columns:1fr}.layout-3{grid-template-columns:1fr}.table th,.table td{padding:10px 8px}.login-page{display:block;min-height:100vh}.login-intro{padding:32px 22px 28px}.login-intro h1{font-size:34px;margin-top:25px}.login-flow{margin-top:24px;gap:8px}.login-panel{padding:20px 14px;align-items:flex-start}.login-card{border-radius:18px}.login-roles{grid-template-columns:1fr 1fr 1fr}}
   </style>
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="appShell">
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">M</span><span>Mospace 集运</span></div>
       <div class="role-switch">
@@ -49,7 +52,7 @@
         <div class="side-label">工作台</div>
         <div id="nav" class="side-nav"></div>
       </div>
-      <div class="side-footer"><strong>试运营原型 v0.6</strong>统一登录拦截 · 仓库确认后付款 · 一次付款</div>
+      <div class="side-footer"><strong>试运营原型 v0.7</strong>角色独立登录 · 分步作业流 · 一次付款</div>
     </aside>
     <main class="main">
       <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted" id="envLabel">演示环境</span><button class="btn ghost small" id="authBtn">登录</button><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
@@ -72,8 +75,8 @@
   <script>
     const state = {
       role:'merchant', page:'dashboard',
-      auth:{user:null,mode:'login',role:null,profile:null,pending:null},
-      order:{id:'SH20261016001', status:'待仓库确认', payment:'待付款', parcels:3, confirmed:0, estimated:268, confirmedAmount:null, paidAmount:null, packed:false, shipped:false},
+      auth:{user:null,mode:'login',role:null,profile:null,pending:null,pendingRole:null,loginTargetRole:'merchant'},
+      order:{id:'SH20261016001', status:'待仓库确认', payment:'待付款', parcels:3, confirmed:0, estimated:268, confirmedAmount:null, paidAmount:null, packed:false, shipped:false, consolidated:false},
       parcels:[
         {no:'YT238901221',name:'服装样品',status:'已入库',weight:'1.20 kg',size:'32×24×10 cm'},
         {no:'SF102993845',name:'家居配件',status:'已测量',weight:'0.85 kg',size:'28×18×12 cm'},
@@ -94,7 +97,7 @@
     };
     const navs = {
       merchant:[
-        ['dashboard','商家控制台'],['order-create','创建集运订单'],['parcels','我的包裹'],['orders','我的订单'],['fee','费用明细与付款'],['tracking','物流追踪'],['address','仓库地址与收件人']
+        ['dashboard','商家控制台'],['order-create','1. 预报包裹'],['consolidate','2. 确认合包'],['parcels','我的包裹'],['orders','我的订单'],['fee','3. 确认订单 / 付款'],['tracking','4. 查询物流'],['address','仓库地址与收件人']
       ],
       warehouse:[
         ['dashboard','仓库工作台'],['inbound','入库扫描'],['confirm','包裹确认'],['packing','拣货 / 合包 / 打包'],['ship','出货登记'],['exceptions','异常处理']
@@ -125,6 +128,7 @@
       state.order.paidAmount=payment?.amount==null?null:Number(payment.amount); state.order.payment=payment?.status==='paid'?'已付款':'待付款';
       state.order.packed=latest.status==='ready_to_ship'||latest.status==='shipped'||Boolean(latest.packed_at);
       state.order.shipped=latest.status==='shipped'||latest.status==='delivered';
+      state.order.consolidated=Boolean(latest.consolidated||state.order.consolidated);
       state.order.boxNo=latest.box_no||null; state.order.carrier=latest.shipment_carrier||null; state.order.shipmentTrackingNo=latest.shipment_tracking_no||null;
       const rows=(latest.order_parcels||[]).map(x=>x.parcels||x.parcel).filter(Boolean);
       if(rows.length){state.order.confirmed=rows.filter(p=>p.actual_weight_kg!=null&&p.length_cm!=null&&p.width_cm!=null&&p.height_cm!=null).length;state.parcels=rows.map(p=>({id:p.id,no:p.parcel_no,name:p.item_name||'未填写品名',status:p.status,statusLabel:p.status,weight:formatWeight(p.actual_weight_kg),size:formatSize(p),actualWeight:p.actual_weight_kg,length:p.length_cm,width:p.width_cm,height:p.height_cm}));}
@@ -137,7 +141,7 @@
       state.events=events.map(e=>({title:e.event_title,desc:e.event_description||'',time:new Date(e.occurred_at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),done:true,current:false}));
     }
     const pageRoles={
-      'order-create':'merchant',parcels:'merchant','parcel-detail':'merchant',fee:'merchant',tracking:'merchant',address:'merchant',
+      'order-create':'merchant',consolidate:'merchant',parcels:'merchant','parcel-detail':'merchant',fee:'merchant',tracking:'merchant',address:'merchant',
       inbound:'warehouse',confirm:'warehouse',packing:'warehouse',ship:'warehouse',exceptions:'warehouse','exception-detail':'warehouse',
       config:'admin',audit:'admin',accounts:'admin'
     };
@@ -147,6 +151,14 @@
     function authRequired(page,role){
       // 商家控制台可以作为公开演示入口；进入订单、包裹、费用以及内部工作台都必须登录。
       return window.MospaceSupabase.isConfigured()&&(role!=='merchant'||page!=='dashboard');
+    }
+    function pageAllowed(page,role){
+      if(page==='consolidate'&&!state.activeOrderId&&!state.order.dbId){toast('请先完成包裹预报');return false}
+      if(role==='warehouse'&&page==='confirm'&&!['warehouse_received','measuring'].includes(state.order.status)&&!state.order.confirmed){toast('请先完成入库扫描，再进入包裹确认');return false}
+      if(role==='warehouse'&&page==='packing'&&!['paid','ready_to_ship','shipped','delivered'].includes(state.order.status)&&!state.order.paidAmount){toast('商家付款后才能进入打包作业');return false}
+      if(role==='warehouse'&&page==='ship'&&!state.order.packed&&!['ready_to_ship','shipped','delivered'].includes(state.order.status)){toast('请先完成打包并录入箱号');return false}
+      if(role==='merchant'&&['fee','tracking'].includes(page)&&!state.activeOrderId&&!state.order.dbId){toast('请先创建集运订单');return false}
+      return true;
     }
     function openAuth(options={}){
       if(!window.MospaceSupabase.isConfigured()){toast('数据库尚未配置，请先配置 anon key');return false}
@@ -172,10 +184,34 @@
       $('#authSubmit').textContent=signup?'注册并继续':'登录';
       $('#authMode').textContent=signup?'返回登录':'注册账号';
     }
+    function loginPage(){
+      const target=state.auth.loginTargetRole||'merchant';
+      const targetLabel=target==='merchant'?'跨境商家':target==='warehouse'?'仓库操作员':'运营管理员';
+      const registerHtml=target==='merchant'?'<div class="login-links"><span class="muted">还没有商家账号？</span><button id="loginRegister">注册商家账号</button></div>':'<div class="login-links"><span class="muted">内部账号由平台创建，请使用已分配的账号登录。</span></div>';
+      return '<div class="login-page"><section class="login-intro"><div class="login-brand"><span class="brand-mark">M</span><span>Mospace 集运</span></div><h1>跨境包裹，从深圳仓到目的地。</h1><p>登录后按你的角色进入专属工作台，系统会把每一步串起来，完成当前步骤后再进入下一步。</p><div class="login-flow"><div class="login-flow-item"><b>1</b><span>商家预报包裹，选择是否合包</span></div><div class="login-flow-item"><b>2</b><span>仓库入库确认，测量并生成费用</span></div><div class="login-flow-item"><b>3</b><span>一次付款、打包出货、在线查询物流</span></div></div></section><section class="login-panel"><div class="login-card"><h2>登录系统</h2><p>请选择你的工作台，再输入会员号或邮箱和密码。</p><div class="login-roles"><button class="'+(target==='merchant'?'active':'')+'" data-login-role="merchant">商家端</button><button class="'+(target==='warehouse'?'active':'')+'" data-login-role="warehouse">仓库端</button><button class="'+(target==='admin'?'active':'')+'" data-login-role="admin">运营后台</button></div><div class="notice" style="margin:0 0 16px;padding:10px 12px"><div>→</div><div><strong>'+targetLabel+'登录</strong><p>登录成功后直接进入'+targetLabel+'控制台。</p></div></div><div class="field"><label>会员号 / 邮箱</label><input id="loginIdentifier" type="text" placeholder="M12345678 或 name@company.com" autocomplete="username" /></div><div class="field" style="margin-top:12px"><label>密码</label><input id="loginPassword" type="password" placeholder="至少 6 位" autocomplete="current-password" /></div><button class="btn primary login-submit" id="loginSubmit">登录并进入'+targetLabel+'</button>'+registerHtml+'<div class="login-note">仓库操作员和运营管理员账号由平台创建；注册入口仅开放给跨境商家。</div></div></section></div>';
+    }
+    async function submitLandingAuth(){
+      const identifier=$('#loginIdentifier')?.value.trim(),password=$('#loginPassword')?.value||'',target=state.auth.loginTargetRole||'merchant';
+      if(!identifier||password.length<6){toast('请输入会员号或邮箱和至少 6 位密码');return}
+      if(!window.MospaceSupabase.isConfigured()){toast('数据库尚未配置，请先配置 anon key');return}
+      try{
+        const result=await window.MospaceSupabase.signInWithIdentifier(identifier,password);
+        state.auth.user=result.user;
+        await syncAuth();
+        const actual=normalizedRole(state.auth.role);
+        if(!state.auth.user||actual!==target){
+          try{await window.MospaceSupabase.signOut()}catch(signOutError){console.info('角色校验后的退出失败',signOutError.message)}
+          state.auth.user=null;state.auth.profile=null;state.auth.role=null;state.role='merchant';
+          toast(actual===target?'账号资料暂不可用':`该账号属于${roleName(actual)}，请切换正确的登录入口`);render();return
+        }
+        state.role=actual;state.page='dashboard';toast('登录成功，正在进入'+roleName(actual));render();
+      }catch(error){toast('登录失败：'+(error.message||'请检查会员号、邮箱和密码'))}
+    }
     function go(page,options={}){
       const targetRole=targetRoleFor(page,options.role);
       const currentRole=normalizedRole(state.auth.role);
       if(state.auth.user&&currentRole!==targetRole){toast(`当前账号没有${roleName(targetRole)}权限`);return false}
+      if(!pageAllowed(page,targetRole))return false;
       if(!state.auth.user&&authRequired(page,targetRole)){
         state.auth.pending={page,role:targetRole,parcelNo:options.parcelNo||null,exceptionId:options.exceptionId||null};
         state.auth.pendingRole=targetRole;
@@ -273,9 +309,18 @@
       const current=!received?1:!paid?2:!shipped?3:!delivered?4:-1;
       return {received,paid,packed,shipped,delivered,current};
     }
+    function merchantNextStep(o){
+      const hasOrder=Boolean(state.activeOrderId||o.dbId);
+      if(!hasOrder)return {page:'order-create',label:'1. 预报包裹'};
+      if(!o.consolidated)return {page:'consolidate',label:'2. 确认合包'};
+      if(!o.confirmedAmount)return {page:'fee',label:'查看仓库确认进度'};
+      if(!o.paidAmount)return {page:'fee',label:'3. 确认订单并付款'};
+      return {page:'tracking',label:'4. 查询物流'};
+    }
     function merchantDashboard(){
       const o=state.order;
       const p=merchantProgress(o);
+      const next=merchantNextStep(o);
       const timeline=[
         {title:'已创建集运订单',desc:'商家提交目的地、线路和预报包裹',done:true},
         {title:'深圳仓入库',desc:p.received?'仓库已收到并完成包裹确认':'等待仓库收货和确认',done:p.received,current:p.current===1},
@@ -283,8 +328,9 @@
         {title:'打包出货',desc:p.shipped?'仓库已打包并完成出货登记':p.packed?'仓库已完成打包，等待出货登记':'付款后由仓库合包、打包并登记出货',done:p.shipped,current:p.current===3},
         {title:'运输与签收',desc:p.delivered?'包裹已签收':'出货后在线查看物流节点',done:p.delivered,current:p.current===4}
       ];
-      return shell('商家控制台','今天的包裹和集运订单都在这里处理。','<button class="btn primary" data-page="order-create">+ 创建集运订单</button>')+
+      return shell('商家控制台','按步骤完成预报、合包、确认订单和物流查询。','<button class="btn primary" data-page="'+next.page+'">'+next.label+'</button>')+
       '<div class="notice"><div>⚡</div><div><strong>当前状态：'+esc(o.statusLabel||orderStatusLabel(o.status))+'</strong><p>订单 '+esc(o.id)+' 的费用和物流节点会从数据库实时刷新。</p></div></div>'+
+      '<div class="card" style="margin-bottom:18px"><div class="card-title"><h3>客户操作流程</h3><span class="tag">完成当前步骤后进入下一步</span></div><div class="flow-list"><div class="flow-item '+(next.page==='order-create'?'current':'done')+'"><div class="flow-index">'+(next.page==='order-create'?'1':'✓')+'</div><div class="flow-copy"><b>预报包裹</b><span>填写目的地、深圳仓地址和快递单号</span></div>'+(next.page==='order-create'?'<button class="btn small primary" data-page="order-create">进入</button>':'')+'</div><div class="flow-item '+(next.page==='consolidate'?'current':next.page==='order-create'?'':'done')+'"><div class="flow-index">'+(next.page==='consolidate'?'2':next.page==='order-create'?'2':'✓')+'</div><div class="flow-copy"><b>确认是否合包</b><span>确认要合并的包裹和包装要求</span></div>'+(next.page==='consolidate'?'<button class="btn small primary" data-page="consolidate">进入</button>':'')+'</div><div class="flow-item '+(next.page==='fee'?'current':next.page==='tracking'?'done':'')+'"><div class="flow-index">'+(o.confirmedAmount?(o.paidAmount?'✓':'3'):'3')+'</div><div class="flow-copy"><b>确认订单并付款</b><span>仓库确认实重后生成唯一应付金额，只付款一次</span></div>'+(next.page==='fee'?'<button class="btn small primary" data-page="fee">进入</button>':'')+'</div><div class="flow-item '+(next.page==='tracking'?'current':'')+'"><div class="flow-index">4</div><div class="flow-copy"><b>查询物流</b><span>查看仓库出货、离港和运输节点</span></div>'+(next.page==='tracking'?'<button class="btn small primary" data-page="tracking">进入</button>':'')+'</div></div></div>'+
       '<div class="grid kpis">'+kpi('待仓库确认',p.received?'0':'1',p.received?'仓库已完成确认':'订单正在核验中')+kpi('待付款',p.paid?'0':(o.confirmedAmount?'1':'0'),p.paid?'已完成一次付款':o.confirmedAmount?'确认后可一次付款':'确认后显示')+kpi('运输中',p.shipped&&!p.delivered?'1':'0',p.shipped?(p.delivered?'已签收':'物流节点运输中'):'暂无运输订单')+kpi('我的包裹',String(state.parcels.length||o.parcels||0),state.parcels.filter(x=>x.status==='待预报'||x.status==='pre_advised').length+' 个待预报')+'</div>'+
       '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>当前集运订单</h3><a data-page="orders">查看全部</a></div><div class="order-card"><div class="order-row"><div><div class="order-id">'+esc(o.id)+'</div><div class="subrow"><span>深圳仓 → 印尼空运专线</span><span>'+o.parcels+' 个包裹</span><span>费用以仓库实测为准</span></div></div>'+status(o.statusLabel||orderStatusLabel(o.status),statusTone(o.status))+'</div><div class="steps">'+['创建订单','深圳仓入库','一次付款','离港出境','运输签收'].map((x,i)=>'<div class="step '+((i===0||[1,2,3,4].some(n=>n===i&&((i===1&&p.received)||(i===2&&p.paid)||(i===3&&p.shipped)||(i===4&&p.delivered))))?'done ':'')+(p.current===i?'current ':'')+'">'+x+'</div>').join('')+'</div><div class="order-row"><span class="muted">'+(o.confirmedAmount?'最终应付':'参考费用')+'</span><strong>¥'+(o.confirmedAmount||o.estimated||0)+'</strong><button class="btn small" data-page="fee">查看费用明细</button></div></div></div>'+
       '<div class="card"><div class="card-title"><h3>包裹动态</h3><a data-page="parcels">查看包裹</a></div><div class="timeline">'+timeline.map(e=>'<div class="event"><div></div><div><h4>'+e.title+' '+(e.done?status('已完成','green'):e.current?status('进行中','blue'):status('待处理','gray'))+'</h4><p>'+e.desc+'</p></div></div>').join('')+'</div></div></div>';
@@ -294,7 +340,14 @@
       '<div class="notice"><div>ⓘ</div><div><strong>付款规则</strong><p>现在只生成参考费用，不收款。仓库确认包裹、重量和尺寸后，系统生成唯一应付金额，商家只付款一次。</p></div></div>'+
       '<div class="card"><div class="card-title"><h3>订单信息</h3><span class="tag">P-05</span></div><div class="form-grid"><div class="field"><label>目的地国家 / 地区</label><select id="destinationCountry"><option>印度尼西亚</option><option>日本</option><option>美国</option><option>英国</option></select></div><div class="field"><label>运输线路</label><select id="routeCode"><option value="ID-AIR">空运专线 · 7-10 天</option><option value="ID-SEA">海运经济线 · 20-30 天</option></select></div><div class="field full"><label>目的地具体收货地址</label><textarea id="destinationAddress" rows="2" placeholder="请填写国家/城市、街道、门牌号、邮编">印度尼西亚雅加达南部 Jl. Jenderal Sudirman No. 10，邮编 12190</textarea></div><div class="field"><label>目的地收件人</label><input id="recipientName" value="Budi Logistics" /></div><div class="field"><label>收件人电话</label><input id="recipientPhone" value="+62 21-5555-1688" /></div><div class="field full"><label>商家备注</label><input id="merchantNote" placeholder="可填写合包、加固等要求" /></div></div></div>'+
       '<div class="card" style="margin-top:16px"><div class="card-title"><h3>国内深圳送仓地址</h3><span class="tag">先寄到深圳，再离港出境</span></div><div class="form-grid"><div class="field"><label>选择国内仓库</label><select><option>深圳仓 · 龙岗跨境集运仓（默认）</option><option>深圳仓 · 宝安中转仓</option></select></div><div class="field"><label>入仓联系人</label><input value="Mospace 深圳仓收货组" /></div><div class="field full"><label>深圳仓收货地址</label><textarea rows="2">广东省深圳市龙岗区平湖街道物流园 2 号楼 1 楼，收件：Mospace 深圳仓</textarea></div><div class="field"><label>仓库联系电话</label><input value="0755-8888-1688" /></div></div><p class="muted" style="margin:12px 0 0;font-size:12px">商家先将包裹寄到深圳仓；深圳仓签收入库、称重、合包后，再安排离港出境并更新物流节点。</p></div>'+
-      '<div class="card" style="margin-top:16px"><div class="card-title"><h3>选择预报包裹</h3><span class="muted">可多选</span></div><div class="check-list">'+state.parcels.map((p,i)=>'<label class="check"><input class="parcel-choice" data-parcel-no="'+esc(p.no)+'" type="checkbox" '+(i<2?'checked':'')+'><span style="flex:1"><b>'+esc(p.no)+'</b><span class="muted"> · '+esc(p.name)+'</span><br><small class="muted">'+esc(p.statusLabel||p.status||'待预报')+' · 预估 '+esc(p.weight)+'</small></span>'+status(p.statusLabel||p.status||'待预报',(p.status==='pre_advised'||p.status==='待预报')?'amber':'green')+'</label>').join('')+'</div><div class="form-actions"><button class="btn ghost">保存草稿</button><button class="btn primary" id="createOrderBtn">提交订单并查看参考费用</button></div></div>';
+      '<div class="card" style="margin-top:16px"><div class="card-title"><h3>选择预报包裹</h3><span class="muted">可多选</span></div><div class="check-list">'+state.parcels.map((p,i)=>'<label class="check"><input class="parcel-choice" data-parcel-no="'+esc(p.no)+'" type="checkbox" '+(i<2?'checked':'')+'><span style="flex:1"><b>'+esc(p.no)+'</b><span class="muted"> · '+esc(p.name)+'</span><br><small class="muted">'+esc(p.statusLabel||p.status||'待预报')+' · 预估 '+esc(p.weight)+'</small></span>'+status(p.statusLabel||p.status||'待预报',(p.status==='pre_advised'||p.status==='待预报')?'amber':'green')+'</label>').join('')+'</div><div class="form-actions"><button class="btn ghost">保存草稿</button><button class="btn primary" id="createOrderBtn">完成预报，下一步确认合包</button></div></div>';
+    }
+    function merchantConsolidate(){
+      const hasOrder=Boolean(state.activeOrderId||state.order.dbId);
+      if(!hasOrder)return shell('确认合包','请先完成包裹预报，再确认合包方案。','<button class="btn primary" data-page="order-create">去预报包裹</button>')+'<div class="card"><div class="empty"><div class="icon">📦</div><b>还没有可确认的集运订单</b><p>完成预报后，这里会显示要合并的包裹。</p></div></div>';
+      const done=Boolean(state.order.consolidated);
+      return shell('确认是否合包','确认本次需要合并的包裹和包装要求，提交后等待深圳仓实测费用。','<button class="btn ghost" data-page="dashboard">返回控制台</button>')+
+      '<div class="notice"><div>ⓘ</div><div><strong>订单 '+esc(state.order.id)+'</strong><p>你只需要在这里确认一次合包方案；仓库确认实重后，系统生成唯一应付金额。</p></div></div><div class="grid layout-2"><div class="card"><div class="card-title"><h3>本次合包包裹</h3><span class="tag">'+(done?'已确认':'待确认')+'</span></div><div class="check-list">'+state.parcels.map(p=>'<label class="check"><input class="merge-choice" data-parcel-no="'+esc(p.no)+'" type="checkbox" '+(done||p.status!=='待预报'?'checked':'')+' '+(done?'disabled':'')+'><span style="flex:1"><b>'+esc(p.no)+'</b><br><small class="muted">'+esc(p.name)+' · '+esc(p.weight)+'</small></span>'+status(done?'已纳入合包':p.statusLabel||p.status||'待确认',done?'green':'amber')+'</label>').join('')+'</div>'+(done?'<div class="notice" style="margin:16px 0 0"><div>✓</div><div><strong>合包方案已确认</strong><p>下一步等待仓库确认实重和尺寸。</p></div></div>':'<div class="form-actions"><button class="btn primary" id="confirmConsolidationBtn">确认合包并进入订单</button></div>')+'</div><div class="card"><div class="card-title"><h3>合包要求</h3><span class="muted">订单备注</span></div><div class="field"><label>包装方式</label><select id="consolidationMethod" '+(done?'disabled':'')+'><option>合并为一个外箱</option><option>按品类分箱</option><option>保持原包裹分别出货</option></select></div><div class="field" style="margin-top:14px"><label>给仓库的备注</label><textarea id="consolidationNote" rows="4" '+(done?'readonly':'')+'>易碎品请加固，外箱请贴防水标签。</textarea></div><div class="metric" style="margin-top:14px"><span>目的地</span><b>印度尼西亚 · 雅加达</b></div><div class="metric"><span>国内送仓</span><b>深圳龙岗跨境集运仓</b></div></div></div>';
     }
     function merchantParcels(){
       return shell('我的包裹','查看预报、入库、测量和异常状态。','<button class="btn primary" data-page="order-create">+ 预报包裹</button>')+
@@ -403,9 +456,19 @@
       return shell('仓库地址与收件人','维护深圳仓收货信息和最终收件信息。','<button class="btn small" id="copyWarehouseBtn">复制深圳仓地址</button>')+'<div class="grid layout-2"><div class="card"><div class="card-title"><h3>深圳仓地址（系统固定）</h3><span class="tag">先寄到深圳</span></div><div id="warehouseAddressText" class="callout"><h3>深圳仓 · 龙岗跨境集运仓</h3><p class="mono">广东省深圳市龙岗区平湖街道物流园 2 号楼 1 楼<br>收件人：Mospace 深圳仓收货组<br>电话：0755-8888-1688</p></div></div><div class="card"><div class="card-title"><h3>我的收件地址</h3><span class="muted">来自数据库</span></div>'+list+'<div class="form-grid" style="margin-top:14px"><div class="field"><label>地址标签</label><input id="addressLabel" placeholder="雅加达仓" /></div><div class="field"><label>收件人</label><input id="addressRecipient" placeholder="姓名 / 公司" /></div><div class="field"><label>联系电话</label><input id="addressPhone" placeholder="+62..." /></div><div class="field"><label>城市</label><input id="addressCity" value="雅加达" /></div><div class="field full"><label>详细地址</label><textarea id="addressLine" rows="2" placeholder="街道、门牌号、邮编"></textarea></div></div><div class="form-actions"><button class="btn primary" id="saveAddressBtn">保存收件地址</button></div></div></div>';
     }
     function render(){
+      const app=$('#appShell');
+      if(!state.auth.user){
+        app.classList.add('login-mode');
+        $('#content').innerHTML=loginPage();
+        $('#crumb').textContent='登录';
+        $('#envLabel').textContent=window.MospaceSupabase.isConfigured()?'数据库已配置':'演示环境';
+        bind();
+        return;
+      }
+      app.classList.remove('login-mode');
       renderNav(); let html='';
       if(state.role==='merchant'){
-        const views={dashboard:merchantDashboard,'order-create':merchantCreate,parcels:merchantParcels,'parcel-detail':merchantParcelDetail,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress};
+        const views={dashboard:merchantDashboard,'order-create':merchantCreate,consolidate:merchantConsolidate,parcels:merchantParcels,'parcel-detail':merchantParcelDetail,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress};
         html=(views[state.page]||merchantDashboard)();
       }else if(state.role==='warehouse'){
         const views={dashboard:warehouseDashboard,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
@@ -431,6 +494,9 @@
       }catch(error){toast('刷新订单失败：'+(error.message||'请稍后重试'))}
     }
     function bind(){
+      document.querySelectorAll('[data-login-role]').forEach(b=>b.onclick=()=>{state.auth.loginTargetRole=b.dataset.loginRole;render()});
+      const landingSubmit=$('#loginSubmit');if(landingSubmit)landingSubmit.onclick=submitLandingAuth;
+      const landingRegister=$('#loginRegister');if(landingRegister)landingRegister.onclick=()=>{state.auth.mode='signup';state.auth.pendingRole='merchant';openAuth({role:'merchant'})};
       document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>switchRole(b.dataset.role));
       document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page,{parcelNo:b.dataset.parcelNo,exceptionId:b.dataset.exception}));
       const authBtn=$('#authBtn');if(authBtn)authBtn.onclick=async()=>{if(state.auth.user){await window.MospaceSupabase.signOut();state.auth.user=null;state.auth.profile=null;state.auth.role=null;state.auth.pending=null;state.auth.pendingRole=null;state.role='merchant';state.page='dashboard';toast('已退出登录');render()}else{state.auth.pending=null;state.auth.pendingRole=state.role;openAuth({role:state.role})}};
@@ -448,9 +514,14 @@
               parcels,estimatedFee:state.order.estimated
             });
             state.activeOrderId=order.id;state.order.id=order.order_no;state.order.dbId=order.id;state.order.status='submitted';state.order.statusLabel='待仓库收货';
-            toast('订单已写入数据库：'+order.order_no);await refreshDbState('fee');
+            state.order.consolidated=false;toast('订单已写入数据库：'+order.order_no);await refreshDbState('consolidate');
           }catch(error){toast('订单写入失败：'+(error.message||'请稍后重试'));console.error(error)}
-        }else{toast('订单已创建，参考费用 ¥'+state.order.estimated+'，等待仓库确认');go('fee',{role:'merchant'})}
+        }else{toast('预报已完成，请确认合包方案');state.activeOrderId='demo-order';state.order.dbId='demo-order';go('consolidate',{role:'merchant'})}
+      };
+      const consolidation=$('#confirmConsolidationBtn');if(consolidation)consolidation.onclick=()=>{
+        const selected=[...document.querySelectorAll('.merge-choice:checked')];
+        if(!selected.length){toast('至少选择一个要合包的包裹');return}
+        state.order.consolidated=true;toast('合包方案已确认，进入订单费用流程');go('fee',{role:'merchant'});
       };
       const confirm=$('#confirmBtn');if(confirm)confirm.onclick=async()=>{
         if(window.MospaceSupabase.isConfigured()&&state.auth.user&&state.order.dbId){
