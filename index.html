@@ -52,7 +52,7 @@
         <div class="side-label">工作台</div>
         <div id="nav" class="side-nav"></div>
       </div>
-      <div class="side-footer"><strong>试运营原型 v0.7</strong>角色独立登录 · 分步作业流 · 一次付款</div>
+      <div class="side-footer"><strong>试运营原型 v0.8</strong>角色独立登录 · 主导航递进 · 一次付款</div>
     </aside>
     <main class="main">
       <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted" id="envLabel">演示环境</span><button class="btn ghost small" id="authBtn">登录</button><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
@@ -97,7 +97,7 @@
     };
     const navs = {
       merchant:[
-        ['dashboard','商家控制台'],['order-create','1. 预报包裹'],['consolidate','2. 确认合包'],['parcels','我的包裹'],['orders','我的订单'],['fee','3. 确认订单 / 付款'],['tracking','4. 查询物流'],['address','仓库地址与收件人']
+        ['dashboard','商家控制台'],['parcels','我的包裹'],['orders','我的订单'],['address','仓库地址与收件人']
       ],
       warehouse:[
         ['dashboard','仓库工作台'],['inbound','入库扫描'],['confirm','包裹确认'],['packing','拣货 / 合包 / 打包'],['ship','出货登记'],['exceptions','异常处理']
@@ -289,8 +289,17 @@
         state.auth.user=result.user; closeAuth(); toast(state.auth.mode==='signup'?'注册成功，已登录':'登录成功'); await continuePendingNavigation();
       }catch(error){toast('操作失败：'+(error.message||'请检查邮箱和密码'))}
     }
+    function navActivePage(page,role){
+      if(role==='merchant'){
+        if(['order-create','consolidate'].includes(page))return 'dashboard';
+        if(page==='parcel-detail')return 'parcels';
+        if(['fee','tracking'].includes(page))return 'orders';
+      }
+      return page;
+    }
     function renderNav(){
-      $('#nav').innerHTML=navs[state.role].map(([id,label])=>'<button class="'+(state.page===id?'active':'')+'" data-page="'+id+'">'+label+(id==='orders'&&state.role==='merchant'?'<span class="count">'+(state.auth.user?'实时':'')+'</span>':'')+'</button>').join('');
+      const activePage=navActivePage(state.page,state.role);
+      $('#nav').innerHTML=navs[state.role].map(([id,label])=>'<button class="'+(activePage===id?'active':'')+'" data-page="'+id+'">'+label+(id==='orders'&&state.role==='merchant'?'<span class="count">'+(state.auth.user?'实时':'')+'</span>':'')+'</button>').join('');
       document.querySelectorAll('[data-role]').forEach(b=>{
         const accountRole=normalizedRole(state.auth.role);
         const allowed=!state.auth.user||accountRole===b.dataset.role;
