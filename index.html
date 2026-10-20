@@ -49,7 +49,7 @@
         <div class="side-label">工作台</div>
         <div id="nav" class="side-nav"></div>
       </div>
-      <div class="side-footer"><strong>试运营原型 v0.5</strong>仓库确认后付款 · 一次付款 · 费用锁定</div>
+      <div class="side-footer"><strong>试运营原型 v0.6</strong>统一登录拦截 · 仓库确认后付款 · 一次付款</div>
     </aside>
     <main class="main">
       <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted" id="envLabel">演示环境</span><button class="btn ghost small" id="authBtn">登录</button><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
@@ -72,7 +72,7 @@
   <script>
     const state = {
       role:'merchant', page:'dashboard',
-      auth:{user:null,mode:'login',role:null,profile:null},
+      auth:{user:null,mode:'login',role:null,profile:null,pending:null},
       order:{id:'SH20261016001', status:'待仓库确认', payment:'待付款', parcels:3, confirmed:0, estimated:268, confirmedAmount:null, paidAmount:null, packed:false, shipped:false},
       parcels:[
         {no:'YT238901221',name:'服装样品',status:'已入库',weight:'1.20 kg',size:'32×24×10 cm'},
@@ -136,15 +136,33 @@
       if(!events?.length)return;
       state.events=events.map(e=>({title:e.event_title,desc:e.event_description||'',time:new Date(e.occurred_at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),done:true,current:false}));
     }
-    function openAuth(){
-      if(!window.MospaceSupabase.isConfigured()){toast('数据库尚未配置，请先配置 anon key');return}
+    const pageRoles={
+      'order-create':'merchant',parcels:'merchant','parcel-detail':'merchant',fee:'merchant',tracking:'merchant',address:'merchant',
+      inbound:'warehouse',confirm:'warehouse',packing:'warehouse',ship:'warehouse',exceptions:'warehouse','exception-detail':'warehouse',
+      config:'admin',audit:'admin',accounts:'admin'
+    };
+    function normalizedRole(role){return role==='warehouse_operator'?'warehouse':role||'merchant'}
+    function roleName(role){return role==='warehouse'?'仓库端':role==='admin'?'运营后台':'商家端'}
+    function targetRoleFor(page,role){return role||pageRoles[page]||state.role||'merchant'}
+    function authRequired(page,role){
+      // 商家控制台可以作为公开演示入口；进入订单、包裹、费用以及内部工作台都必须登录。
+      return window.MospaceSupabase.isConfigured()&&(role!=='merchant'||page!=='dashboard');
+    }
+    function openAuth(options={}){
+      if(!window.MospaceSupabase.isConfigured()){toast('数据库尚未配置，请先配置 anon key');return false}
+      if(options.role) state.auth.pendingRole=options.role;
+      updateAuthMode();
       $('#authModal').hidden=false;
+      setTimeout(()=>$('#authIdentifier')?.focus(),0);
+      return true;
     }
     function closeAuth(){$('#authModal').hidden=true}
     function updateAuthMode(){
       const signup=state.auth.mode==='signup';
+      const target=state.auth.pendingRole||state.role||'merchant';
+      const targetText=target==='merchant'?'商家账号':target==='warehouse'?'仓库操作员账号':'管理员账号';
       $('#authTitle').textContent=signup?'注册商家账号':'账号登录';
-      $('#authHint').textContent=signup?'新注册账号默认是跨境商家；仓库操作员和管理员账号由平台管理员授权。':'商家、仓库操作员和管理员均从这里登录，系统按账号权限进入对应工作台。';
+      $('#authHint').textContent=signup?'新注册账号默认是跨境商家；仓库操作员和管理员账号由平台管理员授权。':`请输入${targetText}的会员号或邮箱，系统会自动进入对应工作台。`;
       $('#authIdentifierLabel').textContent=signup?'注册邮箱':'会员号 / 邮箱';
       $('#authIdentifier').type=signup?'email':'text';
       $('#authIdentifier').placeholder=signup?'name@company.com':'M12345678 或 name@company.com';
@@ -153,6 +171,41 @@
       $('#authResend').hidden=!signup;
       $('#authSubmit').textContent=signup?'注册并继续':'登录';
       $('#authMode').textContent=signup?'返回登录':'注册账号';
+    }
+    function go(page,options={}){
+      const targetRole=targetRoleFor(page,options.role);
+      const currentRole=normalizedRole(state.auth.role);
+      if(state.auth.user&&currentRole!==targetRole){toast(`当前账号没有${roleName(targetRole)}权限`);return false}
+      if(!state.auth.user&&authRequired(page,targetRole)){
+        state.auth.pending={page,role:targetRole,parcelNo:options.parcelNo||null,exceptionId:options.exceptionId||null};
+        state.auth.pendingRole=targetRole;
+        openAuth({role:targetRole});
+        return false;
+      }
+      state.role=targetRole;
+      if(options.parcelNo)state.selectedParcelNo=options.parcelNo;
+      if(options.exceptionId)state.selectedException=options.exceptionId;
+      state.page=page;
+      render();
+      return true;
+    }
+    function switchRole(targetRole){
+      const currentRole=normalizedRole(state.auth.role);
+      if(state.auth.user&&currentRole!==targetRole){toast(`当前账号没有${roleName(targetRole)}权限`);return}
+      if(!state.auth.user&&window.MospaceSupabase.isConfigured()){
+        state.auth.pending={page:'dashboard',role:targetRole};
+        state.auth.pendingRole=targetRole;
+        openAuth({role:targetRole});
+        return;
+      }
+      go('dashboard',{role:targetRole});
+    }
+    async function continuePendingNavigation(){
+      const pending=state.auth.pending;
+      state.auth.pending=null;
+      state.auth.pendingRole=null;
+      await syncAuth();
+      if(pending)go(pending.page,{role:pending.role,parcelNo:pending.parcelNo,exceptionId:pending.exceptionId});
     }
     async function syncAuth(){
       if(!window.MospaceSupabase.isConfigured()) return;
@@ -197,14 +250,14 @@
           toast(memberNo?`注册成功，你的会员号是 ${memberNo}。请先完成邮箱验证，再用会员号登录。`:'注册成功，请查收邮箱完成验证；验证后可向管理员查询会员号。',7000);
           return;
         }
-        state.auth.user=result.user; closeAuth(); toast(state.auth.mode==='signup'?'注册成功，已登录':'登录成功'); await syncAuth();
+        state.auth.user=result.user; closeAuth(); toast(state.auth.mode==='signup'?'注册成功，已登录':'登录成功'); await continuePendingNavigation();
       }catch(error){toast('操作失败：'+(error.message||'请检查邮箱和密码'))}
     }
     function renderNav(){
       $('#nav').innerHTML=navs[state.role].map(([id,label])=>'<button class="'+(state.page===id?'active':'')+'" data-page="'+id+'">'+label+(id==='orders'&&state.role==='merchant'?'<span class="count">'+(state.auth.user?'实时':'')+'</span>':'')+'</button>').join('');
       document.querySelectorAll('[data-role]').forEach(b=>{
-        const normalizedRole=state.auth.role==='warehouse_operator'?'warehouse':state.auth.role;
-        const allowed=!state.auth.user||normalizedRole===b.dataset.role;
+        const accountRole=normalizedRole(state.auth.role);
+        const allowed=!state.auth.user||accountRole===b.dataset.role;
         b.hidden=!allowed; b.classList.toggle('active',b.dataset.role===state.role);
       });
     }
@@ -378,13 +431,9 @@
       }catch(error){toast('刷新订单失败：'+(error.message||'请稍后重试'))}
     }
     function bind(){
-      document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{
-        const normalizedRole=state.auth.role==='warehouse_operator'?'warehouse':state.auth.role;
-        if(state.auth.user && normalizedRole!==b.dataset.role){toast('当前账号没有该角色权限');return}
-        state.role=b.dataset.role;state.page='dashboard';render();
-      });
-      document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{if(b.dataset.parcelNo)state.selectedParcelNo=b.dataset.parcelNo;if(b.dataset.exception)state.selectedException=b.dataset.exception;state.page=b.dataset.page;render()});
-      const authBtn=$('#authBtn');if(authBtn)authBtn.onclick=async()=>{if(state.auth.user){await window.MospaceSupabase.signOut();state.auth.user=null;state.auth.profile=null;state.auth.role=null;state.role='merchant';state.page='dashboard';toast('已退出登录');render()}else openAuth()};
+      document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>switchRole(b.dataset.role));
+      document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page,{parcelNo:b.dataset.parcelNo,exceptionId:b.dataset.exception}));
+      const authBtn=$('#authBtn');if(authBtn)authBtn.onclick=async()=>{if(state.auth.user){await window.MospaceSupabase.signOut();state.auth.user=null;state.auth.profile=null;state.auth.role=null;state.auth.pending=null;state.auth.pendingRole=null;state.role='merchant';state.page='dashboard';toast('已退出登录');render()}else{state.auth.pending=null;state.auth.pendingRole=state.role;openAuth({role:state.role})}};
       const create=$('#createOrderBtn');if(create)create.onclick=async()=>{
         if(window.MospaceSupabase.isConfigured()){
           if(!state.auth.user){toast('请先登录商家账号');openAuth();return}
@@ -401,7 +450,7 @@
             state.activeOrderId=order.id;state.order.id=order.order_no;state.order.dbId=order.id;state.order.status='submitted';state.order.statusLabel='待仓库收货';
             toast('订单已写入数据库：'+order.order_no);await refreshDbState('fee');
           }catch(error){toast('订单写入失败：'+(error.message||'请稍后重试'));console.error(error)}
-        }else{toast('订单已创建，参考费用 ¥'+state.order.estimated+'，等待仓库确认');state.page='fee';render()}
+        }else{toast('订单已创建，参考费用 ¥'+state.order.estimated+'，等待仓库确认');go('fee',{role:'merchant'})}
       };
       const confirm=$('#confirmBtn');if(confirm)confirm.onclick=async()=>{
         if(window.MospaceSupabase.isConfigured()&&state.auth.user&&state.order.dbId){
@@ -416,7 +465,7 @@
             const fee=await window.MospaceSupabase.warehouseConfirmMeasurements(state.order.dbId,measurements);
             toast('已生成唯一应付金额 ¥'+Number(fee.total_amount).toFixed(2));await refreshDbState('dashboard');
           }catch(error){toast('确认失败：'+(error.message||'请先完成入库'));console.error(error)}
-        }else{state.order.confirmed=state.parcels.length;state.order.confirmedAmount=292;state.order.status='awaiting_payment';state.order.statusLabel='待付款';state.events[1]={title:'仓库已完成确认',desc:'全部包裹已核对实重和尺寸',time:'刚刚',done:true};toast('已确认包裹，生成唯一应付金额 ¥292');state.page='fee';render()}
+        }else{state.order.confirmed=state.parcels.length;state.order.confirmedAmount=292;state.order.status='awaiting_payment';state.order.statusLabel='待付款';state.events[1]={title:'仓库已完成确认',desc:'全部包裹已核对实重和尺寸',time:'刚刚',done:true};toast('已确认包裹，生成唯一应付金额 ¥292');go('dashboard',{role:'warehouse'})}
       };
       const pay=$('#payBtn');if(pay)pay.onclick=async()=>{
         if(window.MospaceSupabase.isConfigured()&&state.auth.user&&state.order.dbId){try{await window.MospaceSupabase.recordOrderPayment(state.order.dbId,'manual_transfer','manual',null);toast('付款记录已写入，费用已锁定');await refreshDbState('fee')}catch(error){toast('付款失败：'+(error.message||'请稍后重试'))}}
@@ -424,11 +473,11 @@
       };
       const pack=$('#packBtn');if(pack)pack.onclick=async()=>{
         if(window.MospaceSupabase.isConfigured()&&state.auth.user&&state.order.dbId){try{await window.MospaceSupabase.warehousePackOrder(state.order.dbId,$('#boxNo')?.value,$('#packageNote')?.value);toast('打包记录已写入，订单进入待出货');await refreshDbState('ship')}catch(error){toast('打包失败：'+(error.message||'请稍后重试'))}}
-        else{state.order.packed=true;state.order.status='ready_to_ship';state.order.statusLabel='待出货';toast('打包完成，订单进入待出货');state.page='ship';render()}
+        else{state.order.packed=true;state.order.status='ready_to_ship';state.order.statusLabel='待出货';toast('打包完成，订单进入待出货');go('ship',{role:'warehouse'})}
       };
       const ship=$('#shipBtn');if(ship)ship.onclick=async()=>{
         if(window.MospaceSupabase.isConfigured()&&state.auth.user&&state.order.dbId){try{await window.MospaceSupabase.warehouseShipOrder(state.order.dbId,$('#carrier')?.value,$('#shipmentTrackingNo')?.value);toast('出货记录已写入，已生成物流节点');await refreshDbState('ship')}catch(error){toast('出货失败：'+(error.message||'请先完成打包'))}}
-        else{state.order.shipped=true;state.order.status='shipped';state.order.statusLabel='运输中';toast('出货登记成功，已生成物流节点');state.role='merchant';state.page='tracking';render()}
+        else{state.order.shipped=true;state.order.status='shipped';state.order.statusLabel='运输中';toast('出货登记成功，已生成物流节点');go('ship',{role:'warehouse'})}
       };
       const resolveException=$('#resolveExceptionBtn');if(resolveException)resolveException.onclick=()=>{const item=state.exceptions.find(e=>e.id===state.selectedException);if(item){item.status='已处理';item.tone='green';toast('异常处理结果已记录');render()}};
       const match=$('#matchBtn');if(match)match.onclick=async()=>{
@@ -447,7 +496,10 @@
         try{await window.MospaceSupabase.saveAddress({label:label||'默认收货地址',recipient_name:recipient,recipient_phone:phone,country:'印度尼西亚',city:city||'雅加达',address_line:line,is_default:state.addresses.length===0});state.addresses=await window.MospaceSupabase.listAddresses();toast('收件地址已保存');render()}catch(error){toast('保存地址失败：'+(error.message||'请稍后重试'))}
       };
       const cancel=$('#authCancel');if(cancel)cancel.onclick=closeAuth;
-      const mode=$('#authMode');if(mode)mode.onclick=()=>{state.auth.mode=state.auth.mode==='login'?'signup':'login';updateAuthMode()};
+      const mode=$('#authMode');if(mode)mode.onclick=()=>{
+        if(state.auth.mode==='login'&&(state.auth.pendingRole||state.role)!=='merchant'){toast('仓库和管理员账号由平台创建，不能自行注册');return}
+        state.auth.mode=state.auth.mode==='login'?'signup':'login';updateAuthMode()
+      };
       const submit=$('#authSubmit');if(submit)submit.onclick=submitAuth;
       const resend=$('#authResend');if(resend)resend.onclick=async()=>{const email=$('#authIdentifier').value.trim();if(!email){toast('请先填写注册邮箱');return}try{await window.MospaceSupabase.resendConfirmation(email);toast('验证邮件已重新发送，请检查垃圾箱')}catch(error){toast('发送失败：'+(error.message||'请稍后重试'))}};
     }
