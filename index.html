@@ -79,7 +79,7 @@
         {no:'SF102993845',name:'家居配件',status:'已测量',weight:'0.85 kg',size:'28×18×12 cm'},
         {no:'JD882310114',name:'美妆用品',status:'待预报',weight:'—',size:'—'}
       ],
-      addresses:[], adminOrders:[], dbOrders:[], auditLogs:[], pricing:null, selectedException:null,
+      addresses:[], adminOrders:[], dbOrders:[], activeOrderId:null, auditLogs:[], pricing:null, selectedException:null,
       exceptions:[
         {id:'EX-20261018-01',object:'JD882310114',type:'无法匹配入库单号',status:'待人工确认',tone:'red',detail:'仓库扫描后未找到对应的商家预报包裹。请核对快递单号，或联系商家补充预报。'},
         {id:'EX-20261017-03',object:'SH20261015009',type:'超尺寸',status:'待商家确认',tone:'amber',detail:'包裹外箱尺寸超过当前线路限制，需要商家确认加固、拆分或改用其他线路。'}
@@ -117,7 +117,7 @@
     function formatSize(parcel){return parcel?.length_cm&&parcel?.width_cm&&parcel?.height_cm?`${parcel.length_cm}×${parcel.width_cm}×${parcel.height_cm} cm`:'—'}
     function applyDbOrder(latest){
       const fee=feeRecord(latest), payment=paymentRecord(latest);
-      state.order.dbId=latest.id; state.order.id=latest.order_no; state.order.status=latest.status;
+      state.activeOrderId=latest.id; state.order.dbId=latest.id; state.order.id=latest.order_no; state.order.status=latest.status;
       state.order.statusLabel=orderStatusLabel(latest.status); state.order.parcels=latest.parcel_count||0;
       state.order.estimated=Number(fee?.estimated_total||0); state.order.confirmedAmount=fee?.total_amount==null?null:Number(fee.total_amount);
       state.order.shippingFee=fee?.shipping_fee==null?null:Number(fee.shipping_fee); state.order.handlingFee=fee?.handling_fee==null?null:Number(fee.handling_fee);
@@ -128,6 +128,9 @@
       state.order.boxNo=latest.box_no||null; state.order.carrier=latest.shipment_carrier||null; state.order.shipmentTrackingNo=latest.shipment_tracking_no||null;
       const rows=(latest.order_parcels||[]).map(x=>x.parcels||x.parcel).filter(Boolean);
       if(rows.length){state.order.confirmed=rows.filter(p=>p.actual_weight_kg!=null&&p.length_cm!=null&&p.width_cm!=null&&p.height_cm!=null).length;state.parcels=rows.map(p=>({id:p.id,no:p.parcel_no,name:p.item_name||'未填写品名',status:p.status,statusLabel:p.status,weight:formatWeight(p.actual_weight_kg),size:formatSize(p),actualWeight:p.actual_weight_kg,length:p.length_cm,width:p.width_cm,height:p.height_cm}));}
+    }
+    function currentDbOrder(orders){
+      return orders.find(order=>order.id===state.activeOrderId)||orders.find(order=>order.id===state.order.dbId)||orders[0];
     }
     function applyTracking(events){
       if(!events?.length)return;
@@ -161,7 +164,7 @@
         const orders=await window.MospaceSupabase.myOrders();
         state.dbOrders=orders;
         if(orders.length){
-          const latest=orders[0];
+          const latest=currentDbOrder(orders);
           applyDbOrder(latest);
           try{applyTracking(await window.MospaceSupabase.orderTracking(latest.id));}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
         }
@@ -366,8 +369,9 @@
         const orders=await window.MospaceSupabase.myOrders();
         state.dbOrders=orders;
         if(orders.length){
-          applyDbOrder(orders[0]);
-          try{applyTracking(await window.MospaceSupabase.orderTracking(orders[0].id));}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
+          const latest=currentDbOrder(orders);
+          applyDbOrder(latest);
+          try{applyTracking(await window.MospaceSupabase.orderTracking(latest.id));}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
         }
         if(nextPage)state.page=nextPage;
         render();
@@ -394,7 +398,7 @@
               recipientName:$('#recipientName')?.value.trim(),recipientPhone:$('#recipientPhone')?.value.trim(),
               parcels,estimatedFee:state.order.estimated
             });
-            state.order.id=order.order_no;state.order.dbId=order.id;state.order.status='submitted';state.order.statusLabel='待仓库收货';
+            state.activeOrderId=order.id;state.order.id=order.order_no;state.order.dbId=order.id;state.order.status='submitted';state.order.statusLabel='待仓库收货';
             toast('订单已写入数据库：'+order.order_no);await refreshDbState('fee');
           }catch(error){toast('订单写入失败：'+(error.message||'请稍后重试'));console.error(error)}
         }else{toast('订单已创建，参考费用 ¥'+state.order.estimated+'，等待仓库确认');state.page='fee';render()}
