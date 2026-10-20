@@ -1,0 +1,30 @@
+body .sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;padding-top:24px}
+body .side-nav button{display:flex;align-items:center;gap:10px;padding:11px 12px;min-height:43px}
+.nav-icon{width:20px;height:20px;display:grid;place-items:center;opacity:.8;flex-shrink:0}
+.nav-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav-group{font-size:11px;letter-spacing:.1em;color:#92a1c8;padding:20px 12px 6px}
+body .side-nav button.active{background:#315efb;box-shadow:0 5px 14px #070e262b}
+.workspace-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px}
+.workspace-tabs button{background:#fff;border:1px solid var(--line);border-radius:24px;padding:10px 17px;color:#69788f;min-height:42px}
+.workspace-tabs button[aria-selected=true]{background:#183779;border-color:#183779;color:#fff}
+.workspace-tabs small{margin-left:6px;opacity:.8}
+.workspace-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.workspace-toolbar input,.workspace-toolbar select{border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff;max-width:100%;min-width:180px}
+.workspace-toolbar input{flex:1}
+.empty-state{padding:52px 20px;text-align:center;background:#fafbfd;border:1px dashed #dce3ee;border-radius:13px;color:var(--muted)}
+.empty-state h3{color:#273651;margin:12px 0 6px}.empty-state p{margin:0 auto 20px;max-width:480px}
+.empty-symbol{font-size:32px;color:#7788a9}.quick-links{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.quick-link{background:#fff;border:1px solid var(--line);border-radius:13px;display:flex;align-items:center;gap:12px;padding:18px;text-align:left;color:var(--ink)}
+.quick-link:hover{border-color:#92aaff;background:#f8faff}.quick-link .nav-icon{background:#eff3ff;border-radius:10px;width:38px;height:38px;color:var(--brand)}
+.quick-link b{display:block}.quick-link small{color:var(--muted);display:block;margin-top:2px}
+.page-note{font-size:12px;color:var(--muted);margin:12px 0;line-height:1.7}.workspace-list{display:grid;gap:14px}
+.address-copy{white-space:pre-line;overflow-wrap:anywhere}.ticket-message{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fc;padding:14px;border-radius:10px;margin:12px 0}
+.message-unread{border-left:3px solid var(--brand)}.account-facts{display:grid;grid-template-columns:1fr 1fr;gap:18px}.account-facts small{display:block;color:var(--muted);margin-bottom:4px}
+.field .error{color:var(--red)}.btn:disabled{cursor:not-allowed;opacity:.5;box-shadow:none}.table input[type=checkbox]{accent-color:var(--brand);width:17px;height:17px}
+.form-grid textarea{resize:vertical}.list-amount{font-weight:700;font-variant-numeric:tabular-nums}.tracking-layout{display:grid;grid-template-columns:1.2fr 1fr;gap:18px}
+.amount-large{font-size:34px;font-weight:800;letter-spacing:-.04em}.section-space{margin-top:20px}
+.workspace-tabs button:focus-visible,.btn:focus-visible,.side-nav button:focus-visible{outline:3px solid #9ab4ff;outline-offset:2px}
+@media(max-width:980px){.quick-links{grid-template-columns:1fr 1fr}.tracking-layout{grid-template-columns:1fr}.workspace-toolbar input{min-width:140px}}
+@media(max-width:680px){body .sidebar{position:static;width:100%;height:auto;overflow:visible}body .sidebar .side-section{display:block;padding:0}body .sidebar .side-label,body .sidebar .side-footer{display:none}body .side-nav{display:flex;overflow-x:auto;gap:6px;padding:4px 0 10px}body .side-nav button{white-space:nowrap;flex-shrink:0;font-size:12px;min-height:40px}body .side-nav .nav-group{display:none}body .sidebar .role-switch{display:none}body .topbar{height:auto;min-height:62px;gap:8px;padding:12px 15px;flex-wrap:wrap}body .top-actions{gap:8px;font-size:12px}body #envLabel{display:none}.workspace-tabs{gap:6px}.workspace-tabs button{padding:8px 12px;font-size:12px}.quick-links{gap:10px}.quick-link{padding:12px;gap:8px}.quick-link small{font-size:11px}.account-facts{grid-template-columns:1fr}.workspace-toolbar input{min-width:0;flex-basis:100%}.page-head h1{font-size:24px}.metric{gap:10px}.metric b{font-size:14px;overflow-wrap:anywhere;text-align:right}.workspace-list .order-row{align-items:flex-start;flex-wrap:wrap}.form-actions{flex-wrap:wrap}}
+
+body .side-nav .nav-group{padding-top:14px}body .side-nav button{padding-top:8px;padding-bottom:8px;min-height:38px}body .sidebar{gap:12px}body .quick-link,body .grid>*{min-width:0}body .account-facts b{overflow-wrap:anywhere}

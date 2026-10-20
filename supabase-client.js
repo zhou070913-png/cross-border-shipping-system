@@ -41,7 +41,7 @@
     if (!user) return null;
     const { data, error } = await instance
       .from('profiles')
-      .select('id, member_no, role, company_name, display_name, warehouse_id, is_active')
+      .select('id, member_no, role, company_name, display_name, phone, warehouse_id, is_active')
       .eq('id', user.id)
       .maybeSingle();
     if (error) throw error;
@@ -233,7 +233,7 @@
     if (!parcel) throw new Error('未找到匹配的预报包裹');
     const { data: relation, error: relationError } = await instance.from('order_parcels').select('order_id').eq('parcel_id', parcel.id).limit(1).maybeSingle();
     if (relationError) throw relationError;
-    if (!relation) throw new Error('该包裹尚未关联集运订单');
+    if (!relation) return {parcel,order:null};
     const { data: order, error: orderError } = await instance.from('orders').select('*, fees(*), payments(*), order_parcels(parcel_id, parcels(*))').eq('id', relation.order_id).single();
     if (orderError) throw orderError;
     return { parcel, order };
