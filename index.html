@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mospace 集运系统｜产品原型</title>
-  <link rel="stylesheet" href="merchant-workspace.css?v=5" />
+  <link rel="stylesheet" href="merchant-workspace.css?v=6" />
   <style>
     :root{
       --bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#6d7890;--line:#e6eaf1;
@@ -53,7 +53,7 @@
         <div class="side-label">工作台</div>
         <div id="nav" class="side-nav"></div>
       </div>
-      <div class="side-footer"><strong>试运营原型 v1.2</strong>角色独立登录 · 主导航递进 · 一次付款</div>
+      <div class="side-footer"><strong>试运营原型 v1.5</strong>角色独立登录 · 主导航递进 · 一次付款</div>
     </aside>
     <main class="main">
       <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted" id="envLabel">演示环境</span><button class="btn ghost small" id="authBtn">登录</button><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
@@ -117,7 +117,7 @@
     function statusTone(value){return ['paid','shipped','delivered'].includes(value)?'green':['awaiting_payment','ready_to_ship','measuring','warehouse_received'].includes(value)?'amber':['exception','cancelled'].includes(value)?'red':'blue'}
     function feeRecord(order){return Array.isArray(order?.fees)?(order.fees[0]||null):(order?.fees||null)}
     function paymentRecord(order){return Array.isArray(order?.payments)?(order.payments[0]||null):(order?.payments||null)}
-    function formatWeight(value){return value==null?'—':Number(value).toFixed(2)+' kg'}
+    function formatWeight(value){return value==null?'—':Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:3,useGrouping:false})+' kg'}
     function formatSize(parcel){return parcel?.length_cm&&parcel?.width_cm&&parcel?.height_cm?`${parcel.length_cm}×${parcel.width_cm}×${parcel.height_cm} cm`:'—'}
     function applyDbOrder(latest){
       const fee=feeRecord(latest), payment=paymentRecord(latest);
@@ -595,7 +595,7 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=6"></script>
+  <script src="merchant-workspace.js?v=7"></script>
   <script src="warehouse-workspace.js?v=1"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
