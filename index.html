@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mospace 集运系统｜产品原型</title>
-  <link rel="stylesheet" href="merchant-workspace.css?v=1" />
+  <link rel="stylesheet" href="merchant-workspace.css?v=2" />
   <style>
     :root{
       --bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#6d7890;--line:#e6eaf1;
@@ -53,7 +53,7 @@
         <div class="side-label">工作台</div>
         <div id="nav" class="side-nav"></div>
       </div>
-      <div class="side-footer"><strong>试运营原型 v1.0</strong>角色独立登录 · 主导航递进 · 一次付款</div>
+      <div class="side-footer"><strong>试运营原型 v1.1</strong>角色独立登录 · 主导航递进 · 一次付款</div>
     </aside>
     <main class="main">
       <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted" id="envLabel">演示环境</span><button class="btn ghost small" id="authBtn">登录</button><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
@@ -98,7 +98,7 @@
     };
     const navs = {
       merchant:[
-        ['dashboard','首页'],['parcels','我的包裹'],['orders','我的订单'],['receivers','收货地址'],['tracking-list','物流追踪'],['sea-tracking','海运追踪'],['rates','运价查询'],['address','仓库地址'],['messages','消息中心'],['support','客服工单'],['offers','推广优惠'],['billing','钱包与账单'],['profile','我的资料']
+        ['dashboard','首页'],['parcels','我的包裹'],['orders','我的订单'],['receivers','地址管理'],['rates','运价查询'],['messages','消息与客服'],['profile','我的账户']
       ],
       warehouse:[
         ['dashboard','仓库工作台'],['inbound','入库扫描'],['confirm','包裹确认'],['packing','拣货 / 合包 / 打包'],['ship','出货登记'],['exceptions','异常处理']
@@ -298,7 +298,10 @@
         if(page==='consolidate')return 'parcels';
         if(page==='parcel-detail')return 'parcels';
         if(['fee'].includes(page))return 'orders';
-        if(page==='tracking')return 'tracking-list';
+        if(['tracking','tracking-list','sea-tracking','billing'].includes(page))return 'orders';
+        if(page==='address')return 'receivers';
+        if(page==='support')return 'messages';
+        if(page==='offers')return 'profile';
         if(['pre-advise','packing-request','packing-history'].includes(page))return 'parcels';
       }
       return page;
@@ -494,7 +497,7 @@
         const views={dashboard:adminDashboard,orders:adminOrders,config:adminConfig,audit:adminAudit,accounts:adminAccounts,'support-admin':merchantSupportAdmin};
         html=(views[state.page]||adminDashboard)();
       }
-      $('#content').innerHTML=html; $('#avatar').textContent=state.role==='merchant'?'商':state.role==='warehouse'?'仓':'管'; $('#userName').textContent=state.auth.profile?.member_no||(state.auth.user?.email)||(state.role==='merchant'?'跨境商家':state.role==='warehouse'?'深圳仓操作员':'平台运营管理员'); $('#authBtn').textContent=state.auth.user?'退出登录':'登录'; $('#envLabel').textContent=window.MospaceSupabase.isConfigured()?(state.auth.user?'数据库已连接':'数据库已配置'):'演示环境';
+      $('#content').innerHTML=state.role==='merchant'?merchantPageFrame(html):html; $('#avatar').textContent=state.role==='merchant'?'商':state.role==='warehouse'?'仓':'管'; $('#userName').textContent=state.auth.profile?.member_no||(state.auth.user?.email)||(state.role==='merchant'?'跨境商家':state.role==='warehouse'?'深圳仓操作员':'平台运营管理员'); $('#authBtn').textContent=state.auth.user?'退出登录':'登录'; $('#envLabel').textContent=window.MospaceSupabase.isConfigured()?(state.auth.user?'数据库已连接':'数据库已配置'):'演示环境';
       bind();
     }
     async function refreshDbState(nextPage){
@@ -594,7 +597,7 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=2"></script>
+  <script src="merchant-workspace.js?v=3"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>
