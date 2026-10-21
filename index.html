@@ -101,7 +101,7 @@
         ['dashboard','首页'],['parcels','我的包裹'],['orders','我的订单'],['receivers','地址管理'],['rates','运价查询'],['messages','消息与客服'],['profile','我的账户']
       ],
       warehouse:[
-        ['dashboard','仓库工作台'],['inbound','入库扫描'],['confirm','包裹确认'],['packing','拣货 / 合包 / 打包'],['ship','出货登记'],['exceptions','异常处理']
+        ['dashboard','仓库工作台'],['inbound','入库扫描'],['confirm','包裹确认'],['packing','拣货 / 合包 / 打包'],['ship','出货登记'],['warehouse-tracking','物流查询'],['exceptions','异常处理']
       ],
       admin:[
         ['dashboard','运营看板'],['orders','订单与异常'],['config','渠道 / 箱型 / 运价'],['audit','审计日志'],['support-admin','客服工单'],['accounts','商家与仓库账号']
@@ -301,6 +301,7 @@
         if(page==='offers')return 'profile';
         if(['pre-advise','packing-request','packing-history'].includes(page))return 'parcels';
       }
+      if(role==='warehouse'&&page==='warehouse-tracking-detail')return 'warehouse-tracking';
       return page;
     }
     function renderNav(){
@@ -488,7 +489,7 @@
         const views={dashboard:merchantDashboard,'order-create':merchantCreate,consolidate:merchantConsolidate,parcels:merchantParcels,'parcel-detail':merchantParcelDetail,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress,...MerchantViews};
         html=(views[state.page]||merchantDashboard)();
       }else if(state.role==='warehouse'){
-        const views={dashboard:warehouseDashboard,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
+        const views={dashboard:warehouseDashboard,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,'warehouse-tracking':warehouseTrackingList,'warehouse-tracking-detail':warehouseTrackingDetail,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
         html=(views[state.page]||warehouseDashboard)();
       }else{
         const views={dashboard:adminDashboard,orders:adminOrders,config:adminConfig,audit:adminAudit,accounts:adminAccounts,'support-admin':merchantSupportAdmin};
@@ -596,7 +597,7 @@
 
   </script>
   <script src="merchant-workspace.js?v=7"></script>
-  <script src="warehouse-workspace.js?v=2"></script>
+  <script src="warehouse-workspace.js?v=3"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>

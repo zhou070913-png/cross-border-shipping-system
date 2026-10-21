@@ -1,6 +1,51 @@
 /* 仓库队列与订单详情共用数据库中的订单状态，不通过当前单笔订单计算总任务。 */
 'use strict';
-const warehouseWorkspace={owner:null,selectedId:null,filter:'all',query:'',busy:false,loading:false};
+const warehouseWorkspace={owner:null,selectedId:null,filter:'all',query:'',busy:false,loading:false,trackingQuery:'',trackingTab:'all',tracking:{orderId:null,events:[],loading:false,error:null,request:0}};
+Object.assign(pageRoles,{'warehouse-tracking':'warehouse','warehouse-tracking-detail':'warehouse'});
+function warehouseShippedOrders(){return state.dbOrders.filter(o=>['shipped','delivered'].includes(o.status)||o.shipped_at)}
+function warehouseTrackingList(){
+  const orders=warehouseShippedOrders(),q=warehouseWorkspace.trackingQuery.toLowerCase();
+  const rows=orders.filter(o=>(warehouseWorkspace.trackingTab==='all'||o.status===warehouseWorkspace.trackingTab)&&`${o.order_no} ${o.shipment_tracking_no||''} ${o.shipment_carrier||''} ${o.recipient_name||''}`.toLowerCase().includes(q));
+  return shell('物流查询','出货后按订单或国际运单核对运输状态，点击进入物流详情。',button('返回出货登记','ship'))+
+    notice('物流记录来源','与商家端共用系统登记的物流节点。当前尚未接入承运商自动轨迹，出货登记不代表实时运输位置。')+
+    `<div class="card"><div class="workspace-tabs">${[['all','全部已出货'],['shipped','运输中'],['delivered','已签收']].map(([key,label])=>`<button type="button" data-warehouse-tracking-tab="${key}" class="${warehouseWorkspace.trackingTab===key?'active':''}" aria-pressed="${warehouseWorkspace.trackingTab===key}">${label}（${orders.filter(o=>key==='all'||o.status===key).length}）</button>`).join('')}</div><form id="warehouseTrackingSearch" class="workspace-toolbar"><input id="warehouseTrackingQuery" aria-label="搜索仓库物流" placeholder="订单号 / 国际运单号 / 承运商 / 收件人" value="${esc(warehouseWorkspace.trackingQuery)}"><button class="btn primary">查询</button><button type="button" class="btn ghost" data-refresh-workspace>刷新物流列表</button></form>${rows.length?`<div class="table-wrap"><table class="table"><thead><tr><th>订单号</th><th>承运商 / 国际运单号</th><th>目的地 / 收件人</th><th>物流状态</th><th>操作</th></tr></thead><tbody>${rows.map(o=>`<tr><td class="mono">${esc(o.order_no)}</td><td>${esc(o.shipment_carrier||'待登记')}<br><span class="mono">${esc(o.shipment_tracking_no||'待登记')}</span></td><td>${esc(o.destination_country||'')} · ${esc(o.destination_city||'')}<br>${esc(o.recipient_name||'')}</td><td>${status(orderStatusLabel(o.status),statusTone(o.status))}</td><td>${warehouseOrderButton(o,'warehouse-tracking-detail','查看物流')}</td></tr>`).join('')}</tbody></table></div>`:emptyState('没有匹配的已出货订单',orders.length?'调整搜索词或状态后重试。':'完成出货登记后，订单会自动出现在这里。')}</div>`;
+}
+function warehouseTrackingDetail(){
+  const o=warehouseSelected();
+  if(!o||!warehouseShippedOrders().some(row=>row.id===o.id))return shell('物流详情','请从物流查询选择一笔已出货订单。',button('返回物流查询','warehouse-tracking'));
+  const tracking=warehouseWorkspace.tracking,active=tracking.orderId===o.id;
+  let events;
+  if(!active||tracking.loading)events=notice('正在读取物流节点','请稍候。');
+  else if(tracking.error)events=notice('物流节点读取失败','请点击“刷新本单物流”重试。此处不显示旧订单的节点。');
+  else events=tracking.events.length?`<div class="timeline">${tracking.events.map(e=>`<div class="event"><div></div><div><h4>${esc(e.event_title||'物流节点')}</h4><p>${esc(e.event_description||'')}</p><p>${esc(dateText(e.occurred_at))}${e.location?' · '+esc(e.location):''}</p></div></div>`).join('')}</div>`:emptyState('暂无物流节点','该订单尚无可读取的物流记录，请刷新或联系运营核对。');
+  return shell('物流详情',o.order_no,button('返回物流查询','warehouse-tracking')+`<button type="button" class="btn primary" id="warehouseTrackingRefresh" ${active&&tracking.loading?'disabled':''}>刷新本单物流</button>`)+
+    notice('节点与订单状态','节点来自实际业务登记，与商家端共享。承运商实时轨迹尚未接入，请以承运商实际运输结果为准。')+
+    `<div class="grid layout-2"><div class="card"><div class="card-title"><h3>物流节点</h3>${status(orderStatusLabel(o.status),statusTone(o.status))}</div>${events}</div><div class="card"><h3>订单与运单信息</h3>${[['订单号',o.order_no],['承运商',o.shipment_carrier],['国际运单号',o.shipment_tracking_no],['运输线路',o.route_name],['目的地国家',o.destination_country],['目的地地址',o.destination_address],['收件人',o.recipient_name],['联系电话',o.recipient_phone],['出货登记时间',o.shipped_at?dateText(o.shipped_at):null]].map(([label,value])=>`<div class="metric"><span>${label}</span><b>${esc(value||'待登记')}</b></div>`).join('')}<div class="form-actions">${warehouseOrderButton(o,'ship','查看出货记录')}</div></div></div>`;
+}
+async function loadWarehouseTracking(id){
+  const owner=state.auth.user?.id,request=warehouseWorkspace.tracking.request+1;
+  warehouseWorkspace.tracking={orderId:id,events:[],loading:true,error:null,request};
+  if(state.page==='warehouse-tracking-detail')render();
+  try{
+    const events=await window.MospaceSupabase.orderTracking(id);
+    if(state.auth.user?.id!==owner||state.role!=='warehouse'||warehouseWorkspace.tracking.request!==request)return;
+    warehouseWorkspace.tracking.events=safeRows(events);
+  }catch(e){
+    if(state.auth.user?.id!==owner||warehouseWorkspace.tracking.request!==request)return;
+    warehouseWorkspace.tracking.error=true;
+  }finally{
+    if(state.auth.user?.id===owner&&state.role==='warehouse'&&warehouseWorkspace.tracking.request===request){
+      warehouseWorkspace.tracking.loading=false;
+      if(state.page==='warehouse-tracking-detail'&&warehouseWorkspace.selectedId===id)render();
+    }
+  }
+}
+async function refreshWarehouseTracking(){
+  const id=warehouseWorkspace.selectedId,owner=state.auth.user?.id;
+  if(!id||warehouseWorkspace.tracking.loading)return;
+  if(!await refreshDbState())return;
+  if(state.auth.user?.id===owner&&state.role==='warehouse'&&state.page==='warehouse-tracking-detail'&&warehouseWorkspace.selectedId===id)await loadWarehouseTracking(id);
+}
 const warehouseStages={inbound:['submitted'],confirm:['warehouse_received','measuring'],packing:['paid'],ship:['ready_to_ship']};
 const warehouseStageLabels={inbound:'待收货',confirm:'待确认实重尺寸',packing:'已付款待打包',ship:'待出货'};
 function warehouseStage(o){return Object.keys(warehouseStages).find(k=>warehouseStages[k].includes(o.status))||null}
@@ -9,7 +54,7 @@ function warehouseOrderRows(orders){
   return orders.length?`<div class="table-wrap"><table class="table"><thead><tr><th>订单号 / 国内快递单号</th><th>包裹 / 目的地</th><th>状态</th><th>操作</th></tr></thead><tbody>${orders.map(o=>{
     const next=warehouseStage(o),page=next||(['shipped','delivered'].includes(o.status)?'ship':'confirm');
     const tracking=safeRows(o.order_parcels).map(r=>r.parcels?.tracking_no||r.parcels?.parcel_no).filter(Boolean);
-    return `<tr><td><b class="mono">${esc(o.order_no)}</b><br><small class="muted">${esc(tracking.join(' / ')||'未关联快递单号')}</small></td><td>${Number(o.parcel_count||0)} 个<br><small class="muted">${esc(o.destination_country||'')} · ${esc(o.destination_city||'')}</small></td><td>${status(orderStatusLabel(o.status),statusTone(o.status))}</td><td>${warehouseOrderButton(o,page,next?{inbound:'查看并收货',confirm:'开始确认',packing:'开始打包',ship:'登记出货'}[next]:'查看记录')}</td></tr>`;
+    return `<tr><td><b class="mono">${esc(o.order_no)}</b><br><small class="muted">${esc(tracking.join(' / ')||'未关联快递单号')}</small></td><td>${Number(o.parcel_count||0)} 个<br><small class="muted">${esc(o.destination_country||'')} · ${esc(o.destination_city||'')}</small></td><td>${status(orderStatusLabel(o.status),statusTone(o.status))}</td><td>${warehouseOrderButton(o,page,next?{inbound:'查看并收货',confirm:'开始确认',packing:'开始打包',ship:'登记出货'}[next]:'查看记录')}${['shipped','delivered'].includes(o.status)?warehouseOrderButton(o,'warehouse-tracking-detail','查看物流'):''}</td></tr>`;
   }).join('')}</tbody></table></div>`:emptyState('当前没有此类订单','可返回工作台查看全部订单，或刷新其他角色的最新操作。');
 }
 function warehouseQueue(page){
@@ -33,7 +78,7 @@ warehouseDashboard=function(){
   const rows=state.dbOrders.filter(o=>(warehouseWorkspace.filter==='all'||(warehouseStages[warehouseWorkspace.filter]||[warehouseWorkspace.filter]).includes(o.status))&&
     `${o.order_no} ${o.recipient_name||''} ${safeRows(o.order_parcels).map(r=>r.parcels?.tracking_no||'').join(' ')}`.toLowerCase().includes(warehouseWorkspace.query.toLowerCase()));
   const filters=[['all','全部订单'],...Object.entries(warehouseStageLabels),['awaiting_payment','待商家付款'],['shipped','运输中'],['delivered','已签收']];
-  return shell('仓库工作台','按订单号接续收货、测量确认、打包和出货；与商家端使用同一订单状态。',button('扫描入库','inbound',true))+
+  return shell('仓库工作台','按订单号接续收货、测量确认、打包和出货；与商家端使用同一订单状态。',button('物流查询','warehouse-tracking')+button('扫描入库','inbound',true))+
     `<div class="grid kpis">${Object.keys(warehouseStages).map(k=>`<button type="button" class="warehouse-kpi" data-warehouse-filter="${k}">${kpi(warehouseStageLabels[k],count(k),'订单数 · 点击查看队列')}</button>`).join('')}</div>`+
     `<p class="page-note">另有 ${independent} 个尚未申请打包的预报包裹待入库，可在入库扫描中处理。</p>`+
     `<div class="card section-space"><div class="card-title"><h3>仓库订单与任务</h3><span class="tag">本账号有权处理的全部订单</span></div><div class="workspace-tabs">${filters.map(([k,v])=>`<button type="button" data-warehouse-filter="${k}" class="${warehouseWorkspace.filter===k?'active':''}" aria-pressed="${warehouseWorkspace.filter===k}">${v}</button>`).join('')}</div><form id="warehouseSearchForm" class="workspace-toolbar"><input id="warehouseSearch" aria-label="搜索仓库订单" placeholder="搜索订单号 / 国内快递单号 / 收件人" value="${esc(warehouseWorkspace.query)}"><button class="btn primary">搜索</button></form>${warehouseOrderRows(rows)}</div>`+
@@ -53,7 +98,7 @@ warehouseInbound=function(){
 };
 function warehouseDetail(page,view){
   const o=warehouseSelected();
-  if(!o)return shell({confirm:'包裹确认',packing:'打包作业',ship:'出货登记'}[page],'先选择需要处理的订单，再核对该单数据。',button('返回工作台','dashboard'))+warehouseQueue(page);
+  if(!o)return shell({confirm:'包裹确认',packing:'打包作业',ship:'出货登记'}[page],'先选择需要处理的订单，再核对该单数据。',button('返回工作台','dashboard')+(page==='ship'?button('查询已出货订单物流','warehouse-tracking',true):''))+warehouseQueue(page);
   const permitted={confirm:['warehouse_received','measuring','awaiting_payment','paid','ready_to_ship','shipped','delivered'],packing:['paid','ready_to_ship','shipped','delivered'],ship:['ready_to_ship','shipped','delivered']}[page].includes(o.status);
   if(!permitted)return shell('订单当前进度',o.order_no,button('返回工作台','dashboard'))+warehouseContext(o)+notice('当前无需执行这项操作','请按订单的最新状态进入对应队列。')+(warehouseStage(o)?warehouseOrderButton(o,warehouseStage(o),'进入下一步'):'' )+warehouseQueue(page);
   let html=warehouseContext(o)+view()+warehouseActualFees(o);
@@ -61,6 +106,7 @@ function warehouseDetail(page,view){
     html+=`<div class="card section-space">${notice('实重尺寸和费用确认已完成',o.status==='awaiting_payment'?'下一步等待商家一次付款，无需再次确认。':'此单已完成费用确认，按最新状态继续办理。')}${o.status==='paid'?warehouseOrderButton(o,'packing','进入本单打包'):o.status==='ready_to_ship'?warehouseOrderButton(o,'ship','进入本单出货'):''}</div>`;
   }
   if(page==='packing'&&o.status==='ready_to_ship')html+=`<div class="form-actions">${warehouseOrderButton(o,'ship','继续登记本单出货')}</div>`;
+  if(page==='ship'&&['shipped','delivered'].includes(o.status))html+=`<div class="card section-space"><div class="card-title"><h3>出货登记已完成，继续查看物流</h3>${warehouseOrderButton(o,'warehouse-tracking-detail','查看本单物流')}</div>${button('全部已出货订单物流','warehouse-tracking')}</div>`;
   if(safeRows(o.order_parcels).some(r=>associatedOrders(r.parcel_id).length>1))html=html.replace(/<button([^>]*id="(?:confirmBtn|packBtn|shipBtn)"[^>]*)>/g,'<button$1 disabled>');
   return html+warehouseQueue(page);
 }
@@ -72,6 +118,7 @@ async function openWarehouseOrder(id,page){
   const o=state.dbOrders.find(x=>x.id===id);
   if(!o){toast('该订单暂不可见，请刷新后重试');return}
   warehouseWorkspace.selectedId=id;applyDbOrder(o);state.events=[];go(page,{role:'warehouse'});
+  if(page==='warehouse-tracking-detail')await loadWarehouseTracking(id);
 }
 async function warehouseSave(buttonEl,action,page,expected,message){
   if(warehouseWorkspace.busy||warehouseWorkspace.loading)return;
@@ -95,11 +142,16 @@ const warehouseBaseBind=bind;
 bind=function(){
   warehouseBaseBind();
   if(state.role!=='warehouse'||!state.auth.user)return;
-  if(warehouseWorkspace.owner!==state.auth.user.id)Object.assign(warehouseWorkspace,{owner:state.auth.user.id,selectedId:null,filter:'all',query:'',busy:false,loading:false});
+  if(warehouseWorkspace.owner!==state.auth.user.id)Object.assign(warehouseWorkspace,{owner:state.auth.user.id,selectedId:null,filter:'all',query:'',busy:false,loading:false,trackingQuery:'',trackingTab:'all',tracking:{orderId:null,events:[],loading:false,error:null,request:warehouseWorkspace.tracking.request+1}});
   document.querySelectorAll('#nav [data-page]').forEach(el=>el.addEventListener('click',()=>{if(warehouseWorkspace.busy||warehouseWorkspace.loading)return;warehouseWorkspace.selectedId=null},{capture:true}));
   document.querySelectorAll('[data-warehouse-order]').forEach(el=>el.onclick=()=>openWarehouseOrder(el.dataset.warehouseOrder,el.dataset.warehousePage));
   document.querySelectorAll('[data-warehouse-back]').forEach(el=>el.onclick=()=>{if(warehouseWorkspace.busy||warehouseWorkspace.loading)return;warehouseWorkspace.selectedId=null;render()});
   document.querySelectorAll('[data-warehouse-filter]').forEach(el=>el.onclick=()=>{if(warehouseWorkspace.busy||warehouseWorkspace.loading)return;warehouseWorkspace.filter=el.dataset.warehouseFilter;warehouseWorkspace.selectedId=null;state.page='dashboard';render()});
+  document.querySelectorAll('[data-warehouse-tracking-tab]').forEach(el=>el.onclick=()=>{warehouseWorkspace.trackingTab=el.dataset.warehouseTrackingTab;render()});
+  const trackingSearch=$('#warehouseTrackingSearch');if(trackingSearch)trackingSearch.onsubmit=e=>{e.preventDefault();warehouseWorkspace.trackingQuery=$('#warehouseTrackingQuery').value.trim();render()};
+  const trackingRefresh=$('#warehouseTrackingRefresh');if(trackingRefresh)trackingRefresh.onclick=refreshWarehouseTracking;
+  const globalRefresh=$('#workspaceGlobalRefresh');if(globalRefresh&&state.page==='warehouse-tracking-detail')globalRefresh.onclick=refreshWarehouseTracking;
+  else if(globalRefresh)globalRefresh.onclick=()=>refreshDbState();
   const search=$('#warehouseSearchForm');if(search)search.onsubmit=e=>{e.preventDefault();warehouseWorkspace.query=$('#warehouseSearch').value.trim();render()};
   const receive=$('#receiveSelectedOrder');if(receive)receive.onclick=()=>warehouseSave(receive,id=>window.MospaceSupabase.warehouseReceiveOrder(id),'inbound',['warehouse_received','measuring'],'本单收货已完成，请继续确认实重尺寸');
   const confirm=$('#confirmBtn');if(confirm)confirm.onclick=()=>{

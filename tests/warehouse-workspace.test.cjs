@@ -81,3 +81,41 @@ test('unconfirmed fees never use estimates as actual; zero confirmed fees render
   const zero=run(`warehouseActualFees({fees:{total_amount:0,shipping_fee:0,handling_fee:0}})`);
   assert.ok(zero.includes('¥0.00'));assert.ok(!zero.includes('实际费用尚未生成'));
 });
+
+test('warehouse tracking list includes shipped/delivered only, searches waybills, filters and preserves main navigation',()=>{
+ const {run}=setup();
+ run(`state.dbOrders=[{id:'a',order_no:'ORDER-A',status:'shipped',shipment_carrier:'EMS',shipment_tracking_no:'EM123ID',recipient_name:'Alice',destination_country:'印度尼西亚'},{id:'b',order_no:'ORDER-B',status:'delivered',shipment_tracking_no:'DONE456'},{id:'c',order_no:'UNSHIPPED',status:'ready_to_ship'}];`);
+ let html=run('warehouseTrackingList()');assert.ok(html.includes('ORDER-A'));assert.ok(html.includes('ORDER-B'));assert.ok(!html.includes('UNSHIPPED'));
+ run("warehouseWorkspace.trackingQuery='em123id'");html=run('warehouseTrackingList()');assert.ok(html.includes('ORDER-A'));assert.ok(!html.includes('ORDER-B'));
+ run("warehouseWorkspace.trackingQuery='';warehouseWorkspace.trackingTab='delivered'");html=run('warehouseTrackingList()');assert.ok(html.includes('ORDER-B'));assert.ok(!html.includes('ORDER-A'));
+ run("warehouseWorkspace.trackingQuery='not found'");assert.ok(run('warehouseTrackingList()').includes('没有匹配'));
+ assert.equal(run("pageRoles['warehouse-tracking-detail']"),'warehouse');assert.equal(run("navActivePage('warehouse-tracking-detail','warehouse')"),'warehouse-tracking');
+ assert.ok(run('warehouseShip()').includes('查询已出货订单物流'));
+});
+test('opening shipped order loads its own persisted events and provides shipping-to-tracking links',async()=>{
+ const {context,run}=setup();context.requested=[];
+ run(`state.dbOrders=[{id:'a',order_no:'ORDER-A',status:'shipped',shipment_tracking_no:'EM123',order_parcels:[]}];go=page=>state.page=page;window.MospaceSupabase.orderTracking=async id=>{requested.push(id);return [{event_title:'运输节点',event_description:'仓库已登记出货',occurred_at:'2026-10-21T08:00:00Z',location:'深圳'}]};`);
+ await run("openWarehouseOrder('a','warehouse-tracking-detail')");assert.deepEqual(context.requested,['a']);assert.equal(run('warehouseWorkspace.tracking.orderId'),'a');
+ const html=run('warehouseTrackingDetail()');assert.ok(html.includes('运输节点'));assert.ok(html.includes('深圳'));assert.ok(html.includes('EM123'));assert.ok(html.includes('尚未接入'));assert.ok(!html.includes('暂无物流节点'));
+ assert.ok(run('warehouseShip()').includes('查看本单物流'));
+});
+test('out-of-order event responses never leak previous order nodes and failed reads remain explicit',async()=>{
+ const {run}=setup();run(`state.page='warehouse-tracking-detail';window.MospaceSupabase.orderTracking=id=>new Promise((resolve,reject)=>{if(id==='a'){resolveA=resolve}else{resolveB=resolve;rejectB=reject}})`);
+ const a=run("loadWarehouseTracking('a')"),b=run("loadWarehouseTracking('b')");run("resolveB([{event_title:'B节点'}])");await b;run("resolveA([{event_title:'A节点'}])");await a;
+ assert.equal(run('warehouseWorkspace.tracking.events[0].event_title'),'B节点');assert.equal(run('warehouseWorkspace.tracking.orderId'),'b');
+ run(`state.dbOrders=[{id:'b',order_no:'B',status:'shipped',order_parcels:[]}];applyDbOrder(state.dbOrders[0]);warehouseWorkspace.selectedId='b';window.MospaceSupabase.orderTracking=async()=>{throw Error('network')}`);
+ await run("loadWarehouseTracking('b')");const html=run('warehouseTrackingDetail()');assert.ok(html.includes('物流节点读取失败'));assert.ok(!html.includes('B节点'));assert.equal(run('warehouseWorkspace.tracking.loading'),false);
+});
+test('tracking handles empty results and escaped content and discards responses after account changes',async()=>{
+ const {run}=setup();run(`state.page='warehouse-tracking-detail';state.dbOrders=[{id:'a',order_no:'A',status:'shipped',shipment_tracking_no:'<img>',order_parcels:[]}];applyDbOrder(state.dbOrders[0]);warehouseWorkspace.selectedId='a';window.MospaceSupabase.orderTracking=async()=>[]`);
+ await run("loadWarehouseTracking('a')");assert.ok(run('warehouseTrackingDetail()').includes('暂无物流节点'));
+ run(`warehouseWorkspace.tracking.events=[{event_title:'<script>',event_description:'<img>',location:'<b>'}]`);
+ const html=run('warehouseTrackingDetail()');assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<img>'));
+ run(`window.MospaceSupabase.orderTracking=()=>new Promise(r=>releaseTracking=r)`);const pending=run("loadWarehouseTracking('a')");run(`state.auth.user={id:'other'};releaseTracking([{event_title:'不应显示'}])`);await pending;
+ assert.equal(run('warehouseWorkspace.tracking.events.length'),0);
+});
+test('tracking refresh re-reads order status and events for the selected ID without creating any nodes',async()=>{
+ const {context,run}=setup();context.requests=[];
+ run(`state.page='warehouse-tracking-detail';state.dbOrders=[{id:'a',order_no:'A',status:'shipped',order_parcels:[]}];applyDbOrder(state.dbOrders[0]);warehouseWorkspace.selectedId='a';refreshDbState=async()=>{requests.push('orders');state.dbOrders[0].status='delivered';applyDbOrder(state.dbOrders[0]);return true};window.MospaceSupabase.orderTracking=async id=>{requests.push(id);return [{event_title:'已签收'}]}`);
+ await run('refreshWarehouseTracking()');assert.deepEqual(context.requests,['orders','a']);assert.equal(run('state.order.status'),'delivered');assert.ok(run('warehouseTrackingDetail()').includes('已签收'));
+});
