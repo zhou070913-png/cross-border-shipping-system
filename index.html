@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mospace 集运系统｜产品原型</title>
-  <link rel="stylesheet" href="merchant-workspace.css?v=2" />
+  <link rel="stylesheet" href="merchant-workspace.css?v=3" />
   <style>
     :root{
       --bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#6d7890;--line:#e6eaf1;
@@ -53,7 +53,7 @@
         <div class="side-label">工作台</div>
         <div id="nav" class="side-nav"></div>
       </div>
-      <div class="side-footer"><strong>试运营原型 v1.1</strong>角色独立登录 · 主导航递进 · 一次付款</div>
+      <div class="side-footer"><strong>试运营原型 v1.2</strong>角色独立登录 · 主导航递进 · 一次付款</div>
     </aside>
     <main class="main">
       <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted" id="envLabel">演示环境</span><button class="btn ghost small" id="authBtn">登录</button><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
@@ -72,7 +72,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-client.js?v=merchant-workspace-1"></script>
+  <script src="supabase-client.js?v=warehouse-1"></script>
   <script>
     const state = {
       role:'merchant', page:'dashboard',
@@ -156,9 +156,6 @@
     }
     function pageAllowed(page,role){
       if(page==='consolidate'&&!state.activeOrderId&&!state.order.dbId){toast('请先完成包裹预报');return false}
-      if(role==='warehouse'&&page==='confirm'&&!['warehouse_received','measuring'].includes(state.order.status)&&!state.order.confirmed){toast('请先完成入库扫描，再进入包裹确认');return false}
-      if(role==='warehouse'&&page==='packing'&&!['paid','ready_to_ship','shipped','delivered'].includes(state.order.status)&&!state.order.paidAmount){toast('商家付款后才能进入打包作业');return false}
-      if(role==='warehouse'&&page==='ship'&&!state.order.packed&&!['ready_to_ship','shipped','delivered'].includes(state.order.status)){toast('请先完成打包并录入箱号');return false}
       if(role==='merchant'&&['fee','tracking'].includes(page)&&!state.activeOrderId&&!state.order.dbId){toast('请先创建集运订单');return false}
       return true;
     }
@@ -423,23 +420,23 @@
     }
     function warehouseConfirm(){
       const o=state.order;
-      const completed=['awaiting_payment','paid','ready_to_ship','shipped','delivered'].includes(o.status)||(o.confirmed>0&&o.confirmed>=o.parcels);
+      const completed=['awaiting_payment','paid','ready_to_ship','shipped','delivered'].includes(o.status);
       const completedNotice=completed?'<div class="notice" style="margin-top:14px;margin-bottom:0"><div>✓</div><div><strong>包裹确认已完成</strong><p>实重、尺寸和费用已写入订单，商家可以查看并付款。</p></div></div>':'';
       return shell('包裹确认','核对照片、实重、尺寸和库位；全部确认后自动生成应付金额。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+
-      '<div class="split"><div class="card"><div class="card-title"><h3>确认订单 '+esc(o.id)+'</h3>'+(completed?status('已完成','green'):'<span class="tag">WH-03</span>')+'</div><div class="table-wrap"><table class="table"><thead><tr><th>快递单号</th><th>预报品名</th><th>实重 kg</th><th>长 cm</th><th>宽 cm</th><th>高 cm</th></tr></thead><tbody>'+state.parcels.map((p,i)=>'<tr class="measure-row" data-parcel-no="'+esc(p.no)+'"><td class="mono">'+esc(p.no)+'</td><td>'+esc(p.name)+'</td><td><input class="measure-weight" type="number" min="0" step="0.001" '+(completed?'readonly ':'')+'style="width:72px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.actualWeight||((i===0)?'1.35':(i===1?'0.92':'')))+'" /></td><td><input class="measure-length" type="number" min="0" step="0.1" '+(completed?'readonly ':'')+'style="width:62px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.length||((i===0)?'34':(i===1?'29':'')))+'" /></td><td><input class="measure-width" type="number" min="0" step="0.1" '+(completed?'readonly ':'')+'style="width:62px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.width||((i===0)?'25':(i===1?'19':'')))+'" /></td><td><input class="measure-height" type="number" min="0" step="0.1" '+(completed?'readonly ':'')+'style="width:62px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.height||((i===0)?'11':(i===1?'13':'')))+'" /></td></tr>').join('')+'</tbody></table></div>'+(completed?completedNotice:'<div class="form-actions"><button class="btn primary" id="confirmBtn">确认包裹并生成费用</button></div>')+'</div><div class="card"><div class="card-title"><h3>入库照片</h3><span class="muted">作业记录</span></div><div class="photo">📷 可在后续版本上传包裹照片</div><div class="notice" style="margin-top:14px;margin-bottom:0"><div>!</div><div><strong>'+ (completed?'确认已锁定':'提交后商家才可付款') +'</strong><p>'+ (completed?'费用快照已生成，后续不会重复确认。':'确认数据会写入订单费用快照，商家付款后费用锁定。') +'</p></div></div></div></div>';
+      '<div class="split"><div class="card"><div class="card-title"><h3>确认订单 '+esc(o.id)+'</h3>'+(completed?status('已完成','green'):'<span class="tag">WH-03</span>')+'</div><div class="table-wrap"><table class="table"><thead><tr><th>快递单号</th><th>预报品名</th><th>实重 kg</th><th>长 cm</th><th>宽 cm</th><th>高 cm</th></tr></thead><tbody>'+state.parcels.map((p,i)=>'<tr class="measure-row" data-parcel-no="'+esc(p.no)+'"><td class="mono">'+esc(p.no)+'</td><td>'+esc(p.name)+'</td><td><input class="measure-weight" type="number" min="0" step="0.001" '+(completed?'readonly ':'')+'style="width:72px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.actualWeight??'')+'" /></td><td><input class="measure-length" type="number" min="0" step="0.1" '+(completed?'readonly ':'')+'style="width:62px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.length??'')+'" /></td><td><input class="measure-width" type="number" min="0" step="0.1" '+(completed?'readonly ':'')+'style="width:62px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.width??'')+'" /></td><td><input class="measure-height" type="number" min="0" step="0.1" '+(completed?'readonly ':'')+'style="width:62px;border:1px solid var(--line);padding:7px;border-radius:7px" value="'+(p.height??'')+'" /></td></tr>').join('')+'</tbody></table></div>'+(completed?completedNotice:'<div class="form-actions"><button class="btn primary" id="confirmBtn">确认包裹并生成费用</button></div>')+'</div><div class="card"><div class="card-title"><h3>入库照片</h3><span class="muted">作业记录</span></div><div class="photo">📷 可在后续版本上传包裹照片</div><div class="notice" style="margin-top:14px;margin-bottom:0"><div>!</div><div><strong>'+ (completed?'确认已锁定':'提交后商家才可付款') +'</strong><p>'+ (completed?'费用快照已生成，后续不会重复确认。':'确认数据会写入订单费用快照，商家付款后费用锁定。') +'</p></div></div></div></div>';
     }
     function warehousePacking(){
       const paid=state.order.payment==='已付款';
       const completed=Boolean(state.order.packed)||['ready_to_ship','shipped','delivered'].includes(state.order.status);
       return shell('拣货 / 合包 / 打包','仅处理已付款且没有未解决异常的订单。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+
       '<div class="notice"><div>🔒</div><div><strong>'+(completed?'打包已完成：订单进入待出货':'付款门禁：'+(paid?'订单已付款，可开始打包':'订单尚未付款'))+'</strong><p>'+(completed?'箱号已记录，下一步登记承运商和物流单号。':paid?'费用已锁定，打包过程中不重新计费。':'仓库确认后仍需等待商家一次付款，当前不可出货。')+'</p></div></div>'+
-      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>订单 '+esc(state.order.id)+'</h3>'+status(completed?'已完成':paid?'已付款待打包':'待付款',completed||paid?'green':'amber')+'</div><div class="check-list">'+state.parcels.map(p=>'<div class="check"><span style="flex:1"><b>'+esc(p.no)+'</b><br><small class="muted">'+esc(p.name)+' · '+esc(p.weight)+'</small></span>'+status(completed?'已打包':'已拣货','green')+'</div>').join('')+'</div>'+(completed?'<div class="form-actions"><span class="muted">打包完成时间已记录</span></div>':'<div class="form-actions"><button class="btn primary" id="packBtn" '+(paid?'':'disabled style="opacity:.45"')+'>确认打包完成</button></div>')+'</div><div class="card"><div class="card-title"><h3>包装信息</h3><span class="tag">'+(completed?'已锁定':'付款后可操作')+'</span></div><div class="form-grid"><div class="field"><label>箱号</label><input id="boxNo" value="'+esc(state.order.boxNo||'ID-BOX-001')+'" '+(completed?'readonly':'')+' /></div><div class="field"><label>包装方式</label><select id="packingMethod" '+(completed?'disabled':'')+'><option>标准纸箱</option><option>加固纸箱</option></select></div><div class="field full"><label>作业备注</label><textarea id="packageNote" rows="3" '+(completed?'readonly':'')+'>已按商家要求合包，外箱加贴防水标签。</textarea></div></div></div></div>';
+      '<div class="grid layout-2"><div class="card"><div class="card-title"><h3>订单 '+esc(state.order.id)+'</h3>'+status(completed?'已完成':paid?'已付款待打包':'待付款',completed||paid?'green':'amber')+'</div><div class="check-list">'+state.parcels.map(p=>'<div class="check"><span style="flex:1"><b>'+esc(p.no)+'</b><br><small class="muted">'+esc(p.name)+' · '+esc(p.weight)+'</small></span>'+status(completed?'已打包':'待拣货','green')+'</div>').join('')+'</div>'+(completed?'<div class="form-actions"><span class="muted">打包完成时间已记录</span></div>':'<div class="form-actions"><button class="btn primary" id="packBtn" '+(paid?'':'disabled style="opacity:.45"')+'>确认打包完成</button></div>')+'</div><div class="card"><div class="card-title"><h3>包装信息</h3><span class="tag">'+(completed?'已锁定':'付款后可操作')+'</span></div><div class="form-grid"><div class="field"><label>箱号</label><input id="boxNo" value="'+esc(state.order.boxNo||'')+'" '+(completed?'readonly':'')+' /></div><div class="field"><label>商家包装要求</label><input readonly value="'+esc(state.order.record?.consolidation_method||'未记录，请先核对商家要求')+'" /></div><div class="field full"><label>作业备注</label><textarea id="packageNote" rows="3" '+(completed?'readonly':'')+'>'+esc(state.order.record?.package_note||'')+'</textarea></div></div></div></div>';
     }
     function warehouseShip(){
       const shipped=Boolean(state.order.shipped)||['shipped','delivered'].includes(state.order.status);
       const ready=Boolean(state.order.packed)||['ready_to_ship','shipped','delivered'].includes(state.order.status);
       return shell('出货登记','录入承运商和物流单号，完成出货后商家可在线追踪。','<button class="btn ghost" data-page="dashboard">返回工作台</button>')+
-      '<div class="split"><div class="card"><div class="card-title"><h3>出货订单</h3>'+status(shipped?'已出货':ready?'待出货':'待打包',shipped?'green':ready?'amber':'gray')+'</div><div class="metric"><span>订单</span><b class="mono">'+esc(state.order.id)+'</b></div><div class="metric"><span>箱号</span><b>'+esc(state.order.boxNo||'ID-BOX-001')+'</b></div><div class="metric"><span>费用</span><b>¥'+(state.order.paidAmount||'—')+'</b></div><div class="form-grid" style="margin-top:15px"><div class="field"><label>承运商</label><select id="carrier" '+(shipped?'disabled':'')+'><option>EMS</option><option>DHL</option><option>顺丰国际</option></select></div><div class="field"><label>物流单号</label><input id="shipmentTrackingNo" value="'+esc(state.order.shipmentTrackingNo||'EM123456789ID')+'" '+(shipped?'readonly':'')+' /></div></div><div class="form-actions">'+(shipped?'<span class="muted">出货已完成，物流节点已生成</span>':'<button class="btn primary" id="shipBtn" '+(ready?'':'disabled style="opacity:.45"')+'>确认出货并生成物流节点</button>')+'</div></div><div class="card"><div class="card-title"><h3>出货校验</h3></div><div class="check-list"><div class="check">✓ <span>订单已付款且费用已锁定</span></div><div class="check">'+(ready?'✓':'○')+' <span>已完成打包并录入箱号</span></div><div class="check">'+(shipped?'✓':'○')+' <span>承运商和物流单号完整</span></div></div></div></div>';
+      '<div class="split"><div class="card"><div class="card-title"><h3>出货订单</h3>'+status(shipped?'已出货':ready?'待出货':'待打包',shipped?'green':ready?'amber':'gray')+'</div><div class="metric"><span>订单</span><b class="mono">'+esc(state.order.id)+'</b></div><div class="metric"><span>箱号</span><b>'+esc(state.order.boxNo||'')+'</b></div><div class="metric"><span>费用</span><b>¥'+(state.order.paidAmount||'—')+'</b></div><div class="form-grid" style="margin-top:15px"><div class="field"><label>承运商</label><select id="carrier" '+(shipped?'disabled':'')+'>'+['EMS','DHL','顺丰国际',...([state.order.carrier].filter(x=>x&&!['EMS','DHL','顺丰国际'].includes(x)))].map(x=>'<option '+(x===state.order.carrier?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div><div class="field"><label>物流单号</label><input id="shipmentTrackingNo" value="'+esc(state.order.shipmentTrackingNo||'')+'" '+(shipped?'readonly':'')+' /></div></div><div class="form-actions">'+(shipped?'<span class="muted">出货已完成，物流节点已生成</span>':'<button class="btn primary" id="shipBtn" '+(ready?'':'disabled style="opacity:.45"')+'>确认出货并生成物流节点</button>')+'</div></div><div class="card"><div class="card-title"><h3>出货校验</h3></div><div class="check-list"><div class="check">✓ <span>订单已付款且费用已锁定</span></div><div class="check">'+(ready?'✓':'○')+' <span>已完成打包并录入箱号</span></div><div class="check">'+(shipped?'✓':'○')+' <span>承运商和物流单号完整</span></div></div></div></div>';
     }
     function warehouseExceptions(){
       const pending=state.exceptions.filter(e=>e.status!=='已处理').length;
@@ -512,7 +509,8 @@
         await loadMerchantWorkspace();
         if(nextPage)state.page=nextPage;
         render();
-      }catch(error){toast('刷新订单失败：'+(error.message||'请稍后重试'))}
+        return true;
+      }catch(error){toast('刷新订单失败：'+(error.message||'请稍后重试'));return false}
     }
     function bind(){
       document.querySelectorAll('[data-login-role]').forEach(b=>b.onclick=()=>{state.auth.loginTargetRole=b.dataset.loginRole;render()});
@@ -597,7 +595,8 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=3"></script>
+  <script src="merchant-workspace.js?v=4"></script>
+  <script src="warehouse-workspace.js?v=1"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>

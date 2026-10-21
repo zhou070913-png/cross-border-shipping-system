@@ -231,9 +231,11 @@
       .from('parcels').select('id, parcel_no, tracking_no, item_name, status, actual_weight_kg, length_cm, width_cm, height_cm').eq('tracking_no', value).maybeSingle();
     if (parcelError) throw parcelError;
     if (!parcel) throw new Error('未找到匹配的预报包裹');
-    const { data: relation, error: relationError } = await instance.from('order_parcels').select('order_id').eq('parcel_id', parcel.id).limit(1).maybeSingle();
+    const { data: relations, error: relationError } = await instance.from('order_parcels').select('order_id').eq('parcel_id', parcel.id);
     if (relationError) throw relationError;
-    if (!relation) return {parcel,order:null};
+    if (!relations?.length) return {parcel,order:null};
+    if (relations.length > 1) throw new Error('此包裹关联多笔历史订单，请在仓库工作台按订单号核对，联系运营处理重复关联');
+    const relation=relations[0];
     const { data: order, error: orderError } = await instance.from('orders').select('*, fees(*), payments(*), order_parcels(parcel_id, parcels(*))').eq('id', relation.order_id).single();
     if (orderError) throw orderError;
     return { parcel, order };

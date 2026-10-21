@@ -32,7 +32,7 @@ async function loadMerchantWorkspace(){
   await Promise.all(Object.entries(jobs).map(async([key,fn])=>{
     try{workspace[key]=await fn();delete workspace.errors[key]}catch(e){workspace[key]=[];workspace.errors[key]=e.message}
   }));
-  if(state.role==='merchant'&&!state.dbOrders.length){
+  if(!state.dbOrders.length){
     state.activeOrderId=null;state.order={id:'',status:'draft',parcels:0,confirmed:0,estimated:0,confirmedAmount:null,paidAmount:null,consolidated:false,record:null};state.parcels=[];state.events=[];
   }
 }
