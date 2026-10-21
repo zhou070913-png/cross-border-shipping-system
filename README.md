@@ -1,4 +1,4 @@
-# Mospace 集运系统 Demo
+# Eaztrans集运 Demo
 
 当前仓库包含可点击的前端原型，以及 Supabase 数据库第一版结构。
 
