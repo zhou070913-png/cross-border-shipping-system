@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mospace 集运系统｜产品原型</title>
-  <link rel="stylesheet" href="merchant-workspace.css?v=4" />
+  <link rel="stylesheet" href="merchant-workspace.css?v=5" />
   <style>
     :root{
       --bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#6d7890;--line:#e6eaf1;
@@ -293,7 +293,7 @@
       if(role==='merchant'){
         if(page==='order-create')return 'parcels';
         if(page==='consolidate')return 'parcels';
-        if(page==='parcel-detail')return 'parcels';
+        if(['parcel-detail','parcel-edit'].includes(page))return 'parcels';
         if(['fee'].includes(page))return 'orders';
         if(['tracking','tracking-list','sea-tracking','billing'].includes(page))return 'orders';
         if(page==='address')return 'receivers';
@@ -595,7 +595,7 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=5"></script>
+  <script src="merchant-workspace.js?v=6"></script>
   <script src="warehouse-workspace.js?v=1"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>

@@ -1,6 +1,6 @@
 /* 商家工作台：共享现有角色校验、订单数据与一次付款接口。 */
 'use strict';
-const workspace = {owner:null, parcels:[], routes:[], warehouses:[], tickets:[], errors:{}, parcelTab:'all', parcelQuery:'', parcelPage:1, parcelPageSize:10, orderQuery:'', orderTab:'all', trackingQuery:'', selected:new Set(), editingAddress:null, quote:null, read:[]};
+const workspace = {owner:null, parcels:[], routes:[], warehouses:[], tickets:[], errors:{}, parcelTab:'all', parcelQuery:'', parcelPage:1, parcelPageSize:10, editParcelId:null, parcelBusy:false, orderQuery:'', orderTab:'all', trackingQuery:'', selected:new Set(), editingAddress:null, quote:null, read:[]};
 const parcelLabels = {pre_advised:'待入库',received:'已入库',measuring:'测量中',measured:'已测量',consolidated:'已打包',shipped:'已出货',exception:'异常'};
 const money = n => n == null ? '待确认' : '¥'+Number(n).toFixed(2);
 const dateText = v => v ? new Date(v).toLocaleString('zh-CN',{hour12:false}) : '—';
@@ -13,7 +13,7 @@ function icon(name){
   const paths={dashboard:'M3 10l9-7 9 7v11H3z M9 21v-8h6v8',parcels:'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 5 9-5 M12 12v9',orders:'M6 3h12v18H6z M9 8h6 M9 12h6 M9 16h4',receivers:'M12 21s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z M10 9h4',tracking:'M3 6h12v11H3z M15 10h4l3 4v3h-7 M5 17v3h3v-3 M17 17v3h3v-3',rates:'M12 3v18 M16 7H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H8',address:'M3 10l9-6 9 6v11H3z M8 21v-7h8v7',messages:'M5 17h14l-2-4V8a5 5 0 0 0-10 0v5z M10 21h4',support:'M4 13v-2a8 8 0 0 1 16 0v6h-4v-7h4 M4 10h4v7H4 M16 21h-4',offers:'M3 3h9l9 9-9 9-9-9z M7 7h1',billing:'M3 5h18v15H3z M3 9h18 M16 13h5',profile:'M8 7a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M4 21v-3a8 8 0 0 1 16 0v3'};
   return `<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${paths[name]||paths.orders}"/></svg></span>`;
 }
-Object.assign(pageRoles,{'pre-advise':'merchant','packing-request':'merchant','packing-history':'merchant',receivers:'merchant','tracking-list':'merchant','sea-tracking':'merchant',rates:'merchant',messages:'merchant',support:'merchant',offers:'merchant',billing:'merchant',profile:'merchant','support-admin':'admin'});
+Object.assign(pageRoles,{'parcel-edit':'merchant','pre-advise':'merchant','packing-request':'merchant','packing-history':'merchant',receivers:'merchant','tracking-list':'merchant','sea-tracking':'merchant',rates:'merchant',messages:'merchant',support:'merchant',offers:'merchant',billing:'merchant',profile:'merchant','support-admin':'admin'});
 async function queryData(table,columns='*'){
   // 分批读取包裹，避免接口默认行数上限截断列表和分页总数。
   if(table==='parcels'){
@@ -34,7 +34,7 @@ async function queryData(table,columns='*'){
 async function loadMerchantWorkspace(){
   if(!state.auth.user)return;
   if(workspace.owner!==state.auth.user.id){
-    Object.assign(workspace,{owner:state.auth.user.id,parcels:[],routes:[],warehouses:[],tickets:[],errors:{},selected:new Set(),editingAddress:null,addressReturn:null,packingDraft:{},supportOrderId:null,read:[],quote:null,parcelQuery:'',parcelPage:1,parcelPageSize:10,orderQuery:'',trackingQuery:'',parcelTab:'all',orderTab:'all'});
+    Object.assign(workspace,{owner:state.auth.user.id,parcels:[],routes:[],warehouses:[],tickets:[],errors:{},selected:new Set(),editingAddress:null,addressReturn:null,packingDraft:{},supportOrderId:null,read:[],quote:null,parcelQuery:'',parcelPage:1,parcelPageSize:10,editParcelId:null,parcelBusy:false,orderQuery:'',trackingQuery:'',parcelTab:'all',orderTab:'all'});
     try{workspace.read=JSON.parse(localStorage.getItem('mospace-read-'+workspace.owner)||'[]')}catch(e){workspace.read=[]}
   }
   const jobs={};
@@ -52,6 +52,51 @@ function workspaceError(key){return workspace.errors[key]?notice('数据暂不�
 function associatedOrders(parcelId){return state.dbOrders.filter(o=>safeRows(o.order_parcels).some(r=>r.parcel_id===parcelId))}
 function associatedOrder(parcelId){const rank={delivered:9,shipped:8,ready_to_ship:7,paid:6,awaiting_payment:5,measuring:4,warehouse_received:3,submitted:2,draft:1,cancelled:0};return associatedOrders(parcelId).sort((a,b)=>(rank[b.status]||0)-(rank[a.status]||0))[0]}
 function canRequestLegacy(o){return !o.consolidated&&['submitted','warehouse_received','measuring'].includes(o.status)&&safeRows(o.order_parcels).every(r=>!['shipped','exception','consolidated'].includes(r.parcels?.status))}
+function canMaintainParcel(p){
+  return p?.status==='pre_advised'&&!p.received_at&&!p.measured_at&&
+    ['actual_weight_kg','length_cm','width_cm','height_cm'].every(k=>p[k]==null)&&!associatedOrders(p.id).length;
+}
+function parcelMaintenanceActions(p){
+  if(!canMaintainParcel(p))return '';
+  return `<button type="button" class="btn small ghost" data-edit-parcel="${p.id}" ${workspace.parcelBusy?'disabled':''}>编辑</button><button type="button" class="btn small ghost parcel-delete" data-delete-parcel="${p.id}" ${workspace.parcelBusy?'disabled':''}>删除</button>`;
+}
+function merchantParcelEdit(){
+  const p=workspace.parcels.find(p=>p.id===workspace.editParcelId);
+  const head=shell('编辑包裹预报','修改录入有误的快递单号、快递公司和品名。',button('返回我的包裹','parcels'));
+  if(!canMaintainParcel(p))return head+notice('此包裹当前不可编辑','仅待入库、尚未关联订单的包裹可自行编辑；其他情况请联系运营处理。');
+  return head+`<div class="card"><form id="parcelEditForm"><div class="form-grid">${field('国内快递单号','editParcelTracking',p.tracking_no,'text','required minlength="5" maxlength="80"')}${field('快递公司','editParcelCarrier',p.carrier||'','text','maxlength="80"')}${field('包裹品名','editParcelItem',p.item_name||'','text','required maxlength="120"')}</div><p class="page-note">仅修改当前包裹的预报资料；仓库入库或申请打包后不能自行更改。</p><div class="form-actions">${button('取消','parcels')}<button type="submit" class="btn primary" ${workspace.parcelBusy?'disabled':''}>保存修改</button></div></form></div>`;
+}
+async function maintainParcel(id,action,values={}){
+  if(workspace.parcelBusy)return;
+  const p=workspace.parcels.find(p=>p.id===id),owner=state.auth.user?.id;
+  if(!owner||state.auth.role!=='merchant'||!canMaintainParcel(p))throw Error('包裹已入库或关联订单，不能编辑或删除，请刷新后核对');
+  workspace.parcelBusy=true;
+  document.querySelectorAll('[data-edit-parcel],[data-delete-parcel],#parcelEditForm button').forEach(b=>b.disabled=true);
+  try{
+    const result=await rpcWorkspace(action==='edit'?'merchant_edit_parcel':'merchant_delete_parcel',{
+      p_parcel_id:id,p_expected_updated_at:p.updated_at,...values
+    });
+    if((action==='edit'?result?.id:result)!==id)throw Error('未收到有效保存结果，请刷新核对');
+    if(state.auth.user?.id!==owner)return;
+    workspace.selected.delete(id);workspace.editParcelId=null;
+    if(action==='delete'&&workspace.detailParcelId===id)workspace.detailParcelId=null;
+    const refreshed=await refreshDbState('parcels');
+    if(state.auth.user?.id===owner)toast((action==='edit'?'修改已保存':'包裹已删除')+(refreshed?'':'，列表刷新失败，请点击刷新数据'),6000);
+  }catch(e){
+    if(e.code==='PGRST202')throw Error('包裹编辑和删除功能尚未在数据库启用，请联系管理员');
+    throw e;
+  }finally{
+    if(workspace.owner===owner){
+      workspace.parcelBusy=false;
+      if(state.auth.user?.id===owner)document.querySelectorAll('[data-edit-parcel],[data-delete-parcel],#parcelEditForm button').forEach(b=>b.disabled=false);
+    }
+  }
+}
+const parcelBaseGo=go;
+go=function(page,options={}){
+  if(state.role==='merchant'&&state.auth.user?.id===workspace.owner&&workspace.parcelBusy){toast('正在保存包裹，请稍候');return false}
+  return parcelBaseGo(page,options);
+};
 function allParcels(){return workspace.parcels.map(p=>({...p,order:associatedOrder(p.id)}))}
 function parcelGroup(p){
   if(['shipped','delivered'].includes(p.order?.status)||p.status==='shipped')return 'shipped';
@@ -119,7 +164,7 @@ merchantParcels=function(){
   return shell('我的包裹','检查包裹状态，在这里申请合包与查看打包进度。',button('打包记录','packing-history')+button('申请打包','packing-request')+button('+ 预报包裹','pre-advise',true))+
     (ps.some(p=>associatedOrders(p.id).length>1)?notice('历史包裹关联提示','部分旧包裹关联了多笔历史订单。这里优先展示运输进度最靠后的订单；请在我的订单逐单核对，新申请已拦截重复关联。'):'')+
     tabs([['all','全部',ps.length],['received','已入库',ps.filter(p=>parcelGroup(p)==='received').length],['pending','待入库',ps.filter(p=>parcelGroup(p)==='pending').length],['packed','已打包',ps.filter(p=>parcelGroup(p)==='packed').length],['shipped','已出货',ps.filter(p=>parcelGroup(p)==='shipped').length],['exception','异常',ps.filter(p=>parcelGroup(p)==='exception').length]],workspace.parcelTab,'data-parcel-tab')+
-    `<div class="card">${workspaceError('parcels')}<form id="parcelSearch" class="workspace-toolbar"><input id="parcelSearchText" aria-label="搜索包裹" placeholder="搜索国内快递单号 / 品名" value="${esc(workspace.parcelQuery)}"><button class="btn ghost">搜索</button><button type="button" class="btn ghost" data-refresh-workspace>刷新</button></form><div id="parcelResults">${filtered.length?`<div class="table-wrap"><table class="table"><thead><tr><th>国内快递单号</th><th>品名</th><th>包裹状态</th><th>实重 / 尺寸</th><th>关联订单</th><th>操作</th></tr></thead><tbody>${page.rows.map(p=>`<tr><td class="mono">${esc(p.tracking_no)}</td><td>${esc(p.item_name||'—')}</td><td>${status(parcelLabel(p),parcelGroup(p)==='exception'?'red':'blue')}</td><td>${formatWeight(p.actual_weight_kg)}<br><small class="muted">${formatSize(p)}</small></td><td>${p.order?esc(p.order.order_no):'未申请打包'}</td><td><button class="btn small ghost" data-workspace-parcel="${p.id}">详情</button>${p.order&&canRequestLegacy(p.order)?orderAction(p.order,'consolidate','确认合包'):''}</td></tr>`).join('')}</tbody></table></div>`:emptyState('没有匹配的包裹',ps.length?'调整状态筛选或搜索词后再试。':'先预报国内快递单号，包裹寄到深圳仓后会更新入库状态。',button('预报包裹','pre-advise',true))}</div>${parcelPager(page)}</div>`;
+    `<div class="card">${workspaceError('parcels')}<form id="parcelSearch" class="workspace-toolbar"><input id="parcelSearchText" aria-label="搜索包裹" placeholder="搜索国内快递单号 / 品名" value="${esc(workspace.parcelQuery)}"><button class="btn ghost">搜索</button><button type="button" class="btn ghost" data-refresh-workspace>刷新</button></form><div id="parcelResults">${filtered.length?`<div class="table-wrap"><table class="table"><thead><tr><th>国内快递单号</th><th>品名</th><th>包裹状态</th><th>实重 / 尺寸</th><th>关联订单</th><th>操作</th></tr></thead><tbody>${page.rows.map(p=>`<tr><td class="mono">${esc(p.tracking_no)}</td><td>${esc(p.item_name||'—')}</td><td>${status(parcelLabel(p),parcelGroup(p)==='exception'?'red':'blue')}</td><td>${formatWeight(p.actual_weight_kg)}<br><small class="muted">${formatSize(p)}</small></td><td>${p.order?esc(p.order.order_no):'未申请打包'}</td><td><div class="parcel-row-actions"><button class="btn small ghost" data-workspace-parcel="${p.id}">详情</button>${parcelMaintenanceActions(p)}${p.order&&canRequestLegacy(p.order)?orderAction(p.order,'consolidate','确认合包'):''}</div></td></tr>`).join('')}</tbody></table></div>`:emptyState('没有匹配的包裹',ps.length?'调整状态筛选或搜索词后再试。':'先预报国内快递单号，包裹寄到深圳仓后会更新入库状态。',button('预报包裹','pre-advise',true))}</div>${parcelPager(page)}</div>`;
 };
 function merchantPreAdvise(){return shell('预报包裹','填写国内快递信息，让深圳仓更快识别你的包裹。',button('返回我的包裹','parcels'))+`<div class="grid layout-2"><div class="card"><form id="preAdviceForm"><div class="form-grid">${field('国内快递单号','adviceTracking','','text','required minlength="5" maxlength="80"')}${field('快递公司','adviceCarrier','','text','maxlength="80"')}${field('包裹品名','adviceItem','','text','required maxlength="120"')}</div><div class="form-actions"><button class="btn primary" type="submit">提交预报</button></div></form></div><div class="card"><h3>预报后如何操作？</h3><p class="muted">1. 将货物寄到深圳仓，并在面单上备注会员号。</p><p class="muted">2. 在“我的包裹”查看入库情况、选择包裹申请打包。</p><p class="muted">3. 仓库确认实重和尺寸后，在“我的订单”一次付款。</p>${button('查看深圳仓地址','address')}</div></div>`}
 function merchantPackingRequest(){
@@ -144,7 +189,7 @@ function merchantPackingHistory(){
 merchantParcelDetail=function(){
   const p=allParcels().find(p=>p.id===workspace.detailParcelId);
   if(!p)return shell('包裹详情','请从包裹列表选择一件包裹。',button('返回我的包裹','parcels'));
-  return shell('包裹详情',p.tracking_no,button('返回我的包裹','parcels'))+`<div class="grid layout-2"><div class="card"><h3>${esc(p.item_name)}</h3>${status(parcelLabel(p))}<div class="metric"><span>快递公司</span><b>${esc(p.carrier||'未填写')}</b></div><div class="metric"><span>实际重量</span><b>${formatWeight(p.actual_weight_kg)}</b></div><div class="metric"><span>尺寸</span><b>${formatSize(p)}</b></div><div class="metric"><span>预报时间</span><b>${dateText(p.created_at)}</b></div><div class="metric"><span>收货时间</span><b>${dateText(p.received_at)}</b></div>${p.exception_reason?notice('包裹异常',p.exception_reason):''}${p.order?`<div class="form-actions">${orderAction(p.order,'fee','关联订单')}${orderAction(p.order,'tracking','物流节点')}</div>`:button('申请打包','packing-request',true)}</div><div class="card"><h3>入库 / 打包照片</h3>${emptyState('暂无照片','当前仓库尚未上传照片；此处不展示示例照片。')}</div></div>`;
+  return shell('包裹详情',p.tracking_no,button('返回我的包裹','parcels')+parcelMaintenanceActions(p))+`<div class="grid layout-2"><div class="card"><h3>${esc(p.item_name)}</h3>${status(parcelLabel(p))}<div class="metric"><span>快递公司</span><b>${esc(p.carrier||'未填写')}</b></div><div class="metric"><span>实际重量</span><b>${formatWeight(p.actual_weight_kg)}</b></div><div class="metric"><span>尺寸</span><b>${formatSize(p)}</b></div><div class="metric"><span>预报时间</span><b>${dateText(p.created_at)}</b></div><div class="metric"><span>收货时间</span><b>${dateText(p.received_at)}</b></div>${p.exception_reason?notice('包裹异常',p.exception_reason):''}${p.order?`<div class="form-actions">${orderAction(p.order,'fee','关联订单')}${orderAction(p.order,'tracking','物流节点')}</div>`:button('申请打包','packing-request',true)}</div><div class="card"><h3>入库 / 打包照片</h3>${emptyState('暂无照片','当前仓库尚未上传照片；此处不展示示例照片。')}</div></div>`;
 };
 function workspaceOrderTable(orders){return `<div class="table-wrap"><table class="table"><thead><tr><th>订单号 / 创建时间</th><th>线路 / 目的地</th><th>包裹</th><th>确认金额</th><th>状态</th><th>操作</th></tr></thead><tbody>${orders.map(o=>`<tr><td class="mono">${esc(o.order_no)}<br><small class="muted">${dateText(o.created_at)}</small></td><td>${esc(o.route_name)}<br><small class="muted">${esc(o.destination_country)} · ${esc(o.destination_city||'')}</small></td><td>${o.parcel_count}</td><td class="list-amount">${money(feeRecord(o)?.total_amount)}</td><td>${status(orderStatusLabel(o.status),statusTone(o.status))}</td><td>${orderAction(o,'fee',o.status==='awaiting_payment'?'查看并付款':'详情')}${orderAction(o,'tracking','物流')}</td></tr>`).join('')}</tbody></table></div>`}
 merchantOrders=function(){
@@ -223,7 +268,7 @@ function ticketCards(admin=false){return workspace.tickets.sort((a,b)=>new Date(
 function merchantSupport(){return shell('客服工单','提交订单问题，运营人员在后台回复；当前不提供实时在线聊天。')+workspaceError('tickets')+`<div class="grid layout-2"><div class="workspace-list">${ticketCards()||`<div class="card">${emptyState('暂无工单','遇到入库、费用或物流问题时，可在右侧提交工单。')}</div>`}</div><div class="card"><h3>提交问题</h3><form id="supportForm"><div class="field"><label for="ticketOrder">关联订单（可选）</label><select id="ticketOrder"><option value="">一般咨询</option>${state.dbOrders.map(o=>`<option value="${o.id}" ${workspace.supportOrderId===o.id?'selected':''}>${esc(o.order_no)}</option>`).join('')}</select></div><div class="field section-space"><label for="ticketSubject">问题标题</label><input id="ticketSubject" required minlength="2" maxlength="120"></div><div class="field section-space"><label for="ticketMessage">问题描述</label><textarea id="ticketMessage" required minlength="5" maxlength="4000" rows="5" placeholder="请描述具体问题，勿填写密码或支付凭据"></textarea></div><div class="form-actions"><button class="btn primary" ${workspace.errors.tickets?'disabled':''}>提交工单</button></div></form></div></div>`}
 function merchantSupportAdmin(){return shell('客服工单','查看商家问题并回复，商家端可查看回复结果。',`<button class="btn ghost" data-refresh-workspace>刷新</button>`)+workspaceError('tickets')+`<div class="workspace-list">${ticketCards(true)||`<div class="card">${emptyState('暂无工单','商家提交问题后会出现在这里。')}</div>`}</div>`}
 function merchantOffers(){return shell('推广优惠','查看平台实际发布的活动与优惠。')+`<div class="card">${emptyState('暂无可用优惠','平台尚未配置优惠券或推广返佣活动；订单按已确认费用结算。',button('查看当前运价','rates',true))}</div>`}
-const MerchantViews={'pre-advise':merchantPreAdvise,'packing-request':merchantPackingRequest,'packing-history':merchantPackingHistory,receivers:merchantReceivers,'tracking-list':merchantTrackingList,'sea-tracking':merchantTrackingList,rates:merchantRates,messages:merchantMessages,support:merchantSupport,offers:merchantOffers,billing:merchantBilling,profile:merchantProfile};
+const MerchantViews={'parcel-edit':merchantParcelEdit,'pre-advise':merchantPreAdvise,'packing-request':merchantPackingRequest,'packing-history':merchantPackingHistory,receivers:merchantReceivers,'tracking-list':merchantTrackingList,'sea-tracking':merchantTrackingList,rates:merchantRates,messages:merchantMessages,support:merchantSupport,offers:merchantOffers,billing:merchantBilling,profile:merchantProfile};
 function exportWorkspaceBills(){
   const rows=[['订单号','线路','目的地','状态','确认金额CNY','已登记付款CNY','付款时间'],...state.dbOrders.map(o=>[o.order_no,o.route_name,o.destination_country,orderStatusLabel(o.status),feeRecord(o)?.total_amount??'',paymentRecord(o)?.status==='paid'?paymentRecord(o).amount:0,o.paid_at||''])];
   const csv='\ufeff'+rows.map(row=>row.map(v=>'"'+String(v).replace(/^[=+@\-]/,"'$&").replace(/"/g,'""')+'"').join(',')).join('\r\n');
@@ -258,6 +303,17 @@ bind=function(){
   for(const [form,input,key] of [['parcelSearch','parcelSearchText','parcelQuery'],['orderSearch','orderSearchText','orderQuery'],['trackingSearch','trackingSearchText','trackingQuery']])on(form,'submit',e=>{e.preventDefault();workspace[key]=$('#'+input).value.trim();if(key==='parcelQuery')workspace.parcelPage=1;render()});
   document.querySelectorAll('[data-order-target]').forEach(el=>el.onclick=()=>selectWorkspaceOrder(el.dataset.orderTarget,el.dataset.orderPage));
   document.querySelectorAll('[data-workspace-parcel]').forEach(el=>el.onclick=()=>{workspace.detailParcelId=el.dataset.workspaceParcel;go('parcel-detail')});
+  document.querySelectorAll('[data-edit-parcel]').forEach(el=>el.onclick=()=>{workspace.editParcelId=el.dataset.editParcel;go('parcel-edit')});
+  document.querySelectorAll('[data-delete-parcel]').forEach(el=>el.onclick=async()=>{
+    if(workspace.parcelBusy)return;
+    const p=workspace.parcels.find(p=>p.id===el.dataset.deleteParcel);
+    if(!canMaintainParcel(p)){toast('此包裹当前不能删除，请刷新后核对');return}
+    if(!window.confirm(`确定删除包裹「${p.tracking_no}」吗？\n品名：${p.item_name||'未填写'}\n删除后将从包裹列表移除，无法自行撤销。`))return;
+    try{await maintainParcel(p.id,'delete')}catch(e){toast('删除失败：'+e.message,6000)}
+  });
+  on('parcelEditForm','submit',e=>{e.preventDefault();busyForm(e.target,()=>maintainParcel(workspace.editParcelId,'edit',{
+    p_tracking:$('#editParcelTracking').value.trim(),p_item_name:$('#editParcelItem').value.trim(),p_carrier:$('#editParcelCarrier').value.trim()
+  }))});
   document.querySelectorAll('[name=packingParcel]').forEach(el=>el.onchange=()=>el.checked?workspace.selected.add(el.value):workspace.selected.delete(el.value));
   on('preAdviceForm','submit',e=>{e.preventDefault();busyForm(e.target,async()=>{
     await rpcWorkspace('merchant_pre_advise',{p_tracking:$('#adviceTracking').value.trim(),p_item_name:$('#adviceItem').value.trim(),p_carrier:$('#adviceCarrier').value.trim()});
@@ -321,7 +377,7 @@ function branchLinks(items,active,label){
 }
 function merchantPageFrame(html){
  const page=state.page,root=navActivePage(page,'merchant');
- const names={dashboard:'首页',parcels:'我的包裹',orders:'我的订单',receivers:'地址管理',rates:'运价查询',messages:'消息与客服',profile:'我的账户','pre-advise':'预报包裹','order-create':'预报包裹','packing-request':'申请打包 / 合包','packing-history':'打包记录','parcel-detail':'包裹详情',consolidate:'确认合包',fee:'订单详情与费用',tracking:'物流详情','tracking-list':'物流查询','sea-tracking':'海运查询',billing:'费用账单',address:'仓库地址',support:'客服工单',offers:'推广优惠'};
+ const names={dashboard:'首页',parcels:'我的包裹',orders:'我的订单',receivers:'地址管理',rates:'运价查询',messages:'消息与客服',profile:'我的账户','pre-advise':'预报包裹','order-create':'预报包裹','packing-request':'申请打包 / 合包','packing-history':'打包记录','parcel-detail':'包裹详情','parcel-edit':'编辑包裹预报',consolidate:'确认合包',fee:'订单详情与费用',tracking:'物流详情','tracking-list':'物流查询','sea-tracking':'海运查询',billing:'费用账单',address:'仓库地址',support:'客服工单',offers:'推广优惠'};
  const isChild=page!==root;
  const back=isChild?`<button type="button" data-page="${root}">${names[root]}</button><span aria-hidden="true">/</span>`:'';
  const orderCrumb=page==='tracking'&&state.order.record?`${orderAction(state.order.record,'fee','订单详情')}<span aria-hidden="true">/</span>`:'';

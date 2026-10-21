@@ -16,6 +16,9 @@ body .side-nav button.active{background:#315efb;box-shadow:0 5px 14px #070e262b}
 .pagination-pages .btn{min-width:36px;min-height:36px}
 .pagination-pages .btn[aria-current=page]{background:var(--brand);border-color:var(--brand);color:#fff}
 .pagination-gap{color:var(--muted);padding:0 2px}
+.parcel-row-actions{display:flex;gap:6px;flex-wrap:wrap;min-width:150px}
+.parcel-row-actions .btn{white-space:nowrap}
+button.btn.parcel-delete{color:var(--red);border-color:#f0caca;background:#fff}
 .pagination-size select:focus-visible{outline:3px solid #9ab4ff;outline-offset:2px}
 @media(max-width:680px){.parcel-pagination{gap:12px}.pagination-controls{width:100%;gap:12px}.pagination-pages{gap:5px}.pagination-pages .btn{padding:7px 10px}}
 .workspace-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
