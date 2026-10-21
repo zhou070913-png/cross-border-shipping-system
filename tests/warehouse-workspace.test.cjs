@@ -62,3 +62,22 @@ test('historical multiple-order parcel associations cannot be processed twice',a
   assert.equal(context.calls,0);
   assert.ok(context.testMessages.some(s=>s.includes('历史重复关联')));
 });
+
+test('warehouse details show selected confirmed database fees through payment, packing and shipping',()=>{
+  const {run}=setup();
+  run(`state.dbOrders=[{id:'a',order_no:'ORDER-A',status:'awaiting_payment',parcel_count:1,fees:[{estimated_total:99999,total_amount:2585,shipping_fee:2567,handling_fee:18,actual_weight_kg:60,volume_weight_kg:36,billable_weight_kg:60,confirmed_at:'2026-10-21T08:00:00Z'}],order_parcels:[]},{id:'b',order_no:'ORDER-B',status:'paid',fees:{total_amount:128,shipping_fee:110,handling_fee:18},order_parcels:[]}];applyDbOrder(state.dbOrders[0]);warehouseWorkspace.selectedId='a';`);
+  const html=run('warehouseConfirm()');
+  for(const text of ['仓库实际费用','实际运费','¥2567.00','¥18.00','¥2585.00','60.00 kg','36.00 kg','费用确认时间'])assert.ok(html.includes(text),text);
+  assert.ok(!html.includes('¥99999.00'));assert.ok(!html.includes('id="confirmBtn"'));
+  run(`applyDbOrder(state.dbOrders[1]);warehouseWorkspace.selectedId='b'`);
+  for(const view of ['warehouseConfirm()','warehousePacking()']){const current=run(view);assert.ok(current.includes('¥128.00'));assert.ok(!current.includes('¥2585.00'));}
+  run(`state.dbOrders[1].status='ready_to_ship';applyDbOrder(state.dbOrders[1])`);
+  assert.ok(run('warehouseShip()').includes('¥128.00'));
+});
+test('unconfirmed fees never use estimates as actual; zero confirmed fees render correctly',()=>{
+  const {run}=setup();
+  const pending=run(`warehouseActualFees({fees:[{estimated_total:123,total_amount:null}]})`);
+  assert.ok(pending.includes('实际费用尚未生成'));assert.ok(!pending.includes('¥123.00'));assert.ok(!pending.includes('¥0.00'));
+  const zero=run(`warehouseActualFees({fees:{total_amount:0,shipping_fee:0,handling_fee:0}})`);
+  assert.ok(zero.includes('¥0.00'));assert.ok(!zero.includes('实际费用尚未生成'));
+});

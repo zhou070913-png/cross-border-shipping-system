@@ -17,6 +17,11 @@ function warehouseQueue(page){
   return `<div class="card section-space"><div class="card-title"><h3>${warehouseStageLabels[page]}（${rows.length} 单）</h3>${button('全部仓库订单','dashboard')}</div>${warehouseOrderRows(rows)}</div>`;
 }
 function warehouseSelected(){return warehouseWorkspace.selectedId===state.order.dbId?state.order.record:null}
+function warehouseActualFees(o){
+  const f=feeRecord(o);
+  if(f?.total_amount==null)return `<div class="card section-space" data-warehouse-actual-fees><h3>仓库实际费用</h3>${notice('实际费用尚未生成','完成本单全部包裹的实重和尺寸确认后，显示实际运费、操作费和唯一应付总额。')}</div>`;
+  return `<div class="card section-space" data-warehouse-actual-fees><div class="card-title"><h3>仓库实际费用</h3>${status('已确认','green')}</div><div class="grid layout-2"><div>${[['实重合计',formatWeight(f.actual_weight_kg)],['体积重',formatWeight(f.volume_weight_kg)],['计费重量',formatWeight(f.billable_weight_kg)]].map(([label,value])=>`<div class="metric"><span>${label}</span><b>${value}</b></div>`).join('')}</div><div>${[['实际运费',money(f.shipping_fee)],['仓库操作费',money(f.handling_fee)],['唯一应付总额',money(f.total_amount)]].map(([label,value])=>`<div class="metric"><span>${label}</span><b>${value}</b></div>`).join('')}</div></div><p class="page-note">费用确认时间：${esc(dateText(f.confirmed_at))}。与商家端共用本单已确认费用，商家按此金额一次付款。</p></div>`;
+}
 function warehouseContext(o){
   const duplicates=safeRows(o.order_parcels).some(r=>associatedOrders(r.parcel_id).length>1);
   return `<div class="warehouse-context"><div><small>当前操作订单</small><b class="mono">${esc(o.order_no)}</b></div>${status(orderStatusLabel(o.status),statusTone(o.status))}<button class="btn small ghost" data-warehouse-back>返回任务列表</button></div>`+
@@ -51,7 +56,7 @@ function warehouseDetail(page,view){
   if(!o)return shell({confirm:'包裹确认',packing:'打包作业',ship:'出货登记'}[page],'先选择需要处理的订单，再核对该单数据。',button('返回工作台','dashboard'))+warehouseQueue(page);
   const permitted={confirm:['warehouse_received','measuring','awaiting_payment','paid','ready_to_ship','shipped','delivered'],packing:['paid','ready_to_ship','shipped','delivered'],ship:['ready_to_ship','shipped','delivered']}[page].includes(o.status);
   if(!permitted)return shell('订单当前进度',o.order_no,button('返回工作台','dashboard'))+warehouseContext(o)+notice('当前无需执行这项操作','请按订单的最新状态进入对应队列。')+(warehouseStage(o)?warehouseOrderButton(o,warehouseStage(o),'进入下一步'):'' )+warehouseQueue(page);
-  let html=warehouseContext(o)+view();
+  let html=warehouseContext(o)+view()+warehouseActualFees(o);
   if(page==='confirm'&&['awaiting_payment','paid','ready_to_ship','shipped','delivered'].includes(o.status)){
     html+=`<div class="card section-space">${notice('实重尺寸和费用确认已完成',o.status==='awaiting_payment'?'下一步等待商家一次付款，无需再次确认。':'此单已完成费用确认，按最新状态继续办理。')}${o.status==='paid'?warehouseOrderButton(o,'packing','进入本单打包'):o.status==='ready_to_ship'?warehouseOrderButton(o,'ship','进入本单出货'):''}</div>`;
   }
