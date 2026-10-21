@@ -250,11 +250,11 @@ merchantCreate=merchantPreAdvise;
 merchantFee=function(){
   const o=state.order.record;
   if(!o)return shell('订单详情','请选择一笔订单。',button('我的订单','orders'));
-  const f=feeRecord(o),p=paymentRecord(o),confirmed=f?.total_amount!=null,paid=p?.status==='paid';
+  const f=feeRecord(o),p=paymentRecord(o),confirmed=f?.total_amount!=null,paid=p?.status==='paid',receipt=typeof orderReceipt==='function'?orderReceipt(o.id):null;
   let html=shell('订单详情与费用','仓库确认费用后一次付款。',button('返回我的订单','orders'))+
-    notice(paid?'付款已登记':confirmed?'仓库已确认费用':'等待仓库确认',paid?'本单费用已锁定，后续不再补款。当前付款为系统登记，资金到账需另行核对。':confirmed?'请核对唯一应付金额后付款。':'尚未生成应付金额；此时无需付款。')+
+    notice(paid?'付款记录已保存':receipt?.status==='pending'?'付款凭证待审核':receipt?.status==='rejected'?'请补充凭证':confirmed?'仓库已确认费用':'等待仓库确认',paid?'本单费用已锁定。付款来源与审核结果见下方记录。':receipt?.status==='pending'?'请等待运营审核，勿重复转账。':receipt?.status==='rejected'?'请根据审核说明补充凭证，勿重复转账。':confirmed?'请核对唯一应付金额后付款。':'尚未生成应付金额；此时无需付款。')+
     `<div class="grid layout-2"><div class="card"><div class="card-title"><h3>${esc(o.order_no)}</h3>${status(orderStatusLabel(o.status),statusTone(o.status))}</div>${[['运输费用',money(f?.shipping_fee)],['仓库操作费',money(f?.handling_fee)],['计费重量',formatWeight(f?.billable_weight_kg)],['体积重',formatWeight(f?.volume_weight_kg)],['唯一应付金额',money(f?.total_amount)]].map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join('')}</div><div class="card"><h3>仓库确认进度 ${state.order.confirmed}/${o.parcel_count}</h3>${safeRows(o.order_parcels).map(r=>r.parcels).filter(Boolean).map(p=>`<div class="metric"><span>${esc(p.tracking_no)}<br><small>${esc(p.item_name||'')} · ${formatWeight(p.actual_weight_kg)} · ${formatSize(p)}</small></span>${status(p.actual_weight_kg!=null&&p.length_cm!=null&&p.width_cm!=null&&p.height_cm!=null?'已确认':'待确认')}</div>`).join('')}</div></div>`+
-    (paid?`<div class="card section-space"><h3>付款记录</h3><div class="metric"><span>已登记付款</span><b>${money(p.amount)}</b></div><div class="metric"><span>登记时间</span><b>${dateText(p.paid_at||o.paid_at||p.created_at)}</b></div></div>`:confirmed&&o.status==='awaiting_payment'?`<div class="card section-space"><p class="page-note">测试阶段仅登记付款状态，未接入真实支付渠道。</p><button type="button" class="btn primary" id="payBtn">登记一次付款 ${money(f.total_amount)}</button></div>`:'');
+    (paid?`<div class="card section-space"><h3>付款记录</h3><div class="metric"><span>已登记金额</span><b>${money(p.amount)}</b></div><div class="metric"><span>记录时间</span><b>${dateText(p.paid_at||o.paid_at||p.created_at)}</b></div></div>`:'');
   if(f?.estimate_snapshot)html+=`<div class="card section-space packing-estimate">${packingEstimateHtml(f.estimate_snapshot,true)}</div>`;
   html+=`<div class="card section-space"><div class="card-title"><h3>订单收发信息</h3>${orderAction(o,'tracking','物流详情')}</div><div class="metric"><span>目的地国家</span><b>${esc(o.destination_country)}</b></div><div class="metric"><span>详细收货地址</span><b>${esc(o.destination_address)}</b></div><div class="metric"><span>收件人 / 电话</span><b>${esc(o.recipient_name)} · ${esc(o.recipient_phone)}</b></div><div class="metric"><span>国内深圳仓</span><b>${esc(o.origin_warehouse_address)}</b></div><div class="metric"><span>包装方式</span><b>${esc(o.consolidation_method||'尚未确认')}</b></div><p>${esc(o.consolidation_note||'')}</p></div>`;
   return html;
@@ -306,7 +306,7 @@ function merchantBilling(){
   const paid=orders.filter(o=>paymentRecord(o)?.status==='paid');
   const total=paid.reduce((s,o)=>s+Number(paymentRecord(o).amount),0);
   const due=orders.filter(o=>o.status==='awaiting_payment').reduce((s,o)=>s+Number(feeRecord(o)?.total_amount||0),0);
-  return shell('费用账单','按订单核对已付款、待付款及费用明细。',`<button class="btn ghost" id="exportBills">导出账单 CSV</button>`)+notice('当前采用订单一次付款','钱包充值和余额支付暂未开放；不需要预存资金。账单中的付款记录为系统登记记录，真实资金到账仍需核对。')+
+  return shell('费用账单','按订单核对已付款、待付款及费用明细。',`<button class="btn ghost" id="exportBills">导出账单 CSV</button>`)+notice('当前采用订单一次付款','钱包充值和余额支付暂未开放；不需要预存资金。付款须经运营审核；测试付款及旧版演示记录不代表真实资金到账，请在订单详情核对付款来源。')+
     `<div class="grid kpis">${kpi('累计已登记付款',money(total),'当前账号全部订单')}${kpi('待付款',money(due),'只统计已确认费用')}${kpi('已付款订单',paid.length,'一次付款后锁定')}${kpi('钱包充值','未开放','无需预存')}</div><div class="card">${orders.length?workspaceOrderTable(orders):emptyState('暂无账单','订单产生确认费用后会在这里汇总。')}</div>`;
 }
 function merchantProfile(){

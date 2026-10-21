@@ -72,7 +72,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-client.js?v=warehouse-1"></script>
+  <script src="supabase-client.js?v=payment-1"></script>
   <script>
     const state = {
       role:'merchant', page:'dashboard',
@@ -492,7 +492,7 @@
         const views={dashboard:warehouseDashboard,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,'warehouse-tracking':warehouseTrackingList,'warehouse-tracking-detail':warehouseTrackingDetail,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
         html=(views[state.page]||warehouseDashboard)();
       }else{
-        const views={dashboard:adminDashboard,orders:adminOrders,config:adminConfig,audit:adminAudit,accounts:adminAccounts,'support-admin':merchantSupportAdmin};
+        const views={dashboard:adminDashboard,orders:adminOrders,config:adminConfig,audit:adminAudit,accounts:adminAccounts,'support-admin':merchantSupportAdmin,'payment-review':adminPaymentReview,'receiving-config':adminReceivingConfig};
         html=(views[state.page]||adminDashboard)();
       }
       $('#content').innerHTML=state.role==='merchant'?merchantPageFrame(html):html; $('#avatar').textContent=state.role==='merchant'?'商':state.role==='warehouse'?'仓':'管'; $('#userName').textContent=state.auth.profile?.member_no||(state.auth.user?.email)||(state.role==='merchant'?'跨境商家':state.role==='warehouse'?'深圳仓操作员':'平台运营管理员'); $('#authBtn').textContent=state.auth.user?'退出登录':'登录'; $('#envLabel').textContent=window.MospaceSupabase.isConfigured()?(state.auth.user?'数据库已连接':'数据库已配置'):'演示环境';
@@ -558,10 +558,6 @@
           }catch(error){toast('确认失败：'+(error.message||'请先完成入库'));console.error(error)}
         }else{state.order.confirmed=state.parcels.length;state.order.confirmedAmount=292;state.order.status='awaiting_payment';state.order.statusLabel='待付款';state.events[1]={title:'仓库已完成确认',desc:'全部包裹已核对实重和尺寸',time:'刚刚',done:true};toast('已确认包裹，生成唯一应付金额 ¥292');go('dashboard',{role:'warehouse'})}
       };
-      const pay=$('#payBtn');if(pay)pay.onclick=async()=>{
-        if(window.MospaceSupabase.isConfigured()&&state.auth.user&&state.order.dbId){try{await window.MospaceSupabase.recordOrderPayment(state.order.dbId,'manual_transfer','manual',null);toast('付款记录已写入，费用已锁定');await refreshDbState('fee')}catch(error){toast('付款失败：'+(error.message||'请稍后重试'))}}
-        else{state.order.payment='已付款';state.order.paidAmount=state.order.confirmedAmount;state.order.status='paid';state.order.statusLabel='已付款待打包';toast('付款成功，费用已锁定');render()}
-      };
       const pack=$('#packBtn');if(pack)pack.onclick=async()=>{
         if(window.MospaceSupabase.isConfigured()&&state.auth.user&&state.order.dbId){try{await window.MospaceSupabase.warehousePackOrder(state.order.dbId,$('#boxNo')?.value,$('#packageNote')?.value);toast('打包记录已写入，订单进入待出货');await refreshDbState('ship')}catch(error){toast('打包失败：'+(error.message||'请稍后重试'))}}
         else{state.order.packed=true;state.order.status='ready_to_ship';state.order.statusLabel='待出货';toast('打包完成，订单进入待出货');go('ship',{role:'warehouse'})}
@@ -596,8 +592,9 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=7"></script>
+  <script src="merchant-workspace.js?v=8"></script>
   <script src="warehouse-workspace.js?v=3"></script>
+  <script src="payment-workspace.js?v=1"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>

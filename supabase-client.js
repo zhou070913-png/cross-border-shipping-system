@@ -171,15 +171,7 @@
   }
 
   async function recordOrderPayment(orderId, paymentMethod, provider, providerTransactionId) {
-    const instance = await requireClient();
-    const { data, error } = await instance.rpc('record_order_payment', {
-      p_order_id: orderId,
-      p_payment_method: paymentMethod,
-      p_provider: provider || null,
-      p_provider_transaction_id: providerTransactionId || null
-    });
-    if (error) throw error;
-    return data;
+    throw new Error('请提交付款凭证，运营审核通过后才确认付款成功');
   }
 
   async function warehouseReceiveOrder(orderId) {
