@@ -47,8 +47,12 @@ function estimatePacking(parcels,route){
   const cbm=Math.ceil(measurements.reduce((s,m)=>s+m.values[1]*m.values[2]*m.values[3],0)-1e-9)/1000000;
   if(basis==='cbm'&&(route.price_per_cbm==null||!Number.isFinite(Number(route.price_per_cbm))||Number(route.price_per_cbm)<0||!Number.isFinite(Number(route.minimum_cbm))||!(Number(route.minimum_cbm)>0)))return {status:'no_route'};
   const billableCbm=basis==='cbm'?Math.max(cbm,Number(route.minimum_cbm)):null;
-  const shipping=basis==='cbm'?round(billableCbm*Number(route.price_per_cbm),2):round(Number(route.first_price)+Math.max(0,billable-Number(route.first_weight_kg))*Number(route.additional_price_per_kg),2);
-  return {status:'ready',count:parcels.length,weight,volume,billable,shipping,handling,total:round(shipping+handling,2),billingBasis:basis,volumeCbm:cbm,billableCbm,pricePerCbm:route.price_per_cbm,minimumCbm:route.minimum_cbm,isTestRate:route.is_test_rate,measuredCount:measurements.filter(m=>m.source==='仓库实测').length,routeName:route.route_name,routeCode:route.route_code,volumeDivisor:Number(route.volume_divisor),firstWeight:Number(route.first_weight_kg),firstPrice:Number(route.first_price),additionalPrice:Number(route.additional_price_per_kg),pricingUpdatedAt:route.updated_at};
+  const seaChargeRule=route.sea_charge_rule||'volume_only',seaPricePerKg=route.sea_price_per_kg;
+  if(basis==='cbm'&&seaChargeRule==='higher_of_weight_volume'&&(seaPricePerKg==null||!Number.isFinite(Number(seaPricePerKg))||Number(seaPricePerKg)<=0))return {status:'no_route'};
+  const seaVolumeCharge=basis==='cbm'?round(billableCbm*Number(route.price_per_cbm),2):null;
+  const seaWeightCharge=basis==='cbm'&&seaChargeRule==='higher_of_weight_volume'?round(weight*Number(seaPricePerKg),2):null;
+  const shipping=basis==='cbm'?Math.max(seaVolumeCharge,seaWeightCharge||0):round(Number(route.first_price)+Math.max(0,billable-Number(route.first_weight_kg))*Number(route.additional_price_per_kg),2);
+  return {status:'ready',count:parcels.length,weight,volume,billable,shipping,handling,total:round(shipping+handling,2),billingBasis:basis,volumeCbm:cbm,billableCbm,pricePerCbm:route.price_per_cbm,minimumCbm:route.minimum_cbm,seaChargeRule,seaPricePerKg,seaVolumeCharge,seaWeightCharge,isTestRate:route.is_test_rate,measuredCount:measurements.filter(m=>m.source==='仓库实测').length,routeName:route.route_name,routeCode:route.route_code,volumeDivisor:Number(route.volume_divisor),firstWeight:Number(route.first_weight_kg),firstPrice:Number(route.first_price),additionalPrice:Number(route.additional_price_per_kg),pricingUpdatedAt:route.updated_at};
 }
 function packingEstimateHtml(q,snapshot=false){
   let body;
@@ -444,7 +448,7 @@ function branchLinks(items,active,label){
 }
 function merchantPageFrame(html){
  const page=state.page,root=navActivePage(page,'merchant');
- const names={dashboard:'首页',parcels:'我的包裹',orders:'我的订单',receivers:'地址管理',rates:'运价查询',messages:'消息与客服',profile:'我的账户','pre-advise':'预报包裹','order-create':'预报包裹','packing-request':'申请打包 / 合包','packing-history':'打包记录','parcel-detail':'包裹详情','parcel-edit':'编辑包裹预报',consolidate:'确认合包',fee:'订单详情与费用',tracking:'物流详情','tracking-list':'物流查询','sea-tracking':'海运查询',billing:'费用账单',address:'仓库地址',support:'客服工单',offers:'推广优惠'};
+ const names={dashboard:'首页',parcels:'我的包裹',orders:'我的订单',receivers:'地址管理',rates:'运输计算器',messages:'消息与客服',profile:'我的账户','pre-advise':'预报包裹','order-create':'预报包裹','packing-request':'申请打包 / 合包','packing-history':'打包记录','parcel-detail':'包裹详情','parcel-edit':'编辑包裹预报',consolidate:'确认合包',fee:'订单详情与费用',tracking:'物流详情','tracking-list':'物流查询','sea-tracking':'海运查询',billing:'费用账单',address:'仓库地址',support:'客服工单',offers:'推广优惠'};
  const isChild=page!==root;
  const back=isChild?`<button type="button" data-page="${root}">${names[root]}</button><span aria-hidden="true">/</span>`:'';
  const orderCrumb=page==='tracking'&&state.order.record?`${orderAction(state.order.record,'fee','订单详情')}<span aria-hidden="true">/</span>`:'';
