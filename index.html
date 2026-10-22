@@ -53,7 +53,7 @@
         <div class="side-label">工作台</div>
         <div id="nav" class="side-nav"></div>
       </div>
-      <div class="side-footer"><strong>试运营原型 v1.5</strong>角色独立登录 · 主导航递进 · 一次付款</div>
+      <div class="side-footer"><strong>试运营原型 v1.8</strong>角色独立登录 · 头程尾程独立结算</div>
     </aside>
     <main class="main">
       <header class="topbar"><div class="crumb">集运系统 / <span id="crumb">商家控制台</span></div><div class="top-actions"><span class="muted" id="envLabel">演示环境</span><button class="btn ghost small" id="authBtn">登录</button><div class="user"><span class="avatar" id="avatar">商</span><span id="userName">跨境商家</span></div></div></header>
@@ -187,7 +187,7 @@
       const target=state.auth.loginTargetRole||'merchant';
       const targetLabel=target==='merchant'?'跨境商家':target==='warehouse'?'仓库操作员':'运营管理员';
       const registerHtml=target==='merchant'?'<div class="login-links"><span class="muted">还没有商家账号？</span><button id="loginRegister">注册商家账号</button></div>':'<div class="login-links"><span class="muted">内部账号由平台创建，请使用已分配的账号登录。</span></div>';
-      return '<div class="login-page"><section class="login-intro"><div class="login-brand"><span class="brand-mark">E</span><span>Eaztrans集运</span></div><h1>跨境包裹，从深圳仓到目的地。</h1><p>登录后按你的角色进入专属工作台，系统会把每一步串起来，完成当前步骤后再进入下一步。</p><div class="login-flow"><div class="login-flow-item"><b>1</b><span>商家预报包裹，选择是否合包</span></div><div class="login-flow-item"><b>2</b><span>仓库入库确认，测量并生成费用</span></div><div class="login-flow-item"><b>3</b><span>一次付款、打包出货、在线查询物流</span></div></div></section><section class="login-panel"><div class="login-card"><h2>登录系统</h2><p>请选择你的工作台，再输入会员号或邮箱和密码。</p><div class="login-roles"><button class="'+(target==='merchant'?'active':'')+'" data-login-role="merchant">商家端</button><button class="'+(target==='warehouse'?'active':'')+'" data-login-role="warehouse">仓库端</button><button class="'+(target==='admin'?'active':'')+'" data-login-role="admin">运营后台</button></div><div class="notice" style="margin:0 0 16px;padding:10px 12px"><div>→</div><div><strong>'+targetLabel+'登录</strong><p>登录成功后直接进入'+targetLabel+'控制台。</p></div></div><div class="field"><label>会员号 / 邮箱</label><input id="loginIdentifier" type="text" placeholder="M12345678 或 name@company.com" autocomplete="username" /></div><div class="field" style="margin-top:12px"><label>密码</label><input id="loginPassword" type="password" placeholder="至少 6 位" autocomplete="current-password" /></div><button class="btn primary login-submit" id="loginSubmit">登录并进入'+targetLabel+'</button>'+registerHtml+'<div class="login-note">仓库操作员和运营管理员账号由平台创建；注册入口仅开放给跨境商家。</div></div></section></div>';
+      return '<div class="login-page"><section class="login-intro"><div class="login-brand"><span class="brand-mark">E</span><span>Eaztrans集运</span></div><h1>跨境包裹，从深圳仓到目的地。</h1><p>登录后按你的角色进入专属工作台，系统会把每一步串起来，完成当前步骤后再进入下一步。</p><div class="login-flow"><div class="login-flow-item"><b>1</b><span>商家预报包裹，选择是否合包</span></div><div class="login-flow-item"><b>2</b><span>仓库入库确认，测量并生成费用</span></div><div class="login-flow-item"><b>3</b><span>头程付款出货，尾程独立结算、查询物流</span></div></div></section><section class="login-panel"><div class="login-card"><h2>登录系统</h2><p>请选择你的工作台，再输入会员号或邮箱和密码。</p><div class="login-roles"><button class="'+(target==='merchant'?'active':'')+'" data-login-role="merchant">商家端</button><button class="'+(target==='warehouse'?'active':'')+'" data-login-role="warehouse">仓库端</button><button class="'+(target==='admin'?'active':'')+'" data-login-role="admin">运营后台</button></div><div class="notice" style="margin:0 0 16px;padding:10px 12px"><div>→</div><div><strong>'+targetLabel+'登录</strong><p>登录成功后直接进入'+targetLabel+'控制台。</p></div></div><div class="field"><label>会员号 / 邮箱</label><input id="loginIdentifier" type="text" placeholder="M12345678 或 name@company.com" autocomplete="username" /></div><div class="field" style="margin-top:12px"><label>密码</label><input id="loginPassword" type="password" placeholder="至少 6 位" autocomplete="current-password" /></div><button class="btn primary login-submit" id="loginSubmit">登录并进入'+targetLabel+'</button>'+registerHtml+'<div class="login-note">仓库操作员和运营管理员账号由平台创建；注册入口仅开放给跨境商家。</div></div></section></div>';
     }
     async function submitLandingAuth(){
       const identifier=$('#loginIdentifier')?.value.trim(),password=$('#loginPassword')?.value||'',target=state.auth.loginTargetRole||'merchant';
@@ -592,9 +592,11 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=8"></script>
+  <script src="merchant-workspace.js?v=9"></script>
   <script src="warehouse-workspace.js?v=3"></script>
   <script src="payment-workspace.js?v=1"></script>
+  <script src="transport-workspace.js?v=1"></script>
+  <script src="separate-settlement.js?v=1"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>

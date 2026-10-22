@@ -43,8 +43,12 @@ function estimatePacking(parcels,route){
   const measurements=parcels.map(parcelEstimateMeasurement);
   const weight=round(measurements.reduce((n,m)=>n+m.values[0],0),3);
   const volume=round(measurements.reduce((n,m)=>n+m.values[1]*m.values[2]*m.values[3]/Number(route.volume_divisor),0),3);
-  const billable=Math.max(weight,volume),shipping=round(Number(route.first_price)+Math.max(0,billable-Number(route.first_weight_kg))*Number(route.additional_price_per_kg),2),handling=Number(route.handling_fee);
-  return {status:'ready',count:parcels.length,weight,volume,billable,shipping,handling,total:round(shipping+handling,2),measuredCount:measurements.filter(m=>m.source==='仓库实测').length,routeName:route.route_name,routeCode:route.route_code,volumeDivisor:Number(route.volume_divisor),firstWeight:Number(route.first_weight_kg),firstPrice:Number(route.first_price),additionalPrice:Number(route.additional_price_per_kg),pricingUpdatedAt:route.updated_at};
+  const billable=Math.max(weight,volume),handling=Number(route.handling_fee),basis=route.billing_basis||'kg';
+  const cbm=Math.ceil(measurements.reduce((s,m)=>s+m.values[1]*m.values[2]*m.values[3],0)-1e-9)/1000000;
+  if(basis==='cbm'&&(route.price_per_cbm==null||!Number.isFinite(Number(route.price_per_cbm))||Number(route.price_per_cbm)<0||!Number.isFinite(Number(route.minimum_cbm))||!(Number(route.minimum_cbm)>0)))return {status:'no_route'};
+  const billableCbm=basis==='cbm'?Math.max(cbm,Number(route.minimum_cbm)):null;
+  const shipping=basis==='cbm'?round(billableCbm*Number(route.price_per_cbm),2):round(Number(route.first_price)+Math.max(0,billable-Number(route.first_weight_kg))*Number(route.additional_price_per_kg),2);
+  return {status:'ready',count:parcels.length,weight,volume,billable,shipping,handling,total:round(shipping+handling,2),billingBasis:basis,volumeCbm:cbm,billableCbm,pricePerCbm:route.price_per_cbm,minimumCbm:route.minimum_cbm,isTestRate:route.is_test_rate,measuredCount:measurements.filter(m=>m.source==='仓库实测').length,routeName:route.route_name,routeCode:route.route_code,volumeDivisor:Number(route.volume_divisor),firstWeight:Number(route.first_weight_kg),firstPrice:Number(route.first_price),additionalPrice:Number(route.additional_price_per_kg),pricingUpdatedAt:route.updated_at};
 }
 function packingEstimateHtml(q,snapshot=false){
   let body;
@@ -88,6 +92,7 @@ async function loadMerchantWorkspace(){
   const jobs={};
   if(state.role==='merchant')Object.assign(jobs,{parcels:()=>queryData('parcels'),routes:()=>queryData('route_pricing'),warehouses:()=>queryData('warehouses')});
   if(state.role==='warehouse')jobs.parcels=()=>queryData('parcels');
+  if(state.role==='admin')jobs.routes=()=>queryData('route_pricing');
   if(['merchant','admin'].includes(state.role))jobs.tickets=()=>queryData('support_tickets');
   await Promise.all(Object.entries(jobs).map(async([key,fn])=>{
     try{workspace[key]=await fn();delete workspace.errors[key]}catch(e){workspace[key]=[];workspace.errors[key]=e.message}
@@ -265,7 +270,7 @@ function merchantTrackingList(){
   const rows=state.dbOrders.filter(o=>(!sea||/SEA/i.test(o.route_code)||/海运/.test(o.route_name))&&`${o.order_no} ${o.shipment_tracking_no||''} ${o.recipient_name}`.toLowerCase().includes(q));
   return shell(sea?'海运追踪':'物流追踪',sea?'查看海运订单的仓库和运输节点。':'按订单号或国际运单号查询物流。',button('我的订单','orders'))+
     notice('物流节点来源','当前展示仓库登记和系统操作产生的节点；承运商自动轨迹、船名航次与实时船位尚未接入。')+
-    `<div class="card"><form id="trackingSearch" class="workspace-toolbar"><input id="trackingSearchText" aria-label="搜索物流" value="${esc(workspace.trackingQuery)}" placeholder="输入订单号 / 国际运单号 / 收件人"><button class="btn primary">查询</button></form>${rows.length?`<div class="workspace-list">${rows.map(o=>`<div class="order-card"><div class="order-row"><b>${esc(o.order_no)}</b>${status(orderStatusLabel(o.status),statusTone(o.status))}</div><div class="subrow"><span>${esc(o.route_name)}</span><span>${esc(o.shipment_carrier||'承运商待登记')}</span><span>${esc(o.shipment_tracking_no||'出货后显示运单号')}</span></div><div class="form-actions">${orderAction(o,'tracking','查看物流节点')}</div></div>`).join('')}</div>`:emptyState(sea?'暂无海运订单':'没有匹配的物流记录',sea?'当前已配置的线路以印尼空运为主；海运订单创建后会在此显示。':'请确认订单或运单号，也可以在我的订单查看状态。')}</div>`;
+    `<div class="card"><form id="trackingSearch" class="workspace-toolbar"><input id="trackingSearchText" aria-label="搜索物流" value="${esc(workspace.trackingQuery)}" placeholder="输入订单号 / 国际运单号 / 收件人"><button class="btn primary">查询</button></form>${rows.length?`<div class="workspace-list">${rows.map(o=>`<div class="order-card"><div class="order-row"><b>${esc(o.order_no)}</b>${status(orderStatusLabel(o.status),statusTone(o.status))}</div><div class="subrow"><span>${esc(o.route_name)}</span><span>${esc(o.shipment_carrier||'承运商待登记')}</span><span>${esc(o.shipment_tracking_no||'出货后显示运单号')}</span></div><div class="form-actions">${orderAction(o,'tracking','查看物流节点')}</div></div>`).join('')}</div>`:emptyState(sea?'暂无海运订单':'没有匹配的物流记录',sea?'选择印尼海运专线创建订单后，可在此查看出货物流。':'请确认订单或运单号，也可以在我的订单查看状态。')}</div>`;
 }
 merchantTracking=function(){
   const o=state.order.record;
@@ -319,7 +324,7 @@ function merchantSupportAdmin(){return shell('客服工单','查看商家问题�
 function merchantOffers(){return shell('推广优惠','查看平台实际发布的活动与优惠。')+`<div class="card">${emptyState('暂无可用优惠','平台尚未配置优惠券或推广返佣活动；订单按已确认费用结算。',button('查看当前运价','rates',true))}</div>`}
 const MerchantViews={'parcel-edit':merchantParcelEdit,'pre-advise':merchantPreAdvise,'packing-request':merchantPackingRequest,'packing-history':merchantPackingHistory,receivers:merchantReceivers,'tracking-list':merchantTrackingList,'sea-tracking':merchantTrackingList,rates:merchantRates,messages:merchantMessages,support:merchantSupport,offers:merchantOffers,billing:merchantBilling,profile:merchantProfile};
 function exportWorkspaceBills(){
-  const rows=[['订单号','线路','目的地','状态','确认金额CNY','已登记付款CNY','付款时间'],...state.dbOrders.map(o=>[o.order_no,o.route_name,o.destination_country,orderStatusLabel(o.status),feeRecord(o)?.total_amount??'',paymentRecord(o)?.status==='paid'?paymentRecord(o).amount:0,o.paid_at||''])];
+  const rows=[['订单号','运输段','关联头程订单号','线路','目的地','状态','头程运输费CNY（历史单为原运费）','国内仓操作费CNY','尾程配送费CNY','尾程报价说明','确认金额CNY','已登记付款CNY','付款时间'],...state.dbOrders.map(o=>[o.order_no,o.transport_leg==='last_mile'?'尾程':'头程',state.dbOrders.find(p=>p.id===o.parent_order_id)?.order_no||'',o.route_name,o.destination_country,orderStatusLabel(o.status),feeRecord(o)?.shipping_fee??'',feeRecord(o)?.handling_fee??'',feeRecord(o)?.last_mile_fee??'',feeRecord(o)?.last_mile_note??'未报价或历史未拆分',feeRecord(o)?.total_amount??'',paymentRecord(o)?.status==='paid'?paymentRecord(o).amount:0,o.paid_at||''])];
   const csv='\ufeff'+rows.map(row=>row.map(v=>'"'+String(v).replace(/^[=+@\-]/,"'$&").replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
   const a=document.createElement('a');a.href=url;a.download='集运订单账单.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
