@@ -151,14 +151,27 @@ go=function(page,options={}){
   return parcelBaseGo(page,options);
 };
 function allParcels(){return workspace.parcels.map(p=>({...p,order:associatedOrder(p.id)}))}
-function parcelGroup(p){
-  if(['shipped','delivered'].includes(p.order?.status)||p.status==='shipped')return 'shipped';
-  if(['ready_to_ship'].includes(p.order?.status)||p.status==='consolidated')return 'packed';
-  if(p.status==='exception')return 'exception';
-  if(p.status==='pre_advised')return 'pending';
-  return 'received';
+function parcelTailOrder(p){return p.order&&state.dbOrders.find(o=>o.transport_leg==='last_mile'&&o.parent_order_id===p.order.id&&o.status!=='cancelled')}
+function parcelProgress(p){
+ const head=p.order,tail=parcelTailOrder(p);
+ if(p.status==='exception')return {group:'exception',label:'异常'};
+ if(tail){
+  if(tail.status==='delivered')return {group:'delivered',label:'已签收'};
+  if(tail.status==='shipped')return {group:'tail-shipped',label:'尾程派送中'};
+  if(['paid','ready_to_ship'].includes(tail.status))return {group:'tail-pending',label:'尾程待出库'};
+  if(tail.status==='awaiting_payment')return {group:'tail-pending',label:typeof orderReceipt==='function'&&orderReceipt(tail.id)?.status==='pending'?'尾程付款审核中':'尾程待付款'};
+  return {group:'tail-pending',label:'待尾程报价'};
+ }
+ if(head?.status==='delivered')return {group:'delivered',label:'已签收'};
+ if(head?.overseas_received_at)return {group:'overseas',label:'已到印尼仓'};
+ if(head?.status==='shipped'||p.status==='shipped')return {group:'shipped',label:head?.transport_leg==='last_mile'?'尾程派送中':'头程运输中'};
+ if(head?.status==='ready_to_ship'||p.status==='consolidated')return {group:'packed',label:'已打包'};
+ if(p.status==='pre_advised')return {group:'pending',label:'待入库'};
+ return {group:'received',label:parcelLabels[p.status]||p.status};
 }
-function parcelLabel(p){return {shipped:'已出货',packed:'已打包'}[parcelGroup(p)]||parcelLabels[p.status]||p.status}
+function parcelGroup(p){return parcelProgress(p).group}
+function parcelLabel(p){return parcelProgress(p).label}
+function parcelLinkedOrders(p){const tail=parcelTailOrder(p);return p.order?`${esc(p.order.order_no)}${tail?`<br><small>尾程：${esc(tail.order_no)}</small>`:''}`:'未申请打包'}
 async function selectWorkspaceOrder(id,page){
   const o=state.dbOrders.find(x=>x.id===id);
   if(!o){toast('未找到订单，请刷新列表');return}
@@ -216,8 +229,8 @@ merchantParcels=function(){
   const page=parcelPagination(filtered);
   return shell('我的包裹','检查包裹状态，在这里申请合包与查看打包进度。',button('打包记录','packing-history')+button('申请打包','packing-request')+button('+ 预报包裹','pre-advise',true))+
     (ps.some(p=>associatedOrders(p.id).length>1)?notice('历史包裹关联提示','部分旧包裹关联了多笔历史订单。这里优先展示运输进度最靠后的订单；请在我的订单逐单核对，新申请已拦截重复关联。'):'')+
-    tabs([['all','全部',ps.length],['received','已入库',ps.filter(p=>parcelGroup(p)==='received').length],['pending','待入库',ps.filter(p=>parcelGroup(p)==='pending').length],['packed','已打包',ps.filter(p=>parcelGroup(p)==='packed').length],['shipped','已出货',ps.filter(p=>parcelGroup(p)==='shipped').length],['exception','异常',ps.filter(p=>parcelGroup(p)==='exception').length]],workspace.parcelTab,'data-parcel-tab')+
-    `<div class="card">${workspaceError('parcels')}<form id="parcelSearch" class="workspace-toolbar"><input id="parcelSearchText" aria-label="搜索包裹" placeholder="搜索国内快递单号 / 品名" value="${esc(workspace.parcelQuery)}"><button class="btn ghost">搜索</button><button type="button" class="btn ghost" data-refresh-workspace>刷新</button></form><div id="parcelResults">${filtered.length?`<div class="table-wrap"><table class="table"><thead><tr><th>国内快递单号</th><th>品名</th><th>包裹状态</th><th>重量 / 尺寸</th><th>关联订单</th><th>操作</th></tr></thead><tbody>${page.rows.map(p=>`<tr><td class="mono">${esc(p.tracking_no)}</td><td>${esc(p.item_name||'—')}</td><td>${status(parcelLabel(p),parcelGroup(p)==='exception'?'red':'blue')}</td><td>${p.actual_weight_kg!=null?'实测：'+formatWeight(p.actual_weight_kg):'预报：'+formatWeight(p.declared_weight_kg)}<br><small class="muted">${p.length_cm!=null?formatSize(p):formatSize({length_cm:p.declared_length_cm,width_cm:p.declared_width_cm,height_cm:p.declared_height_cm})}</small></td><td>${p.order?esc(p.order.order_no):'未申请打包'}</td><td><div class="parcel-row-actions"><button class="btn small ghost" data-workspace-parcel="${p.id}">详情</button>${parcelMaintenanceActions(p)}${p.order&&canRequestLegacy(p.order)?orderAction(p.order,'consolidate','确认合包'):''}</div></td></tr>`).join('')}</tbody></table></div>`:emptyState('没有匹配的包裹',ps.length?'调整状态筛选或搜索词后再试。':'先预报国内快递单号，包裹寄到深圳仓后会更新入库状态。',button('预报包裹','pre-advise',true))}</div>${parcelPager(page)}</div>`;
+    tabs([['all','全部',ps.length],...Object.entries({pending:'待入库',received:'已入库',packed:'已打包',shipped:'头程运输中',overseas:'已到印尼仓','tail-pending':'尾程处理中','tail-shipped':'尾程派送中',delivered:'已签收',exception:'异常'}).map(([key,label])=>[key,label,ps.filter(p=>parcelGroup(p)===key).length])],workspace.parcelTab,'data-parcel-tab')+
+    `<div class="card">${workspaceError('parcels')}<form id="parcelSearch" class="workspace-toolbar"><input id="parcelSearchText" aria-label="搜索包裹" placeholder="搜索国内快递单号 / 品名" value="${esc(workspace.parcelQuery)}"><button class="btn ghost">搜索</button><button type="button" class="btn ghost" data-refresh-workspace>刷新</button></form><div id="parcelResults">${filtered.length?`<div class="table-wrap"><table class="table"><thead><tr><th>国内快递单号</th><th>品名</th><th>包裹状态</th><th>重量 / 尺寸</th><th>关联订单</th><th>操作</th></tr></thead><tbody>${page.rows.map(p=>`<tr><td class="mono">${esc(p.tracking_no)}</td><td>${esc(p.item_name||'—')}</td><td>${status(parcelLabel(p),parcelGroup(p)==='exception'?'red':'blue')}</td><td>${p.actual_weight_kg!=null?'实测：'+formatWeight(p.actual_weight_kg):'预报：'+formatWeight(p.declared_weight_kg)}<br><small class="muted">${p.length_cm!=null?formatSize(p):formatSize({length_cm:p.declared_length_cm,width_cm:p.declared_width_cm,height_cm:p.declared_height_cm})}</small></td><td>${parcelLinkedOrders(p)}</td><td><div class="parcel-row-actions"><button class="btn small ghost" data-workspace-parcel="${p.id}">详情</button>${parcelMaintenanceActions(p)}${parcelTailOrder(p)?orderAction(parcelTailOrder(p),'fee','尾程订单'):p.order?.overseas_received_at&&feeRecord(p.order)?.fee_breakdown_version===3?orderAction(p.order,'fee','申请尾程'):''}${p.order&&canRequestLegacy(p.order)?orderAction(p.order,'consolidate','确认合包'):''}</div></td></tr>`).join('')}</tbody></table></div>`:emptyState('没有匹配的包裹',ps.length?'调整状态筛选或搜索词后再试。':'先预报国内快递单号，包裹寄到深圳仓后会更新入库状态。',button('预报包裹','pre-advise',true))}</div>${parcelPager(page)}</div>`;
 };
 function merchantPreAdvise(){return shell('预报包裹','填写国内快递信息，让深圳仓更快识别你的包裹。',button('返回我的包裹','parcels'))+`<div class="grid layout-2"><div class="card"><form id="preAdviceForm"><div class="form-grid">${field('国内快递单号','adviceTracking','','text','required minlength="5" maxlength="80"')}${field('快递公司','adviceCarrier','','text','maxlength="80"')}${field('包裹品名','adviceItem','','text','required maxlength="120"')}${measurementFields('advice')}</div><p class="page-note">重量和尺寸选填，请按整件包裹（含包装）填写；长宽高需同时填写，用于合包费用预估，仓库入库后另行实测。</p><div class="form-actions"><button class="btn primary" type="submit">提交预报</button></div></form></div><div class="card"><h3>预报后如何操作？</h3><p class="muted">1. 将货物寄到深圳仓，并在面单上备注会员号。</p><p class="muted">2. 在“我的包裹”查看入库情况、选择包裹申请打包。</p><p class="muted">3. 仓库确认实重和尺寸后，支付头程费用；到印尼仓后申请尾程配送，另行核价付款。</p>${button('查看深圳仓地址','address')}</div></div>`}
 function merchantPackingRequest(){
@@ -242,7 +255,7 @@ function merchantPackingHistory(){
 merchantParcelDetail=function(){
   const p=allParcels().find(p=>p.id===workspace.detailParcelId);
   if(!p)return shell('包裹详情','请从包裹列表选择一件包裹。',button('返回我的包裹','parcels'));
-  return shell('包裹详情',p.tracking_no,button('返回我的包裹','parcels')+parcelMaintenanceActions(p))+`<div class="grid layout-2"><div class="card"><h3>${esc(p.item_name)}</h3>${status(parcelLabel(p))}<div class="metric"><span>快递公司</span><b>${esc(p.carrier||'未填写')}</b></div><div class="metric"><span>预报重量</span><b>${formatWeight(p.declared_weight_kg)}</b></div><div class="metric"><span>预报外包装尺寸</span><b>${formatSize({length_cm:p.declared_length_cm,width_cm:p.declared_width_cm,height_cm:p.declared_height_cm})}</b></div><div class="metric"><span>仓库实际重量</span><b>${formatWeight(p.actual_weight_kg)}</b></div><div class="metric"><span>仓库实测尺寸</span><b>${formatSize(p)}</b></div><div class="metric"><span>预报时间</span><b>${dateText(p.created_at)}</b></div><div class="metric"><span>收货时间</span><b>${dateText(p.received_at)}</b></div>${p.exception_reason?notice('包裹异常',p.exception_reason):''}${p.order?`<div class="form-actions">${orderAction(p.order,'fee','关联订单')}${orderAction(p.order,'tracking','物流节点')}</div>`:button('申请打包','packing-request',true)}</div><div class="card"><h3>入库 / 打包照片</h3>${emptyState('暂无照片','当前仓库尚未上传照片；此处不展示示例照片。')}</div></div>`;
+  return shell('包裹详情',p.tracking_no,button('返回我的包裹','parcels')+parcelMaintenanceActions(p))+`<div class="grid layout-2"><div class="card"><h3>${esc(p.item_name)}</h3>${status(parcelLabel(p))}<div class="metric"><span>快递公司</span><b>${esc(p.carrier||'未填写')}</b></div><div class="metric"><span>预报重量</span><b>${formatWeight(p.declared_weight_kg)}</b></div><div class="metric"><span>预报外包装尺寸</span><b>${formatSize({length_cm:p.declared_length_cm,width_cm:p.declared_width_cm,height_cm:p.declared_height_cm})}</b></div><div class="metric"><span>仓库实际重量</span><b>${formatWeight(p.actual_weight_kg)}</b></div><div class="metric"><span>仓库实测尺寸</span><b>${formatSize(p)}</b></div><div class="metric"><span>预报时间</span><b>${dateText(p.created_at)}</b></div><div class="metric"><span>收货时间</span><b>${dateText(p.received_at)}</b></div>${p.exception_reason?notice('包裹异常',p.exception_reason):''}${p.order?`<div class="form-actions">${orderAction(p.order,'fee','关联订单')}${orderAction(p.order,'tracking','头程物流')}${parcelTailOrder(p)?orderAction(parcelTailOrder(p),'tracking','尾程物流')+orderAction(parcelTailOrder(p),'fee','尾程订单'):''}</div>`:button('申请打包','packing-request',true)}</div><div class="card"><h3>入库 / 打包照片</h3>${emptyState('暂无照片','当前仓库尚未上传照片；此处不展示示例照片。')}</div></div>`;
 };
 function workspaceOrderTable(orders){return `<div class="table-wrap"><table class="table"><thead><tr><th>订单号 / 创建时间</th><th>线路 / 目的地</th><th>包裹</th><th>确认金额</th><th>状态</th><th>操作</th></tr></thead><tbody>${orders.map(o=>`<tr><td class="mono">${esc(o.order_no)}<br><small class="muted">${dateText(o.created_at)}</small></td><td>${esc(o.route_name)}<br><small class="muted">${esc(o.destination_country)} · ${esc(o.destination_city||'')}</small></td><td>${o.parcel_count}</td><td class="list-amount">${money(feeRecord(o)?.total_amount)}</td><td>${status(orderStatusLabel(o.status),statusTone(o.status))}</td><td>${orderAction(o,'fee',o.status==='awaiting_payment'?'查看并付款':'详情')}${orderAction(o,'tracking','物流')}</td></tr>`).join('')}</tbody></table></div>`}
 merchantOrders=function(){

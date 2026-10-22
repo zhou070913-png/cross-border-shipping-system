@@ -171,11 +171,4 @@ bind=function(){
   document.querySelectorAll('[data-payment-refresh]').forEach(el=>el.onclick=()=>{if(!paymentWorkspace.busy)refreshDbState()});
   const logout=$('#authBtn');if(logout&&state.auth.user){const previous=logout.onclick;logout.onclick=async()=>{if(paymentWorkspace.busy){toast('正在保存，请稍候');return}document.getElementById('paymentProofDialog')?.remove();await previous();await loadPaymentWorkspace()}}
 };
-// 后台审核通知轮询只在工作台刷新，不打断用户正在填写的表单。
-if(typeof setInterval==='function')setInterval(async()=>{
-  if(!state.auth.user||state.page!=='dashboard'||document.visibilityState!=='visible'||paymentWorkspace.busy||paymentWorkspace.loading||warehouseWorkspace.busy||workspace.parcelBusy)return;
-  const before=JSON.stringify([paymentWorkspace.receipts.map(r=>[r.id,r.status]),paymentWorkspace.notices.map(n=>n.id)]);
-  await loadPaymentWorkspace();
-  const after=JSON.stringify([paymentWorkspace.receipts.map(r=>[r.id,r.status]),paymentWorkspace.notices.map(n=>n.id)]);
-  if(before!==after&&state.page==='dashboard'&&!paymentWorkspace.busy)await refreshDbState();
-},30000);
+// 页面自动同步由 progress-sync.js 统一管理。
