@@ -58,3 +58,6 @@ body .side-nav .nav-group{padding-top:14px}body .side-nav button{padding-top:8px
 
 /* 关联进度与本段状态同时展示。 */
 .order-progress{display:inline-flex;flex-direction:column;align-items:flex-start;gap:5px;vertical-align:middle}.order-progress small{display:block;line-height:1.5;white-space:normal;min-width:140px}
+
+/* 整体订单下分段展示，金额按运输段分别标识。 */
+.overall-fees{display:flex;flex-direction:column;gap:7px;line-height:1.5}.overall-summary .overall-fees{flex-direction:row;flex-wrap:wrap;gap:24px}.overall-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.overall-nav>div:first-child{display:flex;flex-direction:column;gap:5px}.overall-nav .form-actions{margin:0}.overall-leg-card .metric b{max-width:70%;overflow-wrap:anywhere;text-align:right}.overall-leg-card h2{font-size:20px}.overall-order-table td:last-child .btn{margin-bottom:5px}.overall-leg-grid{align-items:start}@media(max-width:760px){.overall-nav{align-items:flex-start;flex-direction:column}.overall-leg-grid{grid-template-columns:1fr}}

@@ -218,7 +218,7 @@ renderNav=function(){
   $('#nav').innerHTML=navs.merchant.map(([id,label])=>`${groups[id]?`<div class="nav-group">${groups[id]}</div>`:''}<button class="${active===id?'active':''}" ${active===id?'aria-current="page"':''} data-page="${id}">${icon(icons[id]||id)}<span>${label}</span></button>`).join('');
 };
 merchantDashboard=function(){
-  const orders=state.dbOrders, ps=allParcels();
+  const orders=typeof overallOrderRoots==='function'?overallOrderRoots(state.dbOrders):state.dbOrders, ps=allParcels();
   const waiting=orders.filter(o=>orderMatchesProgress(o,'pending')).length;
   const pending=orders.filter(o=>orderMatchesProgress(o,'awaiting_payment')).length;
   const transit=orders.filter(o=>orderMatchesProgress(o,'shipped')).length;
@@ -227,7 +227,7 @@ merchantDashboard=function(){
   const next=completed?'orders':!ps.length?'pre-advise':!orders.length||ps.some(p=>!p.order)?'parcels':current?.status==='awaiting_payment'?'orders':current?.consolidated?'orders':'parcels';
   return shell('商家首页','从包裹预报到签收，在一个工作台完成。',button('预报包裹','pre-advise',true))+
     `<div class="quick-links">${[['pre-advise','预报包裹','填写国内快递单号','parcels'],['parcels','申请打包','在我的包裹确认合包','parcels'],['orders','确认订单','头程、尾程分别确认付款','orders'],['orders','查询物流','从订单进入物流详情','tracking']].map(([page,label,desc,i])=>`<button class="quick-link" data-page="${page}">${icon(i)}<span><b>${label}</b><small>${desc}</small></span></button>`).join('')}</div>`+
-    `<div class="grid kpis">${kpi('我的包裹',ps.length,'按当前账号统计')}${kpi('待仓库确认',waiting,'订单记录 · 含关联尾程')}${kpi('待付款',pending,'订单记录 · 含关联尾程')}${kpi('运输中',transit,'订单记录 · 含关联尾程')}</div>`+
+    `<div class="grid kpis">${kpi('我的包裹',ps.length,'按当前账号统计')}${kpi('待仓库确认',waiting,'整体订单数')}${kpi('待付款',pending,'整体订单数')}${kpi('运输中',transit,'整体订单数')}</div>`+
     `<div class="card"><div class="card-title"><h3>下一步办理</h3><span class="tag">预报 / 合包 → 头程付款 → 到印尼仓 → 尾程付款配送</span></div>${notice(completed?'本批订单已完成':'按包裹和订单状态继续办理',completed?'头程与关联尾程已完成，可在我的订单查看签收结果，或预报新的包裹。':!ps.length?'先预报包裹，再将包裹寄至深圳仓。':next==='parcels'?'进入我的包裹，选择包裹申请合包或查看已提交的打包申请。':'进入我的订单，查看头程费用与物流；头程到印尼仓后，进入详情申请尾程配送并单独付款。')}<div class="form-actions">${button(next==='pre-advise'?'开始预报':next==='parcels'?'查看我的包裹':'查看我的订单',next,true)}</div></div>`+
     `<div class="card section-space"><div class="card-title"><h3>最近订单</h3>${button('查看全部','orders')}</div>${orders.length?workspaceOrderTable(orders.slice(0,5)):emptyState('还没有集运订单','预报包裹后，在我的包裹里申请打包。',button('去我的包裹','parcels',true))}</div>`;
 };

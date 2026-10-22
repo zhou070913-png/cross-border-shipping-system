@@ -18,7 +18,7 @@ function progressHasDraft(){
 }
 function progressCanApply(){
  if(!progressReady()||progressSync.manual||paymentWorkspace.busy||paymentWorkspace.loading||warehouseWorkspace.busy||warehouseWorkspace.loading||workspace.parcelBusy)return false;
- if(!['dashboard','parcels','parcel-detail','orders','fee','tracking','tracking-list','sea-tracking','packing-history','billing','warehouse-tracking','warehouse-tracking-detail','messages'].includes(state.page))return false;
+ if(!['dashboard','overall-order','parcels','parcel-detail','orders','fee','tracking','tracking-list','sea-tracking','packing-history','billing','warehouse-tracking','warehouse-tracking-detail','messages'].includes(state.page))return false;
  return !progressHasDraft();
 }
 function progressLabel(){

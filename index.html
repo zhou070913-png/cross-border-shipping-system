@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Eaztrans集运｜产品原型</title>
-  <link rel="stylesheet" href="merchant-workspace.css?v=8" />
+  <link rel="stylesheet" href="merchant-workspace.css?v=9" />
   <style>
     :root{
       --bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#6d7890;--line:#e6eaf1;
@@ -489,7 +489,7 @@
         const views={dashboard:merchantDashboard,'order-create':merchantCreate,consolidate:merchantConsolidate,parcels:merchantParcels,'parcel-detail':merchantParcelDetail,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress,...MerchantViews};
         html=(views[state.page]||merchantDashboard)();
       }else if(state.role==='warehouse'){
-        const views={dashboard:warehouseDashboard,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,'warehouse-tracking':warehouseTrackingList,'warehouse-tracking-detail':warehouseTrackingDetail,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
+        const views={dashboard:warehouseDashboard,'overall-order':overallOrderDetail,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,'warehouse-tracking':warehouseTrackingList,'warehouse-tracking-detail':warehouseTrackingDetail,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
         html=(views[state.page]||warehouseDashboard)();
       }else{
         const views={dashboard:adminDashboard,orders:adminOrders,config:adminConfig,audit:adminAudit,accounts:adminAccounts,'support-admin':merchantSupportAdmin,'payment-review':adminPaymentReview,'receiving-config':adminReceivingConfig};
@@ -592,15 +592,16 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=17"></script>
-  <script src="warehouse-workspace.js?v=4"></script>
+  <script src="merchant-workspace.js?v=18"></script>
+  <script src="warehouse-workspace.js?v=5"></script>
   <script src="payment-workspace.js?v=2"></script>
   <script src="transport-workspace.js?v=2"></script>
   <script src="separate-settlement.js?v=4"></script>
   <script src="overseas-addresses.js?v=2"></script>
   <script src="calculator-workspace.js?v=2"></script>
   <script src="last-mile-pricing.js?v=2"></script>
-  <script src="progress-sync.js?v=1"></script>
+  <script src="overall-orders.js?v=1"></script>
+  <script src="progress-sync.js?v=2"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>

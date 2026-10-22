@@ -59,7 +59,7 @@ function warehouseOrderRows(orders){
 }
 function warehouseQueue(page){
   const rows=state.dbOrders.filter(o=>warehouseStages[page].includes(o.status));
-  return `<div class="card section-space"><div class="card-title"><h3>${warehouseStageLabels[page]}（${rows.length} 单）</h3>${button('全部仓库订单','dashboard')}</div>${warehouseOrderRows(rows)}</div>`;
+  return `<div class="card section-space"><div class="card-title"><h3>${warehouseStageLabels[page]}（${typeof overallOrderRoots==='function'?overallOrderRoots(rows).length:rows.length} 单）</h3>${button('全部仓库订单','dashboard')}</div>${warehouseOrderRows(rows)}</div>`;
 }
 function warehouseSelected(){return warehouseWorkspace.selectedId===state.order.dbId?state.order.record:null}
 function warehouseActualFees(o){
@@ -73,10 +73,10 @@ function warehouseContext(o){
     (duplicates?notice('此订单含历史重复关联包裹','同一包裹关联了多笔订单。请运营先核对保留哪一单，避免重复收货、收费或出货；这里保留原记录。'):'');
 }
 warehouseDashboard=function(){
-  const count=k=>state.dbOrders.filter(o=>warehouseStages[k].includes(o.status)).length;
+  const count=k=>{const rows=state.dbOrders.filter(o=>warehouseStages[k].includes(o.status));return typeof overallOrderRoots==='function'?overallOrderRoots(rows).length:rows.length};
   const independent=workspace.parcels.filter(p=>p.status==='pre_advised'&&!associatedOrders(p.id).length).length;
   const rows=state.dbOrders.filter(o=>(warehouseWorkspace.filter==='all'||(['shipped','delivered'].includes(warehouseWorkspace.filter)?orderMatchesProgress(o,warehouseWorkspace.filter):(warehouseStages[warehouseWorkspace.filter]||[warehouseWorkspace.filter]).includes(o.status)))&&
-    `${o.order_no} ${o.recipient_name||''} ${safeRows(o.order_parcels).map(r=>r.parcels?.tracking_no||'').join(' ')}`.toLowerCase().includes(warehouseWorkspace.query.toLowerCase()));
+    (typeof overallOrderSearch==='function'?overallOrderSearch(o,warehouseWorkspace.query):`${o.order_no} ${o.recipient_name||''} ${safeRows(o.order_parcels).map(r=>r.parcels?.tracking_no||'').join(' ')}`.toLowerCase().includes(warehouseWorkspace.query.toLowerCase())));
   const filters=[['all','全部订单'],...Object.entries(warehouseStageLabels),['awaiting_payment','待商家付款'],['shipped','运输中'],['delivered','已签收']];
   return shell('仓库工作台','按订单号接续收货、测量确认、打包和出货；与商家端使用同一订单状态。',button('物流查询','warehouse-tracking')+button('扫描入库','inbound',true))+
     `<div class="grid kpis">${Object.keys(warehouseStages).map(k=>`<button type="button" class="warehouse-kpi" data-warehouse-filter="${k}">${kpi(warehouseStageLabels[k],count(k),'订单数 · 点击查看队列')}</button>`).join('')}</div>`+
