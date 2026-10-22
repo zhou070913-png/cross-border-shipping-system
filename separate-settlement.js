@@ -9,8 +9,11 @@ function settlementContext(o){
  return `<div class="card section-space"><h3>${legLabel(o)}</h3>${p?`<p>关联头程：${esc(p.order_no)}。头程已结算，本尾程单只收配送费。</p>${state.role==='merchant'?orderAction(p,'fee','查看头程账单'):''}`:`<p>头程单仅结算深圳仓到印尼海外仓的运输及国内仓操作费；尾程配送另单核价、付款。</p>`}${o.overseas_received_at?notice('头程已入印尼海外仓',`${o.overseas_warehouse} · ${dateText(o.overseas_received_at)}。尚未代表消费者签收。`):''}${child?`<p>已关联尾程：${esc(child.order_no)} · ${esc(orderStatusLabel(child.status))}</p>${state.role==='merchant'?orderAction(child,'fee','进入尾程订单与付款'):warehouseOrderButton(child,warehouseStage(child)||'ship','进入尾程作业')}`:''}</div>`;
 }
 function lastMileRequest(o){
- if(!o||isLastMile(o)||!o.overseas_received_at||lastMileChild(o)||feeRecord(o)?.fee_breakdown_version!==3)return '';
- return `<div class="card section-space"><h3>申请尾程配送</h3><p>本次将整票头程货物配送至一个消费者地址，单独生成尾程订单。头程费用保持已结算，不重复收取。</p><form id="lastMileRequestForm" data-order-id="${esc(o.id)}"><div class="field"><label for="lastMileAddress">消费者收件地址</label><select id="lastMileAddress"><option value="">沿用头程预留地址：${esc(o.recipient_name)} · ${esc(o.destination_address)}</option>${state.addresses.filter(a=>a.country==='印度尼西亚').map(a=>`<option value="${esc(a.id)}">${esc(a.recipient_name)} · ${esc(a.address_line)}</option>`).join('')}</select></div><p class="page-note">创建后锁定本次地址；请在提交前核对。当前暂不支持一票货拆成多笔消费者配送。</p><button class="btn primary" type="submit">确认地址，创建尾程配送单</button></form></div>`;
+ if(!o||isLastMile(o))return '';
+ const child=lastMileChild(o);if(child)return '';
+ if(feeRecord(o)?.fee_breakdown_version!==3)return notice('历史账单的尾程安排','此单使用旧版费用规则，暂不自动生成尾程，避免重复收费。需要尾程配送请联系运营核对。');
+ if(!o.overseas_received_at)return notice('尾程独立结算入口','头程已到印尼仓后，可在此填写消费者收货地址、申请尾程配送；尾程报价和付款单独进行。当前等待仓库登记印尼仓到货。');
+ return `<div class="card section-space" id="lastMileApplication" style="scroll-margin-top:88px"><h3>申请尾程配送 · 独立结算</h3><p>整票货物从印尼仓配送至一个消费者地址；生成独立尾程订单，头程费用不重复收取。</p><form id="lastMileRequestForm" data-order-id="${esc(o.id)}"><div class="field"><label for="lastMileAddress">选用已保存的消费者地址（选填）</label><select id="lastMileAddress"><option value="">新增消费者收货地址</option>${state.addresses.filter(a=>a.country==='印度尼西亚').map(a=>`<option value="${esc(a.id)}">${esc(a.recipient_name)} · ${esc(a.address_line)}</option>`).join('')}</select></div><div class="form-grid section-space">${field('消费者收件人','lastMileName','','text','required maxlength="120"')}${field('联系电话','lastMilePhone','','tel','required maxlength="80"')}${field('国家','lastMileCountry','印度尼西亚','text','readonly')}${field('城市 / 地区','lastMileCity','','text','required maxlength="120"')}${field('邮编（选填）','lastMilePostal','','text','maxlength="30"')}<div class="field full"><label for="lastMileLine">消费者详细收货地址</label><textarea id="lastMileLine" required maxlength="1000" rows="3" placeholder="填写消费者街道、门牌号等具体收货地址"></textarea></div></div><p class="page-note">此处填写消费者地址，不能沿用头程印尼仓地址。创建后锁定本次收货信息；当前不支持一票拆成多笔消费者配送。新地址会保存至地址簿。</p><button class="btn primary" type="submit">确认消费者地址，创建尾程订单</button></form></div>`;
 }
 const separateMerchantFee=merchantFee;
 merchantFee=function(){
@@ -53,11 +56,11 @@ adminPaymentReview=function(){const r=paymentWorkspace.receipts.find(x=>x.id===p
 const separateBind=bind;
 bind=function(){
  separateBind();
- const forms=[['lastMileRequestForm','merchant_create_last_mile',form=>({p_order_id:form.dataset.orderId,p_address_id:$('#lastMileAddress').value||null}),'尾程配送单已创建，等待独立报价'],['lastMileQuoteForm','warehouse_quote_last_mile',form=>({p_order_id:form.dataset.orderId,p_amount:Number($('#lastMileFee').value),p_note:$('#lastMileNote').value.trim()}),'尾程报价已确认，等待本段付款'],['overseasReceivedForm','warehouse_receive_overseas',form=>({p_order_id:form.dataset.orderId,p_location:$('#overseasLocation').value.trim()}),'头程已到印尼仓，商家可申请尾程配送'],['lastMileDeliveredForm','warehouse_complete_delivery',form=>({p_order_id:form.dataset.orderId,p_note:$('#lastMileDeliveredNote').value.trim()}),'消费者签收已登记']];
+ const forms=[['lastMileRequestForm','merchant_create_last_mile_with_address',form=>({p_order_id:form.dataset.orderId,p_recipient:readLastMileRecipient()}),'尾程配送单已创建，等待独立报价'],['lastMileQuoteForm','warehouse_quote_last_mile',form=>({p_order_id:form.dataset.orderId,p_amount:Number($('#lastMileFee').value),p_note:$('#lastMileNote').value.trim()}),'尾程报价已确认，等待本段付款'],['overseasReceivedForm','warehouse_receive_overseas',form=>({p_order_id:form.dataset.orderId,p_location:$('#overseasLocation').value.trim()}),'头程已到印尼仓，商家可申请尾程配送'],['lastMileDeliveredForm','warehouse_complete_delivery',form=>({p_order_id:form.dataset.orderId,p_note:$('#lastMileDeliveredNote').value.trim()}),'消费者签收已登记']];
  for(const [id,rpc,args,message] of forms){const form=$('#'+id);if(form)form.onsubmit=e=>{e.preventDefault();paymentTask(form,async()=>{
   const owner=state.auth.user?.id,result=await rpcWorkspace(rpc,args(form));
   if(owner!==state.auth.user?.id)throw Error('登录账号已变化，请刷新核对');
-  if(rpc==='merchant_create_last_mile'){state.activeOrderId=result.id;if(!await refreshDbState('fee'))throw Error('申请已提交，请刷新查看，勿重复操作')}
+  if(rpc==='merchant_create_last_mile_with_address'){state.activeOrderId=result.id;if(!await refreshDbState('fee'))throw Error('申请已提交，请刷新查看，勿重复操作')}
   else if(!await refreshDbState())throw Error('已提交，请刷新核对，勿重复操作');
   toast(message);
  })}}

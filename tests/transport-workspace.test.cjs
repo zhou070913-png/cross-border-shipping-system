@@ -4,7 +4,7 @@ function setup(){
  const root=path.join(__dirname,'..'),run=s=>vm.runInContext(s,c),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  run([...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('const state =')));
  run('bind=()=>{};render=()=>{}');
- for(const f of ['merchant-workspace.js','warehouse-workspace.js','payment-workspace.js','transport-workspace.js','separate-settlement.js'])run(fs.readFileSync(path.join(root,f),'utf8'));
+ for(const f of ['merchant-workspace.js','warehouse-workspace.js','payment-workspace.js','transport-workspace.js','separate-settlement.js','overseas-addresses.js'])run(fs.readFileSync(path.join(root,f),'utf8'));
  run(`render=()=>{};messages=[];toast=s=>messages.push(s);state.role='merchant';state.auth={user:{id:'m'},role:'merchant'};
  air={is_active:true,route_code:'ID-AIR',route_name:'印尼空运专线',transport_mode:'air',billing_basis:'kg',volume_divisor:6000,first_weight_kg:0.5,first_price:68,additional_price_per_kg:42,handling_fee:18};
  sea={...air,route_code:'ID-SEA',route_name:'印尼海运专线',transport_mode:'sea',billing_basis:'cbm',price_per_cbm:600,minimum_cbm:0.1,is_test_rate:true};workspace.routes=[air,sea];
@@ -52,10 +52,29 @@ test('tail warehouse quote and arrival controls follow the correct leg; quoted t
  run(`o.transport_leg='last_mile';applyDbOrder(o)`);assert.match(run('warehouseShip()'),/lastMileDeliveredForm/);assert.doesNotMatch(run('warehouseShip()'),/overseasReceivedForm/);
 });
 test('separate request selects returned child ID and quote submits independent amount, not parent total',async()=>{
- const {run,elements}=setup();let form={dataset:{orderId:'o'},querySelectorAll:()=>[]};elements.set('#lastMileRequestForm',form);elements.set('#lastMileAddress',{value:'addr'});
+ const {run,elements}=setup();let form={dataset:{orderId:'o'},querySelectorAll:()=>[]};elements.set('#lastMileRequestForm',form);elements.set('#lastMileAddress',{value:'addr'});for(const [key,value] of [['Name','消费者'],['Phone','TEST'],['City','Jakarta'],['Postal','10000'],['Line','消费者测试地址']])elements.set('#lastMile'+key,{value});
  run(`paymentTask=async(f,fn)=>fn();rpcWorkspace=async(name,args)=>{sent={name,args};return {id:'new-tail'}};refreshDbState=async(page)=>{refreshed=page;return true}`);run('bind()');await form.onsubmit({preventDefault(){}});
- assert.equal(run('sent.name'),'merchant_create_last_mile');assert.equal(run('sent.args.p_address_id'),'addr');assert.equal(run('state.activeOrderId'),'new-tail');assert.equal(run('refreshed'),'fee');
+ assert.equal(run('sent.name'),'merchant_create_last_mile_with_address');assert.equal(run('sent.args.p_recipient.address_line'),'消费者测试地址');assert.equal(run('sent.args.p_recipient.country'),'印度尼西亚');assert.equal(run('state.activeOrderId'),'new-tail');assert.equal(run('refreshed'),'fee');
  elements.delete('#lastMileRequestForm');form={dataset:{orderId:'t'},querySelectorAll:()=>[]};elements.set('#lastMileQuoteForm',form);elements.set('#lastMileFee',{value:'25'});elements.set('#lastMileNote',{value:'本地报价'});run('bind()');await form.onsubmit({preventDefault(){}});
  assert.equal(run('sent.name'),'warehouse_quote_last_mile');assert.equal(run('sent.args.p_order_id'),'t');assert.equal(run('sent.args.p_amount'),25);
 });
 test('smallest positive declared dimensions retain minimum positive sea volume',()=>{const {run}=setup();assert.equal(run('estimatePacking([{...p,declared_length_cm:0.01,declared_width_cm:0.01,declared_height_cm:0.01}],sea).volumeCbm'),0.000001)});
+
+test('head destination uses platform warehouse and allows merchants without consumer address book',()=>{
+ const {run}=setup();run(`state.addresses=[];state.dbOrders=[];p.status='pre_advised';workspace.selected=new Set(['p']);workspace.overseasWarehouses=[{id:'wh',name:'平台测试仓',city:'Jakarta',country:'印度尼西亚',address_line:'测试地址禁止寄件',contact_name:'虚拟联系人',contact_phone:'TEST',is_active:true,is_test_address:true}];`);
+ const html=run('merchantPackingRequest()');assert.match(html,/平台印尼仓/);assert.match(html,/测试仓地址 · 禁止寄件/);assert.doesNotMatch(html,/维护收货地址|请选择收货地址/);assert.doesNotMatch(html,/<button[^>]*disabled[^>]*>提交打包申请/);
+ run('workspace.overseasWarehouses=[]');assert.match(run('merchantPackingRequest()'),/<button[^>]*disabled[^>]*>提交打包申请/);
+});
+test('tail needs consumer address and never defaults to head warehouse',()=>{
+ const {run,elements}=setup();run(`o.destination_address='HEAD-WAREHOUSE-DO-NOT-COPY';o.overseas_received_at='2026-10-22';o.fees=[{fee_breakdown_version:3}];`);
+ const html=run('lastMileRequest(o)');assert.match(html,/消费者详细收货地址/);assert.doesNotMatch(html,/HEAD-WAREHOUSE-DO-NOT-COPY|<option[^>]*>沿用头程/);
+ for(const key of ['Name','Phone','City','Postal','Line'])elements.set('#lastMile'+key,{value:''});assert.throws(()=>run('readLastMileRecipient()'),/完整填写/);
+});
+test('saved tail address fills editable fields; head snapshot labels and settlement guidance stay visible',()=>{
+ const {run,elements}=setup();const select={value:'a'};elements.set('#lastMileAddress',select);
+ for(const key of ['Name','Phone','City','Postal','Line'])elements.set('#lastMile'+key,{value:''});
+ run(`state.addresses=[{id:'a',recipient_name:'Consumer',recipient_phone:'TEST',city:'Jakarta',address_line:'Consumer St',postal_code:'123'}];bind()`);select.onchange();assert.equal(elements.get('#lastMileLine').value,'Consumer St');
+ elements.get('#lastMileLine').value='Edited Consumer St';assert.equal(run('readLastMileRecipient().address_line'),'Edited Consumer St');
+ run(`o.destination_overseas_warehouse_id='wh';o.fees=[];applyDbOrder(o)`);assert.match(run('merchantFee()'),/头程目的地 · 印尼仓地址/);assert.match(run('lastMileRequest(o)'),/历史账单/);
+ run(`o.fees=[{fee_breakdown_version:3}];o.overseas_received_at=null`);assert.match(run('lastMileRequest(o)'),/等待仓库登记/);assert.match(run('merchantOrders()'),/尾程在哪里结算/);
+});

@@ -1,6 +1,6 @@
 /* 商家工作台：共享现有角色校验、订单数据与一次付款接口。 */
 'use strict';
-const workspace = {owner:null, parcels:[], routes:[], warehouses:[], tickets:[], errors:{}, parcelTab:'all', parcelQuery:'', parcelPage:1, parcelPageSize:10, editParcelId:null, parcelBusy:false, orderQuery:'', orderTab:'all', trackingQuery:'', selected:new Set(), editingAddress:null, quote:null, read:[]};
+const workspace = {owner:null, parcels:[], routes:[], warehouses:[], overseasWarehouses:[], tickets:[], errors:{}, parcelTab:'all', parcelQuery:'', parcelPage:1, parcelPageSize:10, editParcelId:null, parcelBusy:false, orderQuery:'', orderTab:'all', trackingQuery:'', selected:new Set(), editingAddress:null, quote:null, read:[]};
 const parcelLabels = {pre_advised:'待入库',received:'已入库',measuring:'测量中',measured:'已测量',consolidated:'已打包',shipped:'已出货',exception:'异常'};
 const money = n => n == null ? '待确认' : '¥'+Number(n).toFixed(2);
 const dateText = v => v ? new Date(v).toLocaleString('zh-CN',{hour12:false}) : '—';
@@ -86,14 +86,14 @@ async function queryData(table,columns='*'){
 async function loadMerchantWorkspace(){
   if(!state.auth.user)return;
   if(workspace.owner!==state.auth.user.id){
-    Object.assign(workspace,{owner:state.auth.user.id,parcels:[],routes:[],warehouses:[],tickets:[],errors:{},selected:new Set(),editingAddress:null,addressReturn:null,packingDraft:{},supportOrderId:null,read:[],quote:null,parcelQuery:'',parcelPage:1,parcelPageSize:10,editParcelId:null,parcelBusy:false,orderQuery:'',trackingQuery:'',parcelTab:'all',orderTab:'all'});
+    Object.assign(workspace,{owner:state.auth.user.id,parcels:[],routes:[],warehouses:[],overseasWarehouses:[],tickets:[],errors:{},selected:new Set(),editingAddress:null,addressReturn:null,packingDraft:{},supportOrderId:null,read:[],quote:null,parcelQuery:'',parcelPage:1,parcelPageSize:10,editParcelId:null,parcelBusy:false,orderQuery:'',trackingQuery:'',parcelTab:'all',orderTab:'all'});
     try{workspace.read=JSON.parse(localStorage.getItem('mospace-read-'+workspace.owner)||'[]')}catch(e){workspace.read=[]}
   }
   const jobs={};
   if(state.role==='merchant')Object.assign(jobs,{parcels:()=>queryData('parcels'),routes:()=>queryData('route_pricing'),warehouses:()=>queryData('warehouses')});
   if(state.role==='warehouse')jobs.parcels=()=>queryData('parcels');
   if(state.role==='admin')jobs.routes=()=>queryData('route_pricing');
-  if(['merchant','admin'].includes(state.role))jobs.tickets=()=>queryData('support_tickets');
+  if(['merchant','admin'].includes(state.role)){jobs.tickets=()=>queryData('support_tickets');jobs.overseasWarehouses=()=>queryData('overseas_warehouses');}
   await Promise.all(Object.entries(jobs).map(async([key,fn])=>{
     try{workspace[key]=await fn();delete workspace.errors[key]}catch(e){workspace[key]=[];workspace.errors[key]=e.message}
   }));
@@ -223,10 +223,10 @@ function merchantPreAdvise(){return shell('预报包裹','填写国内快递信�
 function merchantPackingRequest(){
   const eligible=allParcels().filter(p=>!p.order&&!['exception','shipped','consolidated'].includes(p.status));
   const legacy=state.dbOrders.filter(canRequestLegacy);
-  return shell('申请打包 / 合包','选择本次包裹、收货地址和包装方式；仓库确认后再付款。',button('返回我的包裹','parcels'))+
+  return shell('申请打包 / 合包','选择包裹、平台印尼仓及包装方式；消费者地址在申请尾程时填写。',button('返回我的包裹','parcels'))+
     (legacy.length?`<div class="card section-space"><h3>已有订单待确认合包</h3>${legacy.map(o=>`<div class="metric"><span>${esc(o.order_no)}</span>${orderAction(o,'consolidate','确认合包')}</div>`).join('')}</div>`:'')+
     (!eligible.length?`<div class="card section-space">${emptyState('没有可申请的包裹','已关联订单的包裹不会重复参与打包申请。你可以先预报新包裹，或查看打包记录。',button('预报包裹','pre-advise',true)+button('打包记录','packing-history'))}</div>`:
-    `<form id="packingRequestForm"><div class="grid layout-2 section-space"><div class="card"><div class="card-title"><h3>选择包裹</h3><span class="tag">${eligible.length} 个可选</span></div><div class="check-list">${eligible.map(p=>`<label class="check"><input type="checkbox" name="packingParcel" value="${p.id}" ${workspace.selected.has(p.id)?'checked':''}><span><b>${esc(p.tracking_no)}</b> · ${esc(p.item_name)}<br><small class="muted">${parcelLabel(p)} · ${parcelEstimateMeasurement(p)?parcelEstimateMeasurement(p).source+' '+formatWeight(parcelEstimateMeasurement(p).values[0]):'重量或尺寸待补充'}</small></span></label>`).join('')}</div><p class="page-note">待入库包裹可提前提交申请，仓库收到全部包裹后确认费用。</p></div><div class="card"><div class="field"><label for="packingAddress">目的地收货地址</label><select id="packingAddress" required><option value="">请选择收货地址</option>${state.addresses.map(a=>`<option value="${a.id}" ${workspace.packingDraft?.address===a.id?'selected':''}>${esc(a.recipient_name)} · ${esc(a.city)} · ${esc(a.address_line)}</option>`).join('')}</select></div><p>${button('+ 维护收货地址','receivers').replace('data-page=', 'data-return-packing data-page=')}</p><div class="field"><label for="packingRoute">运输线路</label><select id="packingRoute" required>${workspace.routes.filter(r=>r.is_active&&r.route_code.startsWith('ID-')).map(r=>`<option value="${esc(r.route_code)}" ${workspace.packingDraft?.route===r.route_code?'selected':''}>${esc(r.route_name)}</option>`).join('')}</select></div><div class="field section-space"><label for="packingMethod">包装方式</label><select id="packingMethod">${['合并为一个外箱','按品类分箱','保持原包裹分别出货'].map(v=>`<option ${workspace.packingDraft?.method===v?'selected':''}>${v}</option>`).join('')}</select></div><div id="packingEstimate" class="packing-estimate section-space" aria-live="polite">${packingEstimateHtml(estimatePacking(selectedPackingParcels(),workspace.routes.find(r=>r.route_code===workspace.packingDraft?.route)||workspace.routes.find(r=>r.is_active&&r.route_code.startsWith('ID-'))))}</div><div class="field section-space"><label for="packingNote">给仓库的备注</label><textarea id="packingNote" maxlength="2000" rows="3" placeholder="例如易碎品加固、保留原包装">${esc(workspace.packingDraft?.note||'')}</textarea></div><div class="form-actions"><button class="btn primary" type="submit" ${!state.addresses.length||!workspace.routes.length?'disabled':''}>提交打包申请</button></div></div></div></form>`);
+    `<form id="packingRequestForm"><div class="grid layout-2 section-space"><div class="card"><div class="card-title"><h3>选择包裹</h3><span class="tag">${eligible.length} 个可选</span></div><div class="check-list">${eligible.map(p=>`<label class="check"><input type="checkbox" name="packingParcel" value="${p.id}" ${workspace.selected.has(p.id)?'checked':''}><span><b>${esc(p.tracking_no)}</b> · ${esc(p.item_name)}<br><small class="muted">${parcelLabel(p)} · ${parcelEstimateMeasurement(p)?parcelEstimateMeasurement(p).source+' '+formatWeight(parcelEstimateMeasurement(p).values[0]):'重量或尺寸待补充'}</small></span></label>`).join('')}</div><p class="page-note">待入库包裹可提前提交申请，仓库收到全部包裹后确认费用。</p></div><div class="card">${overseasPackingDestination()}<div class="field"><label for="packingRoute">运输线路</label><select id="packingRoute" required>${workspace.routes.filter(r=>r.is_active&&r.route_code.startsWith('ID-')).map(r=>`<option value="${esc(r.route_code)}" ${workspace.packingDraft?.route===r.route_code?'selected':''}>${esc(r.route_name)}</option>`).join('')}</select></div><div class="field section-space"><label for="packingMethod">包装方式</label><select id="packingMethod">${['合并为一个外箱','按品类分箱','保持原包裹分别出货'].map(v=>`<option ${workspace.packingDraft?.method===v?'selected':''}>${v}</option>`).join('')}</select></div><div id="packingEstimate" class="packing-estimate section-space" aria-live="polite">${packingEstimateHtml(estimatePacking(selectedPackingParcels(),workspace.routes.find(r=>r.route_code===workspace.packingDraft?.route)||workspace.routes.find(r=>r.is_active&&r.route_code.startsWith('ID-'))))}</div><div class="field section-space"><label for="packingNote">给仓库的备注</label><textarea id="packingNote" maxlength="2000" rows="3" placeholder="例如易碎品加固、保留原包装">${esc(workspace.packingDraft?.note||'')}</textarea></div><div class="form-actions"><button class="btn primary" type="submit" ${!workspace.overseasWarehouses?.some(w=>w.is_active)||!workspace.routes.length?'disabled':''}>提交打包申请</button></div></div></div></form>`);
 }
 merchantConsolidate=function(){
   const o=state.order.record;
@@ -289,7 +289,7 @@ merchantAddress=function(){
 };
 function merchantReceivers(){
   const a=state.addresses.find(x=>x.id===workspace.editingAddress)||{};
-  return shell('收货地址','维护印度尼西亚的最终收件地址，申请打包时直接选用。',button(workspace.addressReturn?'返回申请打包':'去我的包裹办理',workspace.addressReturn||'parcels'))+
+  return shell('收货地址','维护尾程消费者收件地址；申请尾程配送时选用，头程直接送至平台印尼仓。',button(workspace.addressReturn?'返回申请打包':'去我的包裹办理',workspace.addressReturn||'parcels'))+
     `<div class="grid layout-2"><div class="workspace-list">${state.addresses.map(a=>`<div class="card"><div class="card-title"><h3>${esc(a.label)}</h3>${a.is_default?status('默认','green'):''}</div><b>${esc(a.recipient_name)} · ${esc(a.recipient_phone)}</b><p class="address-copy">${esc(a.country)} · ${esc(a.city||'')}<br>${esc(a.address_line)} ${esc(a.postal_code||'')}</p><button class="btn small ghost" data-edit-address="${a.id}">编辑地址</button></div>`).join('')||`<div class="card">${emptyState('尚未保存收货地址','在右侧填写收件人、电话和具体地址。')}</div>`}</div><div class="card"><h3>${a.id?'编辑地址':'新增地址'}</h3><form id="receiverForm"><div class="form-grid">${field('地址标签','receiverLabel',a.label||'')}${field('收件人','receiverName',a.recipient_name||'','text','required')}${field('联系电话','receiverPhone',a.recipient_phone||'','tel','required')}${field('国家','receiverCountry','印度尼西亚','text','readonly')}${field('城市','receiverCity',a.city||'','text','required')}${field('邮编','receiverPostal',a.postal_code||'')}<div class="field full"><label for="receiverLine">详细地址</label><textarea id="receiverLine" rows="3" required>${esc(a.address_line||'')}</textarea></div></div><div class="form-actions">${a.id?'<button class="btn ghost" type="button" id="cancelAddressEdit">取消编辑</button>':''}<button class="btn primary" type="submit">保存地址</button></div></form></div></div>`;
 }
 function workspaceMessages(){
@@ -377,7 +377,7 @@ bind=function(){
   on('packingRequestForm','input',rememberPacking);on('packingRequestForm','change',rememberPacking);
   on('packingRequestForm','submit',e=>{e.preventDefault();busyForm(e.target,async()=>{
     const ids=[...document.querySelectorAll('[name=packingParcel]:checked')].map(x=>x.value);if(!ids.length)throw new Error('请选择至少一个包裹');
-    const o=await rpcWorkspace('merchant_create_from_parcels',{p_parcel_ids:ids,p_address_id:$('#packingAddress').value,p_route_code:$('#packingRoute').value,p_method:$('#packingMethod').value,p_note:$('#packingNote').value.trim()});
+    const o=await rpcWorkspace('merchant_create_head_order',{p_parcel_ids:ids,p_overseas_warehouse_id:$('#packingAddress').value,p_route_code:$('#packingRoute').value,p_method:$('#packingMethod').value,p_note:$('#packingNote').value.trim()});
     state.activeOrderId=o.id;workspace.selected.clear();workspace.packingDraft={};workspace.addressReturn=null;toast('打包申请已保存，等待仓库确认');await refreshDbState('orders');
   })});
   on('legacyConsolidationForm','submit',e=>{e.preventDefault();busyForm(e.target,async()=>{
