@@ -90,10 +90,12 @@ async function queryData(table,columns='*'){
 async function loadMerchantWorkspace(){
   if(!state.auth.user)return;
   if(workspace.owner!==state.auth.user.id){
+    workspace.lastMileZones=[];
     Object.assign(workspace,{owner:state.auth.user.id,parcels:[],routes:[],warehouses:[],overseasWarehouses:[],tickets:[],errors:{},selected:new Set(),editingAddress:null,addressReturn:null,packingDraft:{},supportOrderId:null,read:[],quote:null,parcelQuery:'',parcelPage:1,parcelPageSize:10,editParcelId:null,parcelBusy:false,orderQuery:'',trackingQuery:'',parcelTab:'all',orderTab:'all'});
     try{workspace.read=JSON.parse(localStorage.getItem('mospace-read-'+workspace.owner)||'[]')}catch(e){workspace.read=[]}
   }
   const jobs={};
+  if(['merchant','warehouse','admin'].includes(state.role))jobs.lastMileZones=()=>queryData('last_mile_zones');
   if(state.role==='merchant')Object.assign(jobs,{parcels:()=>queryData('parcels'),routes:()=>queryData('route_pricing'),warehouses:()=>queryData('warehouses')});
   if(state.role==='warehouse')jobs.parcels=()=>queryData('parcels');
   if(state.role==='admin')jobs.routes=()=>queryData('route_pricing');
