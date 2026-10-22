@@ -56,4 +56,33 @@ test('operations save region-specific distance prices with version and expose ad
  assert.equal(run('sent.name'),'admin_save_last_mile_zone');assert.equal(run('sent.args.p_config.base_fee'),25);assert.equal(run('sent.args.p_expected_updated_at'),'v1');assert.equal(run('t.fees[0].estimated_total'),30);
 });
 
+test('arrived head links to its delivered tail while keeping leg amounts, addresses and completion distinct',async()=>{
+ const {run}=setup();run(`
+ h.fees[0].total_amount=93.6;h.destination_address='印尼仓地址';
+ t.status='delivered';t.fees=[{fee_breakdown_version:4,last_mile_fee:30,total_amount:30,confirmed_at:'2026-10-22'}];
+ t.payments=[{status:'paid',amount:30,provider:'test_transfer_review'}];
+ other={...t,id:'other-tail',order_no:'OTHER-TAIL',parent_order_id:'other-head',destination_address:'OTHER-ADDRESS',fees:[{fee_breakdown_version:4,total_amount:999,confirmed_at:'2026-10-22'}]};state.dbOrders.push(other);
+ `);
+ const rows=run('workspaceOrderTable([h])');
+ assert.match(rows,/data-order-target="h" data-order-page="fee">头程详情/);
+ assert.match(rows,/data-order-target="t" data-order-page="fee">查看尾程结果（已签收）/);
+ assert.doesNotMatch(rows,/other-tail|尾程订单与结算/);
+ run(`window.MospaceSupabase.orderTracking=async(id)=>{trackingId=id;return []};go=(page)=>{state.page=page}`);
+ await run('selectWorkspaceOrder("t","fee")');
+ assert.equal(run('state.order.record.id'),'t');assert.equal(run('trackingId'),'t');
+ let html=run('merchantFee()');
+ for(const text of ['当前查看：尾程','TAIL','关联头程：HEAD','头程确认金额 ¥93.60','本尾程单已付','¥30.00','QA地址','尾程已签收'])assert.ok(html.includes(text),text);
+ assert.doesNotMatch(html,/OTHER-ADDRESS|¥999.00|仓库可继续|本尾程单应付|paymentReceiptForm/);
+ run('applyDbOrder(h)');html=run('merchantFee()');assert.match(html,/印尼仓地址/);assert.match(html,/查看尾程结果（已签收）/);
+ assert.equal(run('feeRecord(h).total_amount'),93.6);assert.equal(run('h.status'),'shipped');
+});
+
+test('tail navigation and payment notice follow quote, review, dispatch and delivery states',()=>{
+ const {run}=setup();run(`t.status='awaiting_payment';t.fees=[{fee_breakdown_version:4,last_mile_fee:30,total_amount:30,confirmed_at:'2026-10-22'}];paymentWorkspace.account={is_active:true,mode:'test',updated_at:'v1'};`);
+ assert.match(run('lastMileLinkLabel(t)'),/查看尾程付款/);assert.match(run('merchantFee()'),/paymentReceiptForm/);
+ run(`paymentWorkspace.receipts=[{order_id:'t',status:'pending'}]`);assert.equal(run('lastMileLinkLabel(t)'),'查看尾程审核进度');assert.doesNotMatch(run('merchantFee()'),/paymentReceiptForm/);
+ run(`t.payments=[{status:'paid',provider:'test_transfer_review'}];t.status='shipped'`);assert.match(run('merchantFee()'),/尾程配送中/);assert.doesNotMatch(run('merchantFee()'),/仓库可继续/);
+ run(`t.status='cancelled'`);assert.equal(run('lastMileLinkLabel(t)'),'查看已取消尾程');
+});
+
 

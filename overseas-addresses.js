@@ -24,7 +24,7 @@ merchantFee=function(){
  return html;
 };
 const overseasOrderTable=workspaceOrderTable;
-workspaceOrderTable=function(orders){let html=overseasOrderTable(orders);for(const o of orders){if(isLastMile(o)||!o.overseas_received_at||feeRecord(o)?.fee_breakdown_version!==3)continue;const child=lastMileChild(o);html=html.replace(/<tr>[\s\S]*?<\/tr>/g,row=>row.includes(esc(o.order_no))?row.replace('</td></tr>',`${orderAction(child||o,'fee',child?'尾程订单与结算':'申请尾程配送')}</td></tr>`):row)}return html};
+workspaceOrderTable=function(orders){let html=overseasOrderTable(orders);for(const o of orders){if(isLastMile(o)||!o.overseas_received_at||feeRecord(o)?.fee_breakdown_version!==3)continue;const child=lastMileChild(o);html=html.replace(/<tr>[\s\S]*?<\/tr>/g,row=>row.includes(esc(o.order_no))?row.replace('</td></tr>',`${orderAction(child||o,'fee',child?lastMileLinkLabel(child):'申请尾程配送')}</td></tr>`):row)}return html};
 const overseasAdminConfig=adminConfig;
 adminConfig=function(){
  const rows=safeRows(workspace.overseasWarehouses);
