@@ -12,7 +12,7 @@ function lastMileLinkLabel(o){
 function settlementContext(o){
  if(!o)return '';
  const p=isLastMile(o)&&state.dbOrders.find(x=>x.id===o.parent_order_id),child=!isLastMile(o)&&lastMileChild(o);
- return `<div class="card section-space"><h3>当前查看：${legLabel(o)}</h3><p>本段订单号：<strong>${esc(o.order_no)}</strong></p>${p?`<p>关联头程：${esc(p.order_no)} · 头程确认金额 ${money(feeRecord(p)?.total_amount)}。本页显示独立尾程单，只收印尼仓到消费者的配送费，头程金额不变。</p>${state.role==='merchant'?orderAction(p,'fee','查看头程账单'):''}`:`<p>头程单仅结算深圳仓到印尼海外仓的运输及国内仓操作费；尾程配送另单核价、付款。</p>`}${o.overseas_received_at?notice('头程已入印尼海外仓',`${esc(o.overseas_warehouse)} · ${dateText(o.overseas_received_at)}。${child?'消费者配送进度请查看下方关联尾程。':'尚未申请尾程配送。'}`):''}${child?`<p>已关联尾程：${esc(child.order_no)} · ${esc(orderStatusLabel(child.status))} · ${feeRecord(child)?.confirmed_at?'尾程确认金额 '+money(feeRecord(child)?.total_amount):'尾程费用待确认'}</p>${state.role==='merchant'?orderAction(child,'fee',lastMileLinkLabel(child)):warehouseOrderButton(child,warehouseStage(child)||'ship','查看尾程作业')}`:''}</div>`;
+ return `<div class="card section-space"><h3>当前查看：${legLabel(o)}</h3>${!isLastMile(o)?orderProgressHtml(o):''}<p>本段订单号：<strong>${esc(o.order_no)}</strong></p>${p?`<p>关联头程：${esc(p.order_no)} · 头程确认金额 ${money(feeRecord(p)?.total_amount)}。本页显示独立尾程单，只收印尼仓到消费者的配送费，头程金额不变。</p>${state.role==='merchant'?orderAction(p,'fee','查看头程账单'):''}`:`<p>头程单仅结算深圳仓到印尼海外仓的运输及国内仓操作费；尾程配送另单核价、付款。</p>`}${o.overseas_received_at?notice('头程已入印尼海外仓',`${esc(o.overseas_warehouse)} · ${dateText(o.overseas_received_at)}。${child?'消费者配送进度请查看下方关联尾程。':'尚未申请尾程配送。'}`):''}${child?`<p>已关联尾程：${esc(child.order_no)} · ${esc(orderStatusLabel(child.status))} · ${feeRecord(child)?.confirmed_at?'尾程确认金额 '+money(feeRecord(child)?.total_amount):'尾程费用待确认'}</p>${state.role==='merchant'?orderAction(child,'fee',lastMileLinkLabel(child)):warehouseOrderButton(child,warehouseStage(child)||'ship','查看尾程作业')}`:''}</div>`;
 }
 function lastMileRequest(o){
  if(!o||isLastMile(o))return '';
@@ -39,7 +39,6 @@ workspaceOrderTable=function(orders){
  let html=separateOrderTable(orders);
  for(const o of orders){
   if(isLastMile(o))html=html.replace(esc(o.route_name),esc(o.route_name)+'<br><small>尾程独立结算</small>');
-  else if(o.overseas_received_at)html=html.replace(/<tr>[\s\S]*?<\/tr>/g,row=>row.includes(esc(o.order_no))?row.replace(status(orderStatusLabel(o.status),statusTone(o.status)),status('头程已到印尼仓','blue')):row);
  }
  return html;
 };
@@ -82,13 +81,12 @@ const separateBilling=merchantBilling;
 merchantBilling=function(){return separateBilling().replace('当前采用订单一次付款','按运输段独立结算').replace('钱包充值和余额支付暂未开放；不需要预存资金。','头程和尾程分别建单、核价、付款，每段只支付一次。').replaceAll('一次付款后锁定','每段付款后锁定')};
 MerchantViews.billing=merchantBilling;
 
-const legWarehouseContext=warehouseContext;warehouseContext=function(o){return legWarehouseContext(o)+`<p class="page-note">${legLabel(o)} · ${isLastMile(o)?'核对本段独立付款后出库':'到达印尼仓后登记到货，尾程另建配送单'}</p>`};
-const legWarehouseRows=warehouseOrderRows;warehouseOrderRows=function(rows){let html=legWarehouseRows(rows);for(const o of rows)if(o.overseas_received_at)html=html.replace(/<tr>[\s\S]*?<\/tr>/g,row=>row.includes(esc(o.order_no))?row.replace(status(orderStatusLabel(o.status),statusTone(o.status)),status('头程已到印尼仓','blue')):row);return html};
+const legWarehouseContext=warehouseContext;warehouseContext=function(o){return legWarehouseContext(o)+`<p class="page-note">${legLabel(o)} · ${isLastMile(o)?'核对本段独立付款后出库':o?.overseas_received_at?'头程已到仓，关联尾程进度见订单状态':'到达印尼仓后登记到货，尾程另建配送单'}</p>`};
 
 const separatePageFrame=merchantPageFrame;
 merchantPageFrame=function(html){const o=state.order.record;let frame=separatePageFrame(html);if(!o||!['fee','tracking'].includes(state.page))return frame;
  const tail=isLastMile(o);frame=frame.replaceAll('订单详情与费用',tail?'尾程订单与费用':'头程订单与费用').replace('一次付款',tail?'尾程付款':'头程付款');
  if(tail)frame=frame.replace('提交打包','申请尾程').replace('仓库确认','尾程报价').replace('打包出货','尾程出库').replace('运输签收','配送签收');
- else{frame=frame.replace('运输签收','运输至印尼仓');if(o.overseas_received_at)frame=frame.replace(status(orderStatusLabel(o.status),statusTone(o.status)),status('头程已到印尼仓','blue')).replace('class="current" aria-current="step"','class="done"');}
+ else{frame=frame.replace('运输签收','运输至印尼仓');if(o.overseas_received_at)frame=frame.replace('class="current" aria-current="step"','class="done"');}
  return frame;
 };

@@ -34,6 +34,26 @@ test('parcel rows, counts, filters and tail order links use the same progression
  run(`workspace.parcelTab='overseas'`);html=run('merchantParcels()');assert.match(html,/TRACK-1/);assert.doesNotMatch(html,/TRACK-2/);
  run(`state.dbOrders.push({id:'t',order_no:'TAIL-ORDER',transport_leg:'last_mile',parent_order_id:'h',status:'shipped'});workspace.parcelTab='tail-shipped'`);html=run('merchantParcels()');assert.match(html,/TAIL-ORDER/);assert.match(html,/尾程派送中/);assert.match(html,/data-order-target="t"/);assert.match(html,/共 1 个包裹/);
 });
+
+test('head summaries and filters follow only their linked tail through settlement and delivery',()=>{
+ const {run}=setup();run(`h.overseas_received_at='2026-10-22';t={id:'t',order_no:'TAIL',parent_order_id:'h',transport_leg:'last_mile',status:'warehouse_received'};state.dbOrders.push(t,{...t,id:'other',order_no:'UNRELATED',parent_order_id:'another',status:'delivered'});`);
+ for(const [stage,label] of [['warehouse_received','待尾程报价'],['awaiting_payment','尾程待付款'],['paid','尾程待出库'],['ready_to_ship','尾程待出库'],['shipped','尾程派送中'],['delivered','整票已签收'],['cancelled','尾程已取消']]){
+  run(`t.status='${stage}'`);const html=run('workspaceOrderTable([h])');assert.ok(html.includes(label),stage);assert.match(html,/头程已到印尼仓/);
+  assert.equal(run(`orderMatchesProgress(h,'${stage}')`),true);assert.equal(run('h.status'),'shipped');assert.equal(run('feeRecord(h).total_amount'),78);
+ }
+ run(`t.status='awaiting_payment';paymentWorkspace.receipts=[{order_id:'t',status:'pending'}]`);assert.equal(run('orderProgress(h).label'),'尾程付款审核中');
+ run(`state.dbOrders=[h]`);assert.equal(run('orderProgress(h).label'),'头程已到印尼仓');assert.equal(run("orderMatchesProgress(h,'overseas')"),true);assert.equal(run("orderMatchesProgress(h,'shipped')"),false);
+});
+
+test('background tail delivery refresh updates head list, detail and tracking without changing head fees or operational state',async()=>{
+ const {run}=setup();run(`h.overseas_received_at='2026-10-22';t={id:'t',order_no:'TAIL',parent_order_id:'h',transport_leg:'last_mile',status:'shipped',fees:[{fee_breakdown_version:4,total_amount:30}]};state.dbOrders.push(t);state.page='dashboard';render=()=>{renderCount++;rendered=merchantDashboard()};readProgressSnapshot=async()=>{const next=snapshot();next.orders.find(o=>o.id==='t').status='delivered';return next};`);
+ assert.match(run('workspaceOrderTable([h])'),/尾程派送中/);assert.equal(await run('runProgressSync()'),true);
+ assert.match(run('rendered'),/整票已签收/);assert.match(run('rendered'),/本批订单已完成/);assert.match(run('rendered'),/头程已到印尼仓 · 尾程已签收/);
+ run(`workspace.orderTab='delivered'`);assert.match(run('merchantOrders()'),/HEAD/);run(`workspace.orderTab='shipped'`);assert.doesNotMatch(run('merchantOrders()'),/<td class="mono">HEAD/);
+ run(`state.page='fee'`);assert.match(run('merchantPageFrame(merchantFee())'),/整票已签收/);
+ run(`state.page='tracking'`);assert.match(run('merchantTracking()'),/整票已签收/);
+ assert.match(run('warehouseOrderRows(state.dbOrders)'),/整票已签收/);assert.equal(run('state.order.record.status'),'shipped');assert.equal(run('feeRecord(state.order.record).total_amount'),78);
+});
 test('subscription invalidations are debounced and data is reread with merchant filters',async()=>{
  const {run,channels,timers}=setup();run('ensureProgressChannel()');const channel=channels[0];assert.deepEqual(channel.events.map(e=>e.filter.table),['orders','parcels','tracking_events','payment_notifications']);assert.equal(channel.events[0].filter.filter,'merchant_id=eq.m');
  for(let i=0;i<8;i++)channel.events[0].callback({new:{status:'fake-delivered'}});assert.equal(timers.size,1);assert.equal(run('parcelLabel(allParcels()[0])'),'头程运输中');

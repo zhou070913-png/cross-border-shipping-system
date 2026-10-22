@@ -53,7 +53,7 @@ warehouseConfirm=function(){
 const distanceWarehouseRows=warehouseOrderRows;
 warehouseOrderRows=function(rows){
  let html=distanceWarehouseRows(rows).replace('<th>状态</th>','<th>本段费用（CNY）</th><th>状态</th>');
- for(const o of rows){const f=feeRecord(o),amount=f?.total_amount??(f?.pricing_snapshot?.type==='last_mile_distance'?f.estimated_total:null);html=html.replace(/<tr>[\s\S]*?<\/tr>/g,row=>row.includes(esc(o.order_no))?row.replace(/<td>(<span class="status)/,`<td>${money(amount)}${amount!=null&&!f?.confirmed_at?'<br><small>预估，待确认</small>':''}</td><td>$1`):row)}
+ for(const o of rows){const f=feeRecord(o),amount=f?.total_amount??(f?.pricing_snapshot?.type==='last_mile_distance'?f.estimated_total:null);html=html.replace(/<tr>[\s\S]*?<\/tr>/g,row=>row.includes(esc(o.order_no))?row.replace(`<td>${orderProgressHtml(o)}</td>`,`<td>${money(amount)}${amount!=null&&!f?.confirmed_at?'<br><small>预估，待确认</small>':''}</td><td>${orderProgressHtml(o)}</td>`):row)}
  return html;
 };
 function lastMileAdminPanel(){

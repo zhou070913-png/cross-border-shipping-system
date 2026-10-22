@@ -157,6 +157,26 @@ go=function(page,options={}){
   return parcelBaseGo(page,options);
 };
 function allParcels(){return workspace.parcels.map(p=>({...p,order:associatedOrder(p.id)}))}
+// 整票进度从关联尾程推导；本段作业状态和费用仍使用各自订单记录。
+function orderProgress(o){
+ const tail=o?.transport_leg==='last_mile'?o:state.dbOrders.find(t=>t.transport_leg==='last_mile'&&t.parent_order_id===o?.id);
+ const arrived=o?.transport_leg!=='last_mile'&&o?.overseas_received_at;
+ if(o?.status==='cancelled'||o?.status==='exception')return {label:orderStatusLabel(o.status),tone:statusTone(o.status),group:o.status,detail:''};
+ if(tail&&(arrived||tail===o)){
+  const labels={warehouse_received:'待尾程报价',measuring:'待尾程报价',submitted:'待尾程报价',awaiting_payment:typeof orderReceipt==='function'&&orderReceipt(tail.id)?.status==='pending'?'尾程付款审核中':'尾程待付款',paid:'尾程待出库',ready_to_ship:'尾程待出库',shipped:'尾程派送中',delivered:'尾程已签收',cancelled:'尾程已取消',exception:'尾程异常'};
+  const label=labels[tail.status]||orderStatusLabel(tail.status);
+  return {label:arrived&&tail.status==='delivered'?'整票已签收':label,tone:statusTone(tail.status),group:tail.status,detail:arrived?'头程已到印尼仓 · '+label:''};
+ }
+ return {label:arrived?'头程已到印尼仓':orderStatusLabel(o?.status),tone:arrived?'blue':statusTone(o?.status),group:arrived?'overseas':o?.status,detail:arrived?'等待申请尾程配送':''};
+}
+function orderProgressHtml(o){
+ const p=orderProgress(o);
+ return `<span class="order-progress">${status(p.label,p.tone)}${p.detail?`<small class="muted">${esc(p.detail)}</small>`:''}</span>`;
+}
+function orderMatchesProgress(o,tab){
+ const group=orderProgress(o).group;
+ return tab==='all'||(tab==='pending'?['submitted','warehouse_received','measuring'].includes(group):group===tab);
+}
 function parcelTailOrder(p){return p.order&&state.dbOrders.find(o=>o.transport_leg==='last_mile'&&o.parent_order_id===p.order.id&&o.status!=='cancelled')}
 function parcelProgress(p){
  const head=p.order,tail=parcelTailOrder(p);
@@ -199,15 +219,16 @@ renderNav=function(){
 };
 merchantDashboard=function(){
   const orders=state.dbOrders, ps=allParcels();
-  const waiting=orders.filter(o=>['submitted','warehouse_received','measuring'].includes(o.status)).length;
-  const pending=orders.filter(o=>o.status==='awaiting_payment').length;
-  const transit=orders.filter(o=>o.status==='shipped'&&!o.overseas_received_at).length;
+  const waiting=orders.filter(o=>orderMatchesProgress(o,'pending')).length;
+  const pending=orders.filter(o=>orderMatchesProgress(o,'awaiting_payment')).length;
+  const transit=orders.filter(o=>orderMatchesProgress(o,'shipped')).length;
+  const completed=orders.length&&orders.every(o=>orderProgress(o).group==='delivered');
   const current=currentDbOrder(orders);
-  const next=!ps.length?'pre-advise':!orders.length||ps.some(p=>!p.order)?'parcels':current?.status==='awaiting_payment'?'orders':current?.consolidated?'orders':'parcels';
+  const next=completed?'orders':!ps.length?'pre-advise':!orders.length||ps.some(p=>!p.order)?'parcels':current?.status==='awaiting_payment'?'orders':current?.consolidated?'orders':'parcels';
   return shell('商家首页','从包裹预报到签收，在一个工作台完成。',button('预报包裹','pre-advise',true))+
     `<div class="quick-links">${[['pre-advise','预报包裹','填写国内快递单号','parcels'],['parcels','申请打包','在我的包裹确认合包','parcels'],['orders','确认订单','头程、尾程分别确认付款','orders'],['orders','查询物流','从订单进入物流详情','tracking']].map(([page,label,desc,i])=>`<button class="quick-link" data-page="${page}">${icon(i)}<span><b>${label}</b><small>${desc}</small></span></button>`).join('')}</div>`+
-    `<div class="grid kpis">${kpi('我的包裹',ps.length,'按当前账号统计')}${kpi('待仓库确认',waiting,'订单等待收货或测量')}${kpi('待付款',pending,'仓库确认后可付款')}${kpi('运输中',transit,'出货后查看物流')}</div>`+
-    `<div class="card"><div class="card-title"><h3>下一步办理</h3><span class="tag">预报 / 合包 → 头程付款 → 到印尼仓 → 尾程付款配送</span></div>${notice('按包裹和订单状态继续办理',!ps.length?'先预报包裹，再将包裹寄至深圳仓。':next==='parcels'?'进入我的包裹，选择包裹申请合包或查看已提交的打包申请。':'进入我的订单，查看头程费用与物流；头程到印尼仓后，进入详情申请尾程配送并单独付款。')}<div class="form-actions">${button(next==='pre-advise'?'开始预报':next==='parcels'?'查看我的包裹':'查看我的订单',next,true)}</div></div>`+
+    `<div class="grid kpis">${kpi('我的包裹',ps.length,'按当前账号统计')}${kpi('待仓库确认',waiting,'订单记录 · 含关联尾程')}${kpi('待付款',pending,'订单记录 · 含关联尾程')}${kpi('运输中',transit,'订单记录 · 含关联尾程')}</div>`+
+    `<div class="card"><div class="card-title"><h3>下一步办理</h3><span class="tag">预报 / 合包 → 头程付款 → 到印尼仓 → 尾程付款配送</span></div>${notice(completed?'本批订单已完成':'按包裹和订单状态继续办理',completed?'头程与关联尾程已完成，可在我的订单查看签收结果，或预报新的包裹。':!ps.length?'先预报包裹，再将包裹寄至深圳仓。':next==='parcels'?'进入我的包裹，选择包裹申请合包或查看已提交的打包申请。':'进入我的订单，查看头程费用与物流；头程到印尼仓后，进入详情申请尾程配送并单独付款。')}<div class="form-actions">${button(next==='pre-advise'?'开始预报':next==='parcels'?'查看我的包裹':'查看我的订单',next,true)}</div></div>`+
     `<div class="card section-space"><div class="card-title"><h3>最近订单</h3>${button('查看全部','orders')}</div>${orders.length?workspaceOrderTable(orders.slice(0,5)):emptyState('还没有集运订单','预报包裹后，在我的包裹里申请打包。',button('去我的包裹','parcels',true))}</div>`;
 };
 function parcelPagination(rows){
@@ -256,18 +277,18 @@ merchantConsolidate=function(){
 function merchantPackingHistory(){
   const orders=state.dbOrders.filter(o=>o.consolidated);
   return shell('打包申请记录','合包方式、仓库进度和对应订单保持关联。',button('返回我的包裹','parcels')+button('申请打包','packing-request',true))+
-  `<div class="card">${orders.length?`<div class="workspace-list">${orders.map(o=>`<div class="order-card"><div class="order-row"><b>${esc(o.order_no)}</b>${status(orderStatusLabel(o.status),statusTone(o.status))}</div><div class="subrow"><span>${esc(o.consolidation_method||'未记录包装方式')}</span><span>${o.parcel_count} 个包裹</span><span>${dateText(o.consolidation_at)}</span></div><p>${esc(o.consolidation_note||'无特殊备注')}</p><div class="form-actions">${orderAction(o,'fee','查看订单')}${orderAction(o,'tracking','查看物流')}</div></div>`).join('')}</div>`:emptyState('还没有打包记录','在我的包裹中申请打包，或确认已有订单的合包方案。',button('去我的包裹','parcels',true))}</div>`;
+  `<div class="card">${orders.length?`<div class="workspace-list">${orders.map(o=>`<div class="order-card"><div class="order-row"><b>${esc(o.order_no)}</b>${orderProgressHtml(o)}</div><div class="subrow"><span>${esc(o.consolidation_method||'未记录包装方式')}</span><span>${o.parcel_count} 个包裹</span><span>${dateText(o.consolidation_at)}</span></div><p>${esc(o.consolidation_note||'无特殊备注')}</p><div class="form-actions">${orderAction(o,'fee','查看订单')}${orderAction(o,'tracking','查看物流')}</div></div>`).join('')}</div>`:emptyState('还没有打包记录','在我的包裹中申请打包，或确认已有订单的合包方案。',button('去我的包裹','parcels',true))}</div>`;
 }
 merchantParcelDetail=function(){
   const p=allParcels().find(p=>p.id===workspace.detailParcelId);
   if(!p)return shell('包裹详情','请从包裹列表选择一件包裹。',button('返回我的包裹','parcels'));
   return shell('包裹详情',p.tracking_no,button('返回我的包裹','parcels')+parcelMaintenanceActions(p))+`<div class="grid layout-2"><div class="card"><h3>${esc(p.item_name)}</h3>${status(parcelLabel(p))}<div class="metric"><span>快递公司</span><b>${esc(p.carrier||'未填写')}</b></div><div class="metric"><span>预报重量</span><b>${formatWeight(p.declared_weight_kg)}</b></div><div class="metric"><span>预报外包装尺寸</span><b>${formatSize({length_cm:p.declared_length_cm,width_cm:p.declared_width_cm,height_cm:p.declared_height_cm})}</b></div><div class="metric"><span>仓库实际重量</span><b>${formatWeight(p.actual_weight_kg)}</b></div><div class="metric"><span>仓库实测尺寸</span><b>${formatSize(p)}</b></div><div class="metric"><span>预报时间</span><b>${dateText(p.created_at)}</b></div><div class="metric"><span>收货时间</span><b>${dateText(p.received_at)}</b></div>${p.exception_reason?notice('包裹异常',p.exception_reason):''}${p.order?`<div class="form-actions">${orderAction(p.order,'fee','关联订单')}${orderAction(p.order,'tracking','头程物流')}${parcelTailOrder(p)?orderAction(parcelTailOrder(p),'tracking','尾程物流')+orderAction(parcelTailOrder(p),'fee','尾程订单'):''}</div>`:button('申请打包','packing-request',true)}</div><div class="card"><h3>入库 / 打包照片</h3>${emptyState('暂无照片','当前仓库尚未上传照片；此处不展示示例照片。')}</div></div>`;
 };
-function workspaceOrderTable(orders){return `<div class="table-wrap"><table class="table"><thead><tr><th>订单号 / 创建时间</th><th>线路 / 目的地</th><th>包裹</th><th>确认金额</th><th>状态</th><th>操作</th></tr></thead><tbody>${orders.map(o=>`<tr><td class="mono">${esc(o.order_no)}<br><small class="muted">${dateText(o.created_at)}</small></td><td>${esc(o.route_name)}<br><small class="muted">${esc(o.destination_country)} · ${esc(o.destination_city||'')}</small></td><td>${o.parcel_count}</td><td class="list-amount">${money(feeRecord(o)?.total_amount)}</td><td>${status(orderStatusLabel(o.status),statusTone(o.status))}</td><td>${orderAction(o,'fee',o.status==='awaiting_payment'?'查看并付款':(o.transport_leg==='last_mile'?'尾程详情':'头程详情'))}${orderAction(o,'tracking',o.transport_leg==='last_mile'?'尾程物流':'头程物流')}</td></tr>`).join('')}</tbody></table></div>`}
+function workspaceOrderTable(orders){return `<div class="table-wrap"><table class="table"><thead><tr><th>订单号 / 创建时间</th><th>线路 / 目的地</th><th>包裹</th><th>确认金额</th><th>状态</th><th>操作</th></tr></thead><tbody>${orders.map(o=>`<tr><td class="mono">${esc(o.order_no)}<br><small class="muted">${dateText(o.created_at)}</small></td><td>${esc(o.route_name)}<br><small class="muted">${esc(o.destination_country)} · ${esc(o.destination_city||'')}</small></td><td>${o.parcel_count}</td><td class="list-amount">${money(feeRecord(o)?.total_amount)}</td><td>${orderProgressHtml(o)}</td><td>${orderAction(o,'fee',o.status==='awaiting_payment'?'查看并付款':(o.transport_leg==='last_mile'?'尾程详情':'头程详情'))}${orderAction(o,'tracking',o.transport_leg==='last_mile'?'尾程物流':'头程物流')}</td></tr>`).join('')}</tbody></table></div>`}
 merchantOrders=function(){
-  const filtered=state.dbOrders.filter(o=>(workspace.orderTab==='all'||(workspace.orderTab==='pending'?['submitted','warehouse_received','measuring'].includes(o.status):o.status===workspace.orderTab))&&`${o.order_no} ${o.recipient_name} ${o.shipment_tracking_no||''}`.toLowerCase().includes(workspace.orderQuery.toLowerCase()));
+  const filtered=state.dbOrders.filter(o=>orderMatchesProgress(o,workspace.orderTab)&&`${o.order_no} ${o.recipient_name} ${o.shipment_tracking_no||''}`.toLowerCase().includes(workspace.orderQuery.toLowerCase()));
   return shell('我的订单','核对仓库确认费用、付款记录与出货进度。',button('去我的包裹申请打包','parcels',true))+
-    tabs([['all','全部订单'],['pending','待仓库确认'],['awaiting_payment','待付款'],['paid','待打包'],['ready_to_ship','待出货'],['shipped','运输中'],['delivered','已签收']],workspace.orderTab,'data-order-tab')+
+    tabs([['all','全部订单'],['pending','待仓库确认'],['awaiting_payment','待付款'],['paid','待打包'],['ready_to_ship','待出货'],['overseas','已到印尼仓'],['shipped','运输中'],['delivered','已签收']],workspace.orderTab,'data-order-tab')+
     `<div class="card"><form class="workspace-toolbar" id="orderSearch"><input id="orderSearchText" aria-label="搜索订单" placeholder="搜索订单号 / 收件人 / 国际运单号" value="${esc(workspace.orderQuery)}"><button class="btn ghost">搜索</button><button class="btn ghost" type="button" data-refresh-workspace>刷新</button></form>${filtered.length?workspaceOrderTable(filtered):emptyState('没有匹配的订单','创建订单后，这里会显示真实状态、费用和付款入口。',button('我的包裹','parcels',true))}</div>`;
 };
 merchantCreate=merchantPreAdvise;
@@ -277,7 +298,7 @@ merchantFee=function(){
   const f=feeRecord(o),p=paymentRecord(o),confirmed=f?.total_amount!=null,paid=p?.status==='paid',receipt=typeof orderReceipt==='function'?orderReceipt(o.id):null;
   let html=shell('订单详情与费用','仓库确认费用后一次付款。',button('返回我的订单','orders'))+
     notice(paid?'付款记录已保存':receipt?.status==='pending'?'付款凭证待审核':receipt?.status==='rejected'?'请补充凭证':confirmed?'仓库已确认费用':'等待仓库确认',paid?'本单费用已锁定。付款来源与审核结果见下方记录。':receipt?.status==='pending'?'请等待运营审核，勿重复转账。':receipt?.status==='rejected'?'请根据审核说明补充凭证，勿重复转账。':confirmed?'请核对唯一应付金额后付款。':'尚未生成应付金额；此时无需付款。')+
-    `<div class="grid layout-2"><div class="card"><div class="card-title"><h3>${esc(o.order_no)}</h3>${status(orderStatusLabel(o.status),statusTone(o.status))}</div>${[['运输费用',money(f?.shipping_fee)],['仓库操作费',money(f?.handling_fee)],['计费重量',formatWeight(f?.billable_weight_kg)],['体积重',formatWeight(f?.volume_weight_kg)],['唯一应付金额',money(f?.total_amount)]].map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join('')}</div><div class="card"><h3>仓库确认进度 ${state.order.confirmed}/${o.parcel_count}</h3>${safeRows(o.order_parcels).map(r=>r.parcels).filter(Boolean).map(p=>`<div class="metric"><span>${esc(p.tracking_no)}<br><small>${esc(p.item_name||'')} · ${formatWeight(p.actual_weight_kg)} · ${formatSize(p)}</small></span>${status(p.actual_weight_kg!=null&&p.length_cm!=null&&p.width_cm!=null&&p.height_cm!=null?'已确认':'待确认')}</div>`).join('')}</div></div>`+
+    `<div class="grid layout-2"><div class="card"><div class="card-title"><h3>${esc(o.order_no)}</h3>${orderProgressHtml(o)}</div>${[['运输费用',money(f?.shipping_fee)],['仓库操作费',money(f?.handling_fee)],['计费重量',formatWeight(f?.billable_weight_kg)],['体积重',formatWeight(f?.volume_weight_kg)],['唯一应付金额',money(f?.total_amount)]].map(([k,v])=>`<div class="metric"><span>${k}</span><b>${v}</b></div>`).join('')}</div><div class="card"><h3>仓库确认进度 ${state.order.confirmed}/${o.parcel_count}</h3>${safeRows(o.order_parcels).map(r=>r.parcels).filter(Boolean).map(p=>`<div class="metric"><span>${esc(p.tracking_no)}<br><small>${esc(p.item_name||'')} · ${formatWeight(p.actual_weight_kg)} · ${formatSize(p)}</small></span>${status(p.actual_weight_kg!=null&&p.length_cm!=null&&p.width_cm!=null&&p.height_cm!=null?'已确认':'待确认')}</div>`).join('')}</div></div>`+
     (paid?`<div class="card section-space"><h3>付款记录</h3><div class="metric"><span>已登记金额</span><b>${money(p.amount)}</b></div><div class="metric"><span>记录时间</span><b>${dateText(p.paid_at||o.paid_at||p.created_at)}</b></div></div>`:'');
   if(f?.estimate_snapshot)html+=`<div class="card section-space packing-estimate">${packingEstimateHtml(f.estimate_snapshot,true)}</div>`;
   html+=`<div class="card section-space"><div class="card-title"><h3>订单收发信息</h3>${orderAction(o,'tracking','物流详情')}</div><div class="metric"><span>目的地国家</span><b>${esc(o.destination_country)}</b></div><div class="metric"><span>详细收货地址</span><b>${esc(o.destination_address)}</b></div><div class="metric"><span>收件人 / 电话</span><b>${esc(o.recipient_name)} · ${esc(o.recipient_phone)}</b></div><div class="metric"><span>国内深圳仓</span><b>${esc(o.origin_warehouse_address)}</b></div><div class="metric"><span>包装方式</span><b>${esc(o.consolidation_method||'尚未确认')}</b></div><p>${esc(o.consolidation_note||'')}</p></div>`;
@@ -289,13 +310,13 @@ function merchantTrackingList(){
   const rows=state.dbOrders.filter(o=>(!sea||/SEA/i.test(o.route_code)||/海运/.test(o.route_name))&&`${o.order_no} ${o.shipment_tracking_no||''} ${o.recipient_name}`.toLowerCase().includes(q));
   return shell(sea?'海运追踪':'物流追踪',sea?'查看海运订单的仓库和运输节点。':'按订单号或国际运单号查询物流。',button('我的订单','orders'))+
     notice('物流节点来源','当前展示仓库登记和系统操作产生的节点；承运商自动轨迹、船名航次与实时船位尚未接入。')+
-    `<div class="card"><form id="trackingSearch" class="workspace-toolbar"><input id="trackingSearchText" aria-label="搜索物流" value="${esc(workspace.trackingQuery)}" placeholder="输入订单号 / 国际运单号 / 收件人"><button class="btn primary">查询</button></form>${rows.length?`<div class="workspace-list">${rows.map(o=>`<div class="order-card"><div class="order-row"><b>${esc(o.order_no)}</b>${status(orderStatusLabel(o.status),statusTone(o.status))}</div><div class="subrow"><span>${esc(o.route_name)}</span><span>${esc(o.shipment_carrier||'承运商待登记')}</span><span>${esc(o.shipment_tracking_no||'出货后显示运单号')}</span></div><div class="form-actions">${orderAction(o,'tracking','查看物流节点')}</div></div>`).join('')}</div>`:emptyState(sea?'暂无海运订单':'没有匹配的物流记录',sea?'选择印尼海运专线创建订单后，可在此查看出货物流。':'请确认订单或运单号，也可以在我的订单查看状态。')}</div>`;
+    `<div class="card"><form id="trackingSearch" class="workspace-toolbar"><input id="trackingSearchText" aria-label="搜索物流" value="${esc(workspace.trackingQuery)}" placeholder="输入订单号 / 国际运单号 / 收件人"><button class="btn primary">查询</button></form>${rows.length?`<div class="workspace-list">${rows.map(o=>`<div class="order-card"><div class="order-row"><b>${esc(o.order_no)}</b>${orderProgressHtml(o)}</div><div class="subrow"><span>${esc(o.route_name)}</span><span>${esc(o.shipment_carrier||'承运商待登记')}</span><span>${esc(o.shipment_tracking_no||'出货后显示运单号')}</span></div><div class="form-actions">${orderAction(o,'tracking','查看物流节点')}</div></div>`).join('')}</div>`:emptyState(sea?'暂无海运订单':'没有匹配的物流记录',sea?'选择印尼海运专线创建订单后，可在此查看出货物流。':'请确认订单或运单号，也可以在我的订单查看状态。')}</div>`;
 }
 merchantTracking=function(){
   const o=state.order.record;
   if(!o)return shell('物流详情','请选择需要查看的订单。',button('物流追踪','tracking-list'));
   return shell('物流详情',o.order_no,orderAction(o,'fee','返回订单详情')+button('物流查询','tracking-list'))+
-    `<div class="tracking-layout"><div class="card"><div class="card-title"><h3>订单节点</h3>${status(orderStatusLabel(o.status),statusTone(o.status))}</div>${state.events.length?`<div class="timeline">${state.events.map(e=>`<div class="event"><div></div><div><h4>${esc(e.title)}</h4><p>${esc(e.desc)} · ${esc(e.time)}</p></div></div>`).join('')}</div>`:emptyState('暂无节点','仓库操作后，相关物流节点会在这里显示。')}</div><div class="card"><h3>运单与收件信息</h3>${[['承运商',o.shipment_carrier],['国际运单号',o.shipment_tracking_no],['线路',o.route_name],['目的地国家',o.destination_country],['具体收货地址',o.destination_address],['收件人',o.recipient_name],['深圳送仓地址',o.origin_warehouse_address]].map(([k,v])=>`<div class="metric"><span>${k}</span><b>${esc(v||'待登记')}</b></div>`).join('')}<p class="page-note">节点来自真实作业记录；出货登记不等于已离港，离港和签收以实际记录为准。</p></div></div>`;
+    `<div class="tracking-layout"><div class="card"><div class="card-title"><h3>订单节点</h3>${orderProgressHtml(o)}</div>${state.events.length?`<div class="timeline">${state.events.map(e=>`<div class="event"><div></div><div><h4>${esc(e.title)}</h4><p>${esc(e.desc)} · ${esc(e.time)}</p></div></div>`).join('')}</div>`:emptyState('暂无节点','仓库操作后，相关物流节点会在这里显示。')}</div><div class="card"><h3>运单与收件信息</h3>${[['承运商',o.shipment_carrier],['国际运单号',o.shipment_tracking_no],['线路',o.route_name],['目的地国家',o.destination_country],['具体收货地址',o.destination_address],['收件人',o.recipient_name],['深圳送仓地址',o.origin_warehouse_address]].map(([k,v])=>`<div class="metric"><span>${k}</span><b>${esc(v||'待登记')}</b></div>`).join('')}<p class="page-note">节点来自真实作业记录；出货登记不等于已离港，离港和签收以实际记录为准。</p></div></div>`;
 };
 function merchantRates(){
   const r=workspace.quote;
@@ -468,7 +489,7 @@ function merchantPageFrame(html){
   const o=state.order.record;
   const stages=[['提交打包',['submitted']],['仓库确认',['warehouse_received','measuring']],['一次付款',['awaiting_payment']],['打包出货',['paid','ready_to_ship']],['运输签收',['shipped','delivered']]];
   const current=o.status==='delivered'?stages.length:stages.findIndex(([,statuses])=>statuses.includes(o.status));
-  journey=`<section class="order-journey" aria-label="当前订单进度"><div class="order-journey-title"><b>${esc(o.order_no)}</b>${status(orderStatusLabel(o.status),statusTone(o.status))}</div><ol>${stages.map(([label],i)=>`<li class="${current<0?'':i<current?'done':i===current?'current':''}" ${i===current?'aria-current="step"':''}><span>${i<current?'✓':i+1}</span>${label}</li>`).join('')}</ol><div class="journey-links">${orderAction(o,'fee','订单详情与费用')}${orderAction(o,'tracking','物流节点')}<button type="button" class="btn small ghost" data-page="support" data-ticket-context="${o.id}">咨询此订单</button></div></section>`;
+  journey=`<section class="order-journey" aria-label="当前订单进度"><div class="order-journey-title"><b>${esc(o.order_no)}</b>${orderProgressHtml(o)}</div><ol>${stages.map(([label],i)=>`<li class="${current<0?'':i<current?'done':i===current?'current':''}" ${i===current?'aria-current="step"':''}><span>${i<current?'✓':i+1}</span>${label}</li>`).join('')}</ol><div class="journey-links">${orderAction(o,'fee','订单详情与费用')}${orderAction(o,'tracking','物流节点')}<button type="button" class="btn small ghost" data-page="support" data-ticket-context="${o.id}">咨询此订单</button></div></section>`;
  }
  $('#crumb').textContent=isChild?`${names[root]} / ${names[page]}`:names[root];
  return crumb+local+journey+html;
