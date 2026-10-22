@@ -165,7 +165,7 @@ function orderProgress(o){
  if(tail&&(arrived||tail===o)){
   const labels={warehouse_received:'待尾程报价',measuring:'待尾程报价',submitted:'待尾程报价',awaiting_payment:typeof orderReceipt==='function'&&orderReceipt(tail.id)?.status==='pending'?'尾程付款审核中':'尾程待付款',paid:'尾程待出库',ready_to_ship:'尾程待出库',shipped:'尾程派送中',delivered:'尾程已签收',cancelled:'尾程已取消',exception:'尾程异常'};
   const label=labels[tail.status]||orderStatusLabel(tail.status);
-  return {label:arrived&&tail.status==='delivered'?'整票已签收':label,tone:statusTone(tail.status),group:tail.status,detail:arrived?'头程已到印尼仓 · '+label:''};
+  return {label:tail.status==='delivered'?'已签收':label,tone:statusTone(tail.status),group:tail.status,detail:arrived?'头程已到印尼仓 · '+label:tail.status==='delivered'?'尾程配送完成':''};
  }
  return {label:arrived?'头程已到印尼仓':orderStatusLabel(o?.status),tone:arrived?'blue':statusTone(o?.status),group:arrived?'overseas':o?.status,detail:arrived?'等待申请尾程配送':''};
 }
