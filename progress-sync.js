@@ -18,7 +18,7 @@ function progressHasDraft(){
 }
 function progressCanApply(){
  if(!progressReady()||progressSync.manual||paymentWorkspace.busy||paymentWorkspace.loading||warehouseWorkspace.busy||warehouseWorkspace.loading||workspace.parcelBusy)return false;
- if(!['dashboard','overall-order','parcels','parcel-detail','orders','fee','tracking','tracking-list','sea-tracking','packing-history','billing','warehouse-tracking','warehouse-tracking-detail','messages'].includes(state.page))return false;
+ if(!['dashboard','overall-order','overseas-stock','overseas-stock-warehouse','parcels','parcel-detail','orders','fee','tracking','tracking-list','sea-tracking','packing-history','billing','warehouse-tracking','warehouse-tracking-detail','messages'].includes(state.page))return false;
  return !progressHasDraft();
 }
 function progressLabel(){
@@ -84,11 +84,12 @@ async function readProgressSnapshot(){
   state.page==='tracking'&&id?window.MospaceSupabase.orderTracking(id):Promise.resolve(null),
   state.page==='warehouse-tracking-detail'&&trackingId?window.MospaceSupabase.orderTracking(trackingId):Promise.resolve(null)
  ]);
- return {orders,parcels,receipts,notices,events,warehouseEvents};
+ const forwardingSnapshot=typeof forwarding!=='undefined'&&forwarding.ready?await readForwardingSnapshot():null;
+ return {orders,parcels,receipts,notices,events,warehouseEvents,forwardingSnapshot};
 }
 function progressTrackingFingerprint(events){return events===null?null:(events||[]).map(e=>[e.event_title??e.title,e.event_description??e.desc??'',e.occurred_at?new Date(e.occurred_at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):e.time])}
-function progressFingerprint(snapshot){return JSON.stringify([snapshot.orders,snapshot.parcels,snapshot.receipts,snapshot.notices,progressTrackingFingerprint(snapshot.events),snapshot.warehouseEvents])}
-function currentProgressSnapshot(){return {orders:state.dbOrders,parcels:workspace.parcels,receipts:paymentWorkspace.receipts,notices:paymentWorkspace.notices,events:state.page==='tracking'?state.events:null,warehouseEvents:state.page==='warehouse-tracking-detail'?warehouseWorkspace.tracking.events:null}}
+function progressFingerprint(snapshot){return JSON.stringify([snapshot.orders,snapshot.parcels,snapshot.receipts,snapshot.notices,progressTrackingFingerprint(snapshot.events),snapshot.warehouseEvents,snapshot.forwardingSnapshot||null])}
+function currentProgressSnapshot(){return {orders:state.dbOrders,parcels:workspace.parcels,receipts:paymentWorkspace.receipts,notices:paymentWorkspace.notices,events:state.page==='tracking'?state.events:null,warehouseEvents:state.page==='warehouse-tracking-detail'?warehouseWorkspace.tracking.events:null,forwardingSnapshot:typeof forwarding!=='undefined'&&forwarding.ready?{packages:forwarding.packages,items:forwarding.items,staff:forwarding.staff}:null}}
 async function runProgressSync(){
  if(progressSync.busy||!progressCanApply())return false;
  const owner=progressOwnerKey(),revision=progressSync.revision,epoch=progressSync.epoch,page=state.page,id=state.activeOrderId,warehouseId=warehouseWorkspace.selectedId;
@@ -101,6 +102,7 @@ async function runProgressSync(){
   const changed=progressFingerprint(snapshot)!==progressFingerprint(currentProgressSnapshot());
   state.dbOrders=snapshot.orders;workspace.parcels=snapshot.parcels;delete workspace.errors.parcels;
   paymentWorkspace.receipts=snapshot.receipts;paymentWorkspace.notices=snapshot.notices;
+  if(snapshot.forwardingSnapshot)applyForwardingSnapshot(snapshot.forwardingSnapshot);
   const order=currentDbOrder(snapshot.orders);
   if(order)applyDbOrder(order);
   else{state.activeOrderId=null;state.order={id:'',status:'draft',record:null};state.parcels=[];state.events=[]}
@@ -122,7 +124,7 @@ const progressBaseRender=render;
 render=function(){progressSync.revision++;progressBaseRender();ensureProgressChannel();showProgressSync()};
 if(typeof setInterval==='function')setInterval(()=>{
  ensureProgressChannel();
- const cadence=progressSync.connected?30000:10000;
+ const cadence=typeof forwarding!=='undefined'&&forwarding.ready?10000:progressSync.connected?30000:10000;
  if(progressReady()&&(progressSync.dirty||Date.now()-progressSync.lastAttempt>=cadence))void runProgressSync();
 },10000);
 if(typeof document.addEventListener==='function'){

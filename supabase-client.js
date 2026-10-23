@@ -116,12 +116,16 @@
 
   async function myOrders() {
     const instance = await requireClient();
-    const { data, error } = await instance
-      .from('orders')
-      .select('*, fees(*), payments(*), order_parcels(parcel_id, parcels(*))')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    const rows = [];
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await instance.from('orders')
+        .select('*, fees(*), payments(*), order_parcels(parcel_id, parcels(*))')
+        .order('created_at', { ascending: false }).order('id', { ascending: false })
+        .range(offset, offset + 499);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 500) return rows;
+    }
   }
 
   async function orderTracking(orderId) {
@@ -257,10 +261,7 @@
   }
 
   async function adminOrders() {
-    const instance = await requireClient();
-    const { data, error } = await instance.from('orders').select('*, fees(*), payments(*)').order('created_at', { ascending: false }).limit(100);
-    if (error) throw error;
-    return data || [];
+    return myOrders();
   }
 
   async function adminAuditLogs() {

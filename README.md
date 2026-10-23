@@ -2,6 +2,21 @@
 
 当前仓库包含可点击的前端原型，以及 Supabase 数据库第一版结构。
 
+## v3.0 开发版：海外仓整包转寄（第一阶段）
+
+本功能在 `feature/overseas-forwarding` 分支开发；`master` 继续提供稳定公网版本。发布前备份标签：`v2.2-stable-before-forwarding`。开发分支不自动部署 GitHub Pages，也尚未迁移线上 Supabase。
+
+本地体验：安装 Node.js 20 或更新版本，在本目录依次执行 `npm ci --ignore-scripts`、`npm run dev:forwarding`，打开 **http://127.0.0.1:4175/**。Windows 也可在 PowerShell 中运行 `./start-forwarding.ps1`。保持终端开启。
+
+- 使用本机临时 PostgreSQL（PGlite），不会连接线上 Supabase；无需填写数据库密钥。
+- 页面底部可切换测试商家、仓库、运营，只有本地测试身份，不是公网可用账号。
+- 预置一笔已完成头程的测试批次，从海外仓实际外箱入库开始验收；重启服务清空测试数据。
+- 支持实际逐箱到货、分批转寄、一头程多尾程、占用防重复、付款前取消释放、独立核价付款审核、直接整包出库、运单复制、人工核实签收。
+- 包裹和订单每 10 秒同步，并在操作后刷新；快递公司的自动轨迹尚未接入。
+- 不拆包、不做商品 SKU、拣货、商品库存或电商 ERP；测试仓地址、运单和款项不可用于真实寄件或转账。
+
+验收命令：`npm test`、`npm run test:db`。完整流程、数据字典、历史单处理和发布顺序见 [第一阶段说明](docs/overseas-forwarding-phase1.md)。后面的 v2.2 及更早章节为稳定版历史说明，以本节和第一阶段说明为准。
+
 ## v2.2 印尼尾程地区与距离运价
 
 在 v2.1 基础上执行 `supabase/last-mile-pricing.sql`，再部署配套前端。新增 `last_mile_zones` 和订单 `delivery_zone_id`，不回填或重算已有订单费用。重复迁移不覆盖已维护的地区价格。地区与印尼发货仓绑定。

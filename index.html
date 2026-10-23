@@ -72,7 +72,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-client.js?v=payment-1"></script>
+  <script src="supabase-client.js?v=forwarding-1"></script>
   <script>
     const state = {
       role:'merchant', page:'dashboard',
@@ -489,7 +489,7 @@
         const views={dashboard:merchantDashboard,'order-create':merchantCreate,consolidate:merchantConsolidate,parcels:merchantParcels,'parcel-detail':merchantParcelDetail,orders:merchantOrders,fee:merchantFee,tracking:merchantTracking,address:merchantAddress,...MerchantViews};
         html=(views[state.page]||merchantDashboard)();
       }else if(state.role==='warehouse'){
-        const views={dashboard:warehouseDashboard,'overall-order':overallOrderDetail,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,'warehouse-tracking':warehouseTrackingList,'warehouse-tracking-detail':warehouseTrackingDetail,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
+        const views={dashboard:warehouseDashboard,'overall-order':overallOrderDetail,'overseas-receive':overseasReceive,'overseas-stock-warehouse':forwardingStock,inbound:warehouseInbound,confirm:warehouseConfirm,packing:warehousePacking,ship:warehouseShip,'warehouse-tracking':warehouseTrackingList,'warehouse-tracking-detail':warehouseTrackingDetail,exceptions:warehouseExceptions,'exception-detail':warehouseExceptionDetail};
         html=(views[state.page]||warehouseDashboard)();
       }else{
         const views={dashboard:adminDashboard,orders:adminOrders,config:adminConfig,audit:adminAudit,accounts:adminAccounts,'support-admin':merchantSupportAdmin,'payment-review':adminPaymentReview,'receiving-config':adminReceivingConfig};
@@ -601,7 +601,8 @@
   <script src="calculator-workspace.js?v=2"></script>
   <script src="last-mile-pricing.js?v=2"></script>
   <script src="overall-orders.js?v=1"></script>
-  <script src="progress-sync.js?v=2"></script>
+  <script src="forwarding-workspace.js?v=1"></script>
+  <script src="progress-sync.js?v=3"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>
