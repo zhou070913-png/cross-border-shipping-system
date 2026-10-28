@@ -14,7 +14,7 @@ export async function createForwardingDb(){
  grant usage on schema public,auth,storage to authenticated,anon;
  grant select,insert on storage.objects to authenticated;
  alter default privileges in schema public grant select,insert,update,delete on tables to authenticated;`);
- const migrations=['schema','warehouse-operations','admin-operations','merchant-workspace','parcel-maintenance','parcel-estimates','payment-review','sea-route','separate-settlement','overseas-addresses','cargo-channels','last-mile-pricing','overseas-forwarding'];
+ const migrations=['schema','warehouse-operations','admin-operations','merchant-workspace','parcel-maintenance','parcel-estimates','payment-review','sea-route','separate-settlement','overseas-addresses','cargo-channels','last-mile-pricing','overseas-forwarding','combined-delivery'];
  for(const name of migrations){let sql=await fs.readFile(new URL('../supabase/'+name+'.sql',import.meta.url),'utf8');await db.exec(sql.replace('create extension if not exists pgcrypto;',''))}
  for(const [role,id] of Object.entries(fixtureUsers)){
   await db.query('insert into auth.users(id,email) values($1,$2)',[id,role+'@local.test']);

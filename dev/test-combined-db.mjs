@@ -1,0 +1,62 @@
+import assert from 'node:assert/strict';
+import {createForwardingDb,withRole,fixtureUsers} from './forwarding-db.mjs';
+import fs from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+const db=await createForwardingDb();
+const rpc=(role,name,args=[])=>withRole(db,role,async tx=>(await tx.query('select to_jsonb(public.'+name+'('+args.map((_,i)=>'$'+(i+1)).join(',')+')) r',args.map(x=>x&&typeof x==='object'?JSON.stringify(x):x))).rows[0].r);
+const order=async id=>(await db.query('select * from orders where id=$1',[id])).rows[0];
+const recipient={country:'印度尼西亚',recipient_name:'TEST Alice',recipient_phone:'TEST-NO-PHONE',city:'Jakarta',address_line:'TEST address only',postal_code:'12345'};
+const boxes=[{weight:2,length:20,width:20,height:20}];
+let groups=0;const pass=s=>{groups++;console.log('PASS: '+s)};
+try{
+ await db.exec(await fs.readFile(new URL('../supabase/combined-delivery.sql',import.meta.url),'utf8'));pass('combined migration is repeatable');
+ const a=await rpc('merchant','merchant_pre_advise',['TEST-COMBINED-A','测试商品A',null]),b=await rpc('merchant','merchant_pre_advise',['TEST-COMBINED-B','测试商品B',null]);
+ const second='10000000-0000-0000-0000-000000000004';
+ await db.query('insert into auth.users(id,email) values($1,$2)',[second,'second@local.test']);
+ await db.query("update profiles set member_no='LOCAL-SECOND' where id=$1",[second]);
+ await db.query("insert into parcels(parcel_no,merchant_id,warehouse_id,tracking_no,item_name) values('TEST-SECOND',$1,$2,'TEST-SECOND','Test item')",[second,a.warehouse_id]);
+ const customers=await rpc('warehouse','warehouse_pending_customers');assert.equal(customers.length,2);assert.equal(customers.find(c=>c.merchant_id===a.merchant_id).parcel_count,2);assert.equal((await rpc('merchant','warehouse_pending_customers')).length,0);pass('warehouse pending counts customers, exposes own warehouse only');
+ const request=randomUUID(),parcelArray='{'+a.id+','+b.id+'}';
+ let o=await rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',recipient,'TEST',request]);
+ assert.equal(o.recipient_name,'TEST Alice');assert.equal((await rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',recipient,'TEST',request])).id,o.id);
+ await assert.rejects(rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',{...recipient,city:'Bali'},'TEST',request]),/变化/);
+ await assert.rejects(rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',recipient,'TEST',randomUUID()]),/关联/);pass('one order snapshots consumer address; retries idempotent and parcels cannot be reused');
+ await assert.rejects(rpc('warehouse','warehouse_pack_combined',[o.id,boxes,o.updated_at]),/收货/);
+ await assert.rejects(rpc('warehouse','warehouse_receive_order',[o.id]),/逐件/);
+ await assert.rejects(withRole(db,'warehouse',tx=>tx.query("update orders set status='paid' where id=$1",[o.id])),/permission denied/);
+ await assert.rejects(rpc('merchant','warehouse_receive_combined_parcel',[a.id]),/无权/);
+ await rpc('warehouse','warehouse_receive_combined_parcel',[a.id]);assert.equal((await order(o.id)).status,'submitted');
+ await rpc('warehouse','warehouse_receive_combined_parcel',[b.id]);o=await order(o.id);assert.equal(o.status,'warehouse_received');pass('each physical parcel must arrive before packing');
+ const f=await rpc('warehouse','warehouse_pack_combined',[o.id,boxes,o.updated_at]);o=await order(o.id);
+ assert.equal(Number(f.shipping_fee),60);assert.equal(Number(f.handling_fee),18);assert.equal(f.last_mile_fee,null);assert.equal(f.total_amount,null);assert.equal(o.status,'measuring');
+ await assert.rejects(rpc('merchant','merchant_submit_payment_receipt',[o.id,'bad','test',null,new Date().toISOString(),null,new Date().toISOString()]),/不可提交/);pass('sea max-weight-volume pricing uses packed boxes; pending tail is NULL and cannot be paid');
+ await assert.rejects(rpc('warehouse','warehouse_confirm_combined_fees',[o.id,-1,'TEST distance',o.updated_at]),/有效/);
+ await assert.rejects(rpc('warehouse','warehouse_confirm_combined_fees',[o.id,30,'TEST distance','2000-01-01']),/刷新/);
+ const final=await rpc('warehouse','warehouse_confirm_combined_fees',[o.id,30,'TEST address distance 20 km',o.updated_at]);assert.equal(Number(final.total_amount),108);o=await order(o.id);
+ await assert.rejects(db.query('update fees set last_mile_fee=99,total_amount=177 where order_id=$1',[o.id]),/锁定/);
+ await assert.rejects(db.query("update orders set destination_city='Changed',destination_address='Changed' where id=$1",[o.id]),/地址/);
+ await assert.rejects(rpc('warehouse','warehouse_pack_combined',[o.id,boxes,o.updated_at]),/状态/);
+ await assert.rejects(rpc('warehouse','warehouse_advance_combined',[o.id,'head_ship','TEST','TEST123',o.updated_at]),/付款/);pass('manual tail review creates single total, locks quote, prevents unpaid dispatch');
+ const account=(await db.query('select * from payment_receiving_accounts')).rows[0],proof=fixtureUsers.merchant+'/'+o.id+'/test.png';
+ await db.query("insert into storage.objects(bucket_id,name,metadata) values('payment-proofs',$1,$2)",[proof,{size:12,mimetype:'image/png'}]);
+ const receipt=await rpc('merchant','merchant_submit_payment_receipt',[o.id,proof,'TEST PAYER','TEST',new Date().toISOString(),'test only',account.updated_at]);assert.equal(Number(receipt.amount),108);
+ await assert.rejects(rpc('warehouse','admin_review_payment_receipt',[receipt.id,true,108,'TEST-REF',null,true]),/仅运营/);
+ await assert.rejects(rpc('admin','admin_review_payment_receipt',[receipt.id,true,78,'TEST-REF',null,true]),/金额/);
+ await rpc('admin','admin_review_payment_receipt',[receipt.id,true,108,'TEST-COMBINED-REF','test only',true]);o=await order(o.id);assert.equal(o.status,'ready_to_ship');
+ assert.equal((await db.query('select count(*) n from payments where order_id=$1',[o.id])).rows[0].n,1);
+ await assert.rejects(rpc('admin','admin_review_payment_receipt',[receipt.id,true,108,'TEST-COMBINED-REF',null,true]),/已审核/);pass('one proof, one exact combined payment, operations approval required');
+ for(const action of ['head_ship','overseas_receive','tail_ship','delivered']){
+  if(action==='tail_ship')await assert.rejects(rpc('warehouse','warehouse_advance_combined',[o.id,'delivered',null,null,o.updated_at]),/状态/);
+  o=await rpc('warehouse','warehouse_advance_combined',[o.id,action,'J&T TEST','TEST-'+action,o.updated_at]);
+ }
+ assert.equal(o.status,'delivered');assert.equal(o.tail_tracking_no,'TEST-tail_ship');assert.equal(o.shipment_tracking_no,'TEST-head_ship');assert.equal((await db.query('select count(*) n from orders where parent_order_id=$1',[o.id])).rows[0].n,0);pass('same order follows head shipping, Indonesia arrival, tail dispatch and signature with no second bill');
+ await assert.rejects(rpc('merchant','merchant_create_last_mile_with_address',[o.id,recipient]));
+ assert.equal((await db.query('select count(*) n from orders where parent_order_id=$1',[o.id])).rows[0].n,0);
+ const ticket=await rpc('merchant','submit_support',[null,o.id,'测试客服','测试客服消息内容']);
+ await rpc('warehouse','submit_support',[ticket.id,null,null,'Warehouse response']);await rpc('admin','submit_support',[ticket.id,null,null,'Operations response']);
+ const visible=await withRole(db,'merchant',tx=>tx.query('select * from support_replies where ticket_id=$1',[ticket.id]));assert.equal(visible.rows.length,2);assert.deepEqual(visible.rows.map(r=>r.actor_role).sort(),['admin','warehouse_operator']);pass('merchant sees both warehouse and operations replies without overwrites');
+ // Different warehouse cannot read package customer totals, order or ticket.
+ await db.query("update profiles set warehouse_id=null where id=$1",[fixtureUsers.warehouse]);
+ assert.equal((await rpc('warehouse','warehouse_pending_customers')).length,0);await assert.rejects(rpc('warehouse','submit_support',[ticket.id,null,null,'should reject']),/无权/);pass('cross warehouse ticket and pending customer isolation');
+ console.log(groups+' combined database groups passed');
+}finally{await db.close()}

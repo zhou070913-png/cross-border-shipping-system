@@ -1,0 +1,26 @@
+const setup=require('./combined-ui-harness.cjs');
+function audit(){
+ const {run,document}=setup(),missing=new Set();
+ const inspect=(html,label)=>{
+  document.querySelector('#content').innerHTML=html;run('localizeKnownDom()');
+  const walk=document.createTreeWalker(document.querySelector('#content'),4);
+  while(walk.nextNode()){
+   const n=walk.currentNode,t=n.textContent.trim();
+   if(n.nodeType===3&&/[\u4e00-\u9fff]/.test(t)&&!n.parentElement.closest('[data-i18n],[data-user-content],script,style,input,textarea,option'))missing.add(label+': '+t);
+  }
+ };
+ run(`paymentWorkspace.account={id:'a',mode:'test',bank_name:'TEST-BANK',account_holder:'TEST-OWNER',account_number:'TEST-NOT-A-BANK',currency:'CNY',is_active:true,updated_at:'v1'};o.status='awaiting_payment';o.fees=[{shipping_fee:60,handling_fee:18,last_mile_fee:30,total_amount:108,confirmed_at:'now',fee_breakdown_version:2}];`);
+ for(const role of ['merchant','warehouse','admin']){
+  run(`state.auth.loginTargetRole='${role}';state.auth.pendingRole='${role}'`);inspect(run('loginPage()'),role+' login');
+  for(const mode of ['login','signup']){run(`state.auth.mode='${mode}';updateAuthMode()`);inspect(document.querySelector('#authModal').innerHTML,role+' '+mode)}
+ }
+ run(`state.role='merchant';workspace.parcels=[{id:'p',status:'pre_advised',tracking_no:'TEST-PARCEL',item_name:'用户原文'}];workspace.editParcelId='p';state.events=[{title:'合包实测已保存',desc:'头程预估已更新，尾程费用待仓库复核',time:'10/28 16:00'}]`);
+ for(const expr of ['combinedDashboard()','combinedAdvice()','combinedAdvice(true)','combinedParcelList()','combinedPackingRequest()','combinedOrderList()','combinedCalculator()','combinedAddresses()','combinedProfile()','merchantAddress()','combinedDetail(o)','combinedSupport()','adminReceivingConfig()','adminPaymentReview()','combinedConfig()','adminAudit()','combinedAccounts()'])inspect(run(expr),expr);
+ run(`state.role='warehouse';combined.pending=[{merchant_id:'m',member_no:'TEST-MERCHANT',parcel_count:1,parcels:[{id:'p',tracking_no:'TEST-PARCEL',item_name:'原文商品'}]}]`);
+ for(const expr of ['combinedWarehouseDashboard()','combinedPending()','combinedSupport()','combinedDetail(o)'])inspect(run(expr),expr);
+ run(`state.role='admin';paymentWorkspace.receipts=[{id:'r',order_id:'o',amount:108,currency:'CNY',is_test:true,status:'pending',account_snapshot:paymentWorkspace.account,transferred_at:'2026-10-28',created_at:'2026-10-28',payer_name:'TEST'}];paymentWorkspace.selected='r'`);
+ for(const status of ['pending','approved','rejected']){run(`paymentWorkspace.receipts[0].status='${status}';paymentWorkspace.receipts[0].reviewed_at='2026-10-28'`);inspect(run('adminPaymentReview()'),'review '+status)}
+ return [...missing];
+}
+module.exports=audit;
+if(require.main===module){const missing=audit();console.log(JSON.stringify(missing,null,2));if(missing.length)process.exitCode=1}

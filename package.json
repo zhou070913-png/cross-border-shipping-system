@@ -3,8 +3,11 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.cjs",
-    "test:db": "node dev/test-forwarding-db.mjs",
+    "test:db": "node dev/test-forwarding-db.mjs && node dev/test-combined-db.mjs",
     "dev:forwarding": "node dev/forwarding-server.mjs"
   },
-  "devDependencies": {"@electric-sql/pglite": "0.5.11"}
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
+    "linkedom": "^0.18.14"
+  }
 }
