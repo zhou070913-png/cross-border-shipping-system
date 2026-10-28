@@ -47,6 +47,29 @@ test('warehouse pending is hierarchical by customer, not order or parcel count',
  document.querySelector('#content').innerHTML=run('combinedPending()');
  assert.equal(document.querySelectorAll('details.customer-group').length,2);assert.equal(document.querySelectorAll('[data-combined-receive]').length,3);assert.match(document.querySelector('h2').textContent,/2/);
 });
+test('admin dashboard and order detail open the exact receipt review and return to admin orders',()=>{
+ const {run,document}=setup();
+ run(`state.role='admin';state.auth.role='admin';state.page='dashboard';o.status='awaiting_payment';o.fees[0]={shipping_fee:60,handling_fee:18,last_mile_fee:30,total_amount:108,confirmed_at:'now'};paymentWorkspace.selected='other';paymentWorkspace.filter='approved';paymentWorkspace.receipts=[{id:'other',order_id:'other-order',status:'approved',amount:999,created_at:'2026-10-28T01:00:00Z'},{id:'old',order_id:'o',status:'rejected',amount:108,created_at:'2026-10-28T02:00:00Z'},{id:'current',order_id:'o',status:'pending',amount:108,currency:'CNY',is_test:true,payer_name:'TEST',created_at:'2026-10-28T03:00:00Z'}];render()`);
+ const entry=document.querySelector('[data-combined-review="o"]');assert.ok(entry);entry.onclick();
+ assert.equal(run('state.page'),'payment-review');assert.equal(run('paymentWorkspace.selected'),'current');assert.equal(run('paymentWorkspace.filter'),'pending');
+ assert.equal(document.querySelector('#paymentReviewForm').dataset.receiptId,'current');assert.match(document.querySelector('#paymentReviewDetail h3').textContent,/TEST-ORDER/);
+ run(`state.page='overall-order';state.order.record=o;render()`);
+ assert.ok(document.querySelector('[data-combined-review="o"]'));
+ document.querySelector('[data-page="orders"]').onclick();assert.equal(run('state.page'),'orders');assert.equal(run('state.role'),'admin');
+ run(`state.page='overall-order';render()`);document.querySelector('[data-combined-review="o"]').onclick();
+ assert.equal(document.querySelector('#paymentReviewForm').dataset.receiptId,'current');
+ run(`paymentWorkspace.receipts[2].status='approved';state.page='overall-order';render()`);
+ assert.match(document.querySelector('[data-combined-review="o"]').textContent,/查看付款审核记录/);
+ document.querySelector('[data-combined-review="o"]').onclick();assert.equal(run('paymentWorkspace.filter'),'approved');assert.equal(document.querySelector('#paymentReviewForm'),null);
+});
+test('payment review links never grant merchant access or open missing receipts, and preserve selection while saving',()=>{
+ const {run,document}=setup();run(`paymentWorkspace.receipts=[{id:'r',order_id:'o',status:'pending'}];state.page='fee';render()`);
+ assert.equal(document.querySelector('[data-combined-review]'),null);assert.equal(run(`openPaymentReview('r')`),false);assert.equal(run('state.page'),'fee');
+ run(`state.role='admin';state.auth.role='admin';state.page='dashboard';paymentWorkspace.selected=null;paymentWorkspace.filter='all';paymentWorkspace.busy=true`);
+ assert.equal(run(`openPaymentReview('r')`),false);assert.equal(run('paymentWorkspace.selected'),null);
+ run(`paymentWorkspace.busy=false`);assert.equal(run(`openPaymentReview('missing')`),false);
+ run(`combined.busy=true`);assert.equal(run(`openPaymentReview('r')`),false);assert.equal(run('paymentWorkspace.selected'),null);assert.equal(run('paymentWorkspace.filter'),'all');
+});
 test('warehouse shows one actionable next step and ships after payment without second pack or bill',()=>{
  const {run}=setup();run(`state.role='warehouse';o.order_parcels=[{parcels:{id:'p',received_at:null}}]`);assert.doesNotMatch(run('combinedWarehouseActions(o)'),/id="combinedPack"/);
  run(`o.order_parcels[0].parcels.received_at='now'`);assert.match(run('combinedWarehouseActions(o)'),/id="combinedPack"/);
