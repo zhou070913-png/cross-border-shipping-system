@@ -91,6 +91,23 @@ test('warehouse pending is hierarchical by customer, not order or parcel count',
  document.querySelector('#content').innerHTML=run('combinedPending()');
  assert.equal(document.querySelectorAll('details.customer-group').length,2);assert.equal(document.querySelectorAll('[data-combined-receive]').length,3);assert.match(document.querySelector('h2').textContent,/2/);
 });
+test('warehouse receipt history retains received parcels through shipment and delivery, with search and pagination',async()=>{
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';workspace.parcels=Array.from({length:22},(_,n)=>({id:'receipt-'+n,tracking_no:'RECEIPT-'+n,item_name:n===21?'<img src=x>':'TEST item',received_at:new Date(Date.UTC(2026,9,28,0,n)).toISOString(),status:'received'}));workspace.parcels.push({id:'not-received',tracking_no:'PENDING',status:'pre_advised'});o.order_parcels=[{parcel_id:'receipt-0',parcels:workspace.parcels[0]}];o.status='shipped';window.MospaceSupabase.orderTracking=async()=>[];render()`);
+ assert.match(document.querySelector('#content').textContent,/当前没有待收货包裹/);
+ document.querySelector('[data-combined-inbound-tab="received"]').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,10);assert.match(document.querySelector('#content').textContent,/共 22 条记录/);assert.equal(document.querySelectorAll('tbody img').length,0);
+ document.querySelector('[data-combined-receipt-page="2"]').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,10);
+ document.querySelector('#combinedReceiptQuery').value='TEST-ORDER';document.querySelector('#combinedReceiptSearch').onsubmit({preventDefault(){}});assert.equal(run('combined.receiptPage'),1);assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,1);assert.match(document.querySelector('tbody').textContent,/头程运输中/);
+ await document.querySelector('[data-combined-open="o"]').onclick();const back=document.querySelector('#content [data-page="inbound"]');assert.match(back.textContent,/返回收货记录/);back.onclick();assert.equal(run('state.page'),'inbound');assert.equal(document.querySelector('#combinedReceiptQuery').value,'TEST-ORDER');
+ run(`o.status='delivered';render()`);assert.match(document.querySelector('tbody').textContent,/已签收/);
+ document.querySelector('#combinedReceiptReset').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,10);
+ run(`combined.receiptPage=3;workspace.parcels=workspace.parcels.slice(0,1);render()`);assert.equal(run('combined.receiptPage'),1);
+ run(`workspace.errors.parcels='failed';render()`);assert.match(document.querySelector('#content').textContent,/收货记录读取失败/);assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,0);
+});
+test('confirming receipt moves the parcel from pending to retained history without a page reload',async()=>{
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';workspace.parcels=[{id:'received-now',tracking_no:'NEW-RECEIPT',item_name:'TEST',status:'pre_advised'}];combined.pending=[{member_no:'M-TEST',merchant_id:'m',parcel_count:1,parcels:workspace.parcels}];rpcWorkspace=async()=>{workspace.parcels[0].received_at='2026-10-28T00:00:00Z';workspace.parcels[0].status='received';combined.pending=[]};refreshDbState=async()=>{render();return true};render()`);
+ await document.querySelector('[data-combined-receive]').onclick();assert.equal(document.querySelectorAll('[data-combined-receive]').length,0);
+ document.querySelector('[data-combined-inbound-tab="received"]').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,1);assert.match(document.querySelector('tbody').textContent,/NEW-RECEIPT/);
+});
 test('admin dashboard and order detail open the exact receipt review and return to admin orders',()=>{
  const {run,document}=setup();
  run(`state.role='admin';state.auth.role='admin';state.page='dashboard';o.status='awaiting_payment';o.fees[0]={shipping_fee:60,handling_fee:18,last_mile_fee:30,total_amount:108,confirmed_at:'now'};paymentWorkspace.selected='other';paymentWorkspace.filter='approved';paymentWorkspace.receipts=[{id:'other',order_id:'other-order',status:'approved',amount:999,created_at:'2026-10-28T01:00:00Z'},{id:'old',order_id:'o',status:'rejected',amount:108,created_at:'2026-10-28T02:00:00Z'},{id:'current',order_id:'o',status:'pending',amount:108,currency:'CNY',is_test:true,payer_name:'TEST',created_at:'2026-10-28T03:00:00Z'}];render()`);

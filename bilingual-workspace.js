@@ -1,6 +1,7 @@
 /* Exact UI translations only. Customer-entered content, input values and IDs are never translated. */
 'use strict';
 const idLocale={
+ '收货管理':'Kelola penerimaan','收货记录':'Riwayat penerimaan',
  '工作台':'Ruang kerja','集运系统 /':'Sistem pengiriman /','本地测试数据库':'Basis data pengujian lokal','开发版 · 本地隔离数据库':'Versi pengembangan · basis data lokal terpisah','重启清空，禁止真实付款或寄件':'Data dihapus saat mulai ulang. Jangan bayar atau kirim barang nyata.','切换测试商家':'Beralih ke pelanggan uji','切换测试仓库':'Beralih ke gudang uji','切换测试运营':'Beralih ke admin uji','v3.1 开发验收 · 整单一次结算':'v3.1 Uji pengembangan · satu pembayaran per pesanan',
  '每页':'Per halaman','上一页':'Sebelumnya','下一页':'Berikutnya','商家先寄到国内深圳仓，再由仓库安排出境。':'Kirim paket ke gudang Shenzhen terlebih dahulu, lalu gudang mengatur pengiriman internasional.',
  '本单唯一应付：':'Total pesanan yang harus dibayar:','。请使用下方生成的测试凭证，无需真实转账。':'. Gunakan bukti uji yang dibuat di bawah, tanpa transfer uang nyata.','。请确认向上方账户完成转账后，再提交资料。':'. Kirim data setelah transfer ke rekening di atas selesai.',
