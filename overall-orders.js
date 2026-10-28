@@ -13,7 +13,7 @@ function overallOrderLegs(o){
 }
 function overallOrderSearch(o,query){
  const q=String(query||'').trim().toLowerCase();
- return !q||overallOrderLegs(o).some(x=>[x.order_no,x.recipient_name,x.destination_city,x.shipment_tracking_no,x.shipment_carrier,...safeRows(x.order_parcels).map(p=>p.parcels?.tracking_no)].join(' ').toLowerCase().includes(q));
+ return !q||overallOrderLegs(o).some(x=>[x.order_no,x.recipient_name,x.destination_city,x.shipment_tracking_no,x.shipment_carrier,x.tail_tracking_no,x.tail_carrier,...safeRows(x.order_parcels).map(p=>p.parcels?.tracking_no)].join(' ').toLowerCase().includes(q));
 }
 function overallOrderButton(o,label='查看整体订单'){
  return `<button type="button" class="btn small ghost" data-overall-order="${esc(overallOrderRoot(o).id)}">${label}</button>`;

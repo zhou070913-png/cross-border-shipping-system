@@ -37,10 +37,10 @@ test('order list retains waiting shipment between payment and transport after ho
  const paid=document.querySelector('[data-combined-filter="paid"]');assert.ok(paid);assert.match(paid.textContent,/待出货/);
  const filters=[...document.querySelectorAll('[data-combined-filter]')].map(b=>b.dataset.combinedFilter);
  assert.equal(filters.indexOf('paid'),filters.indexOf('awaiting_payment')+1);assert.equal(filters.indexOf('shipped'),filters.indexOf('paid')+1);
- paid.onclick();assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'paid');assert.equal(document.querySelectorAll('.combined-order-row').length,2);
- const text=document.querySelector('.combined-order-list').textContent;assert.match(text,/TEST-STAGE-paid/);assert.match(text,/TEST-STAGE-ready_to_ship/);assert.doesNotMatch(text,/TEST-STAGE-awaiting_payment|TEST-STAGE-shipped/);
- run(`state.dbOrders[2].status='shipped';render()`);assert.equal(document.querySelectorAll('.combined-order-row').length,1);
- document.querySelector('[data-combined-filter="shipped"]').onclick();assert.equal(document.querySelectorAll('.combined-order-row').length,2);
+ paid.onclick();assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'paid');assert.equal(document.querySelectorAll('[data-combined-order-row]').length,2);
+ const text=document.querySelector('.combined-order-table').textContent;assert.match(text,/TEST-STAGE-paid/);assert.match(text,/TEST-STAGE-ready_to_ship/);assert.doesNotMatch(text,/TEST-STAGE-awaiting_payment|TEST-STAGE-shipped/);
+ run(`state.dbOrders[2].status='shipped';render()`);assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);
+ document.querySelector('[data-combined-filter="shipped"]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,2);
 });
 test('fee details use the saved air tariff and measured cartons, retaining pending fees and zero charges',()=>{
  const {run,document}=setup();
@@ -52,6 +52,32 @@ test('fee details use the saved air tariff and measured cartons, retaining pendi
  run(`o.fees[0].last_mile_fee=0;o.fees[0].total_amount=93;o.fees[0].confirmed_at='now';o.fees[0].last_mile_note='<img src=x onerror=alert(1)>'`);
  document.querySelector('#content').innerHTML=run('combinedFeeDetails(o)');
  assert.match(document.querySelector('#content').textContent,/¥0\.00/);assert.equal(document.querySelectorAll('#content img').length,0);
+});
+test('merchant order pagination searches the entire result set, combines status filters and clamps shrinking pages',()=>{
+ const {run,document}=setup();run(`state.dbOrders=Array.from({length:25},(_,n)=>({...o,id:'o'+n,order_no:'ORDER-'+String(n+1).padStart(3,'0'),recipient_name:n%2?'Beta':'Alpha',status:n%2?'awaiting_payment':'ready_to_ship'}));state.page='orders';render()`);
+ assert.equal(document.querySelectorAll('[data-combined-order-row]').length,10);assert.match(document.querySelector('.pagination-summary').textContent,/共 25 个订单.*1–10.*1 \/ 3/s);
+ document.querySelector('[data-combined-order-page="2"]').onclick();assert.equal(document.querySelector('[data-combined-order-row]').dataset.combinedOrderRow,'o10');
+ document.querySelector('#orderSearchText').value='ORDER-025';document.querySelector('#orderSearch').onsubmit({preventDefault(){}});
+ assert.equal(run('combined.orderPage'),1);assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);assert.match(document.querySelector('tbody').textContent,/ORDER-025/);
+ document.querySelector('#combinedOrderReset').onclick();const size=document.querySelector('#combinedOrderPageSize');size.querySelector('option[value="20"]').selected=true;size.onchange();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,20);
+ document.querySelector('[data-combined-order-page="2"]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,5);
+ document.querySelector('#orderSearchText').value='Alpha';document.querySelector('#orderSearch').onsubmit({preventDefault(){}});document.querySelector('[data-combined-filter="paid"]').onclick();
+ assert.equal(run('workspace.orderQuery'),'Alpha');assert.equal(document.querySelectorAll('[data-combined-order-row]').length,13);
+ document.querySelector('#orderSearchText').value='NOT-FOUND';document.querySelector('#orderSearch').onsubmit({preventDefault(){}});assert.equal(document.querySelectorAll('[data-combined-order-row]').length,0);assert.match(document.querySelector('tbody').textContent,/没有匹配的订单/);assert.match(document.querySelector('.pagination-summary').textContent,/0–0.*1 \/ 1/s);
+ run(`workspace.orderQuery='';combined.filter='all';combined.orderPageSize=10;combined.orderPage=3;state.dbOrders=state.dbOrders.slice(0,2);render()`);assert.equal(run('combined.orderPage'),1);assert.equal(document.querySelectorAll('[data-combined-order-row]').length,2);
+ run(`state.dbOrders[1].tail_tracking_no='TAIL-SEARCH-ONLY';workspace.orderQuery='TAIL-SEARCH-ONLY';render()`);assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);assert.equal(document.querySelector('[data-combined-order-row]').dataset.combinedOrderRow,'o1');
+});
+test('paged order details open the selected order and return to the same page and search',async()=>{
+ const {run,document}=setup();run(`window.MospaceSupabase.orderTracking=async()=>[];state.dbOrders=Array.from({length:15},(_,n)=>({...o,id:'o'+n,order_no:'RETURN-'+n}));state.page='orders';workspace.orderQuery='RETURN-';combined.orderPage=2;render()`);
+ await document.querySelector('[data-combined-order-row="o12"] [data-combined-open]').onclick();
+ assert.equal(run('state.page'),'fee');assert.equal(run('state.order.record.id'),'o12');assert.match(document.querySelector('.combined-summary').textContent,/RETURN-12/);
+ document.querySelector('[data-combined-back-orders]').onclick();assert.equal(run('state.page'),'orders');assert.equal(run('combined.orderPage'),2);assert.equal(run('workspace.orderQuery'),'RETURN-');assert.equal(document.querySelector('[data-combined-order-row]').dataset.combinedOrderRow,'o10');
+});
+test('order table preserves pending fees, actual zero tail, historical navigation and escapes user content',()=>{
+ const {run,document}=setup();run(`o.recipient_name='<img src=x onerror=alert(1)>';o.destination_address='"<script>unsafe</script>';state.page='orders';render()`);
+ assert.match(document.querySelector('tbody').textContent,/待复核费用/);assert.doesNotMatch(document.querySelector('tbody').textContent,/¥0\.00/);assert.equal(document.querySelectorAll('tbody img,tbody script').length,0);
+ run(`o.fees[0]={shipping_fee:60,handling_fee:18,last_mile_fee:0,total_amount:78,confirmed_at:'now'};render()`);assert.match(document.querySelector('tbody').textContent,/¥78\.00/);assert.match(document.querySelector('tbody').textContent,/¥0\.00/);
+ run(`state.dbOrders=[{...o,id:'legacy',fulfillment_mode:null}];render()`);assert.ok(document.querySelector('[data-overall-order="legacy"]'));assert.match(document.querySelector('tbody').textContent,/历史订单/);
 });
 test('sea fee details explain weight and volume pricing from the order snapshot and stay expanded after refresh',()=>{
  const {run,document}=setup();
