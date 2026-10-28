@@ -80,3 +80,29 @@ test('combined writes block duplicate submit and navigation until refreshed; fai
  assert.equal(run('combined.busy'),false);assert.equal(document.querySelector('#save button').disabled,false);
  assert.ok(run(`notices.some(n=>n.includes('刷新失败'))`));assert.ok(!run(`notices.includes('操作已保存')`));
 });
+
+test('warehouse can receive consecutive parcels after each refresh replaces the pending customer buttons',async()=>{
+ const {run,document}=setup();
+ run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='dashboard';state.dbOrders=[];
+ combined.pending=[{merchant_id:'m',member_no:'TEST-MERCHANT',parcel_count:3,parcels:[{id:'p1',tracking_no:'TEST-1'},{id:'p2',tracking_no:'TEST-2'},{id:'p3',tracking_no:'TEST-3'}]}];
+ let received=[];rpcWorkspace=async(name,args)=>{received.push(args.p_parcel_id);const c=combined.pending[0];c.parcels=c.parcels.filter(p=>p.id!==args.p_parcel_id);c.parcel_count=c.parcels.length;if(!c.parcel_count)combined.pending=[]};
+ refreshDbState=async()=>{render();return true};render()`);
+ document.querySelector('details.customer-group').setAttribute('open','');
+ for(const id of ['p1','p2','p3']){
+  const button=document.querySelector('[data-combined-receive="'+id+'"]');
+  assert.equal(button.disabled,false,'remaining receive button must be usable without manual refresh');
+  await button.onclick();assert.equal(run('combined.busy'),false);
+  if(id!=='p3')assert.equal(document.querySelector('details.customer-group').hasAttribute('open'),true);
+ }
+ assert.deepEqual(Array.from(run('received')),['p1','p2','p3']);
+ assert.equal(document.querySelectorAll('[data-combined-receive]').length,0);
+});
+
+test('releasing a save lock never enables buttons disabled by business rules',async()=>{
+ const {run,document}=setup();
+ document.querySelector('#content').innerHTML='<form id="save"><button id="allowed">Save</button><button id="unavailable" disabled>Unavailable</button></form>';
+ run('refreshDbState=async()=>false');
+ await run(`combinedSave(document.querySelector('#save'),async()=>{})`);
+ assert.equal(document.querySelector('#allowed').disabled,false);
+ assert.equal(document.querySelector('#unavailable').disabled,true);
+});
