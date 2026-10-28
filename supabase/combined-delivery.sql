@@ -12,6 +12,17 @@ create unique index if not exists combined_request_once on public.orders(merchan
 create or replace function public.combined_capabilities() returns integer language sql stable security definer set search_path=public as $$select 1 where exists(select 1 from profiles where id=auth.uid() and is_active)$$;
 
 -- 服务器返回可见包裹对应的会员号，仓库不必获得商家完整资料。
+create or replace function public.warehouse_customer_directory() returns jsonb language sql stable security definer set search_path=public as $$
+ select coalesce(jsonb_agg(x order by x.member_no),'[]') from (
+ select pr.id merchant_id,pr.member_no,pr.display_name from profiles pr
+ where exists(select 1 from profiles actor where actor.id=auth.uid() and actor.is_active and actor.role in ('admin','warehouse_operator') and (
+ exists(select 1 from parcels p where p.merchant_id=pr.id and (actor.role='admin' or p.warehouse_id=actor.warehouse_id)) or
+ exists(select 1 from orders o where o.merchant_id=pr.id and (actor.role='admin' or o.warehouse_id=actor.warehouse_id))))
+ ) x
+$$;
+revoke all on function public.warehouse_customer_directory() from public,anon;
+grant execute on function public.warehouse_customer_directory() to authenticated;
+
 create or replace function public.warehouse_pending_customers() returns jsonb language sql stable security definer set search_path=public as $$
  select coalesce(jsonb_agg(x),'[]') from (
  select p.merchant_id,pr.member_no,count(*) parcel_count,jsonb_agg(jsonb_build_object('id',p.id,'tracking_no',p.tracking_no,'item_name',p.item_name,'order_id',(select op.order_id from order_parcels op where op.parcel_id=p.id limit 1)) order by p.created_at) parcels

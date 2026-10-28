@@ -16,6 +16,7 @@ try{
  await db.query("update profiles set member_no='LOCAL-SECOND' where id=$1",[second]);
  await db.query("insert into parcels(parcel_no,merchant_id,warehouse_id,tracking_no,item_name) values('TEST-SECOND',$1,$2,'TEST-SECOND','Test item')",[second,a.warehouse_id]);
  const customers=await rpc('warehouse','warehouse_pending_customers');assert.equal(customers.length,2);assert.equal(customers.find(c=>c.merchant_id===a.merchant_id).parcel_count,2);assert.equal((await rpc('merchant','warehouse_pending_customers')).length,0);pass('warehouse pending counts customers, exposes own warehouse only');
+ const directory=await rpc('warehouse','warehouse_customer_directory');assert.equal(directory.length,2);assert.equal(directory.find(c=>c.merchant_id===second).member_no,'LOCAL-SECOND');assert.ok(directory.every(c=>Object.keys(c).sort().join(',')==='display_name,member_no,merchant_id'));assert.equal((await rpc('merchant','warehouse_customer_directory')).length,0);pass('customer directory exposes only minimal visible merchant identity and denies merchants');
  const request=randomUUID(),parcelArray='{'+a.id+','+b.id+'}';
  let o=await rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',recipient,'TEST',request]);
  assert.equal(o.recipient_name,'TEST Alice');assert.equal((await rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',recipient,'TEST',request])).id,o.id);
@@ -26,7 +27,7 @@ try{
  await assert.rejects(withRole(db,'warehouse',tx=>tx.query("update orders set status='paid' where id=$1",[o.id])),/permission denied/);
  await assert.rejects(rpc('merchant','warehouse_receive_combined_parcel',[a.id]),/无权/);
  await rpc('warehouse','warehouse_receive_combined_parcel',[a.id]);assert.equal((await order(o.id)).status,'submitted');
- await rpc('warehouse','warehouse_receive_combined_parcel',[b.id]);o=await order(o.id);assert.equal(o.status,'warehouse_received');pass('each physical parcel must arrive before packing');
+ await rpc('warehouse','warehouse_receive_combined_parcel',[b.id]);o=await order(o.id);assert.equal(o.status,'warehouse_received');assert.ok((await rpc('warehouse','warehouse_customer_directory')).some(c=>c.merchant_id===fixtureUsers.merchant));pass('each physical parcel must arrive before packing');
  const f=await rpc('warehouse','warehouse_pack_combined',[o.id,boxes,o.updated_at]);o=await order(o.id);
  assert.equal(Number(f.shipping_fee),60);assert.equal(Number(f.handling_fee),18);assert.equal(f.last_mile_fee,null);assert.equal(f.total_amount,null);assert.equal(o.status,'measuring');
  await assert.rejects(rpc('merchant','merchant_submit_payment_receipt',[o.id,'bad','test',null,new Date().toISOString(),null,new Date().toISOString()]),/不可提交/);pass('sea max-weight-volume pricing uses packed boxes; pending tail is NULL and cannot be paid');
@@ -57,6 +58,6 @@ try{
  const visible=await withRole(db,'merchant',tx=>tx.query('select * from support_replies where ticket_id=$1',[ticket.id]));assert.equal(visible.rows.length,2);assert.deepEqual(visible.rows.map(r=>r.actor_role).sort(),['admin','warehouse_operator']);pass('merchant sees both warehouse and operations replies without overwrites');
  // Different warehouse cannot read package customer totals, order or ticket.
  await db.query("update profiles set warehouse_id=null where id=$1",[fixtureUsers.warehouse]);
- assert.equal((await rpc('warehouse','warehouse_pending_customers')).length,0);await assert.rejects(rpc('warehouse','submit_support',[ticket.id,null,null,'should reject']),/无权/);pass('cross warehouse ticket and pending customer isolation');
+ assert.equal((await rpc('warehouse','warehouse_pending_customers')).length,0);assert.equal((await rpc('warehouse','warehouse_customer_directory')).some(c=>c.merchant_id===second),false);await assert.rejects(rpc('warehouse','submit_support',[ticket.id,null,null,'should reject']),/无权/);pass('cross warehouse ticket and pending customer isolation');
  console.log(groups+' combined database groups passed');
 }finally{await db.close()}

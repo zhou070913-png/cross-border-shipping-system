@@ -151,17 +151,25 @@ async function reviewPaymentReceipt(form,approve){
   if(!await refreshDbState('payment-review'))throw Error('审核已提交，但刷新失败，请刷新核对，勿重复审核');
   toast(approve?(r.is_test?'测试审核通过，已通知商家及仓库':'审核通过，已通知商家及仓库'):'已退回凭证并通知商家');
 }
+function paymentProofSource(value){
+  if(typeof value!=='string')throw Error('无法读取凭证链接');
+  if(window.MospaceSupabase.isLocalPreview===true&&window.location?.origin==='http://127.0.0.1:4175'&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)&&value.length<7500000)return value;
+  const url=new URL(value),expected=new URL(window.MospaceSupabase.config.url);
+  if(url.protocol!=='https:'||url.origin!==expected.origin||!url.pathname.startsWith('/storage/v1/object/sign/payment-proofs/'))throw Error('无法读取凭证链接');
+  return url.href;
+}
 async function showPaymentProof(id){
-  const r=paymentWorkspace.receipts.find(r=>r.id===id),owner=state.auth.user?.id;if(!r)return;
+  const r=paymentWorkspace.receipts.find(r=>r.id===id),owner=state.auth.user?.id,role=state.role;if(!r)return;
   try{
     const {data,error}=await paymentClient().storage.from('payment-proofs').createSignedUrl(r.object_path,60);if(error)throw error;
-    if(owner!==state.auth.user?.id)return;
-    const url=new URL(data.signedUrl),expected=new URL(window.MospaceSupabase.config.url);
-    if(url.protocol!=='https:'||url.origin!==expected.origin||!url.pathname.includes('/storage/v1/object/sign/payment-proofs/'))throw Error('无法读取凭证链接');
+    if(owner!==state.auth.user?.id||role!==state.role)return;
+    const source=paymentProofSource(data?.signedUrl);
     document.getElementById('paymentProofDialog')?.remove();
     const dialog=document.createElement('dialog');dialog.id='paymentProofDialog';dialog.setAttribute('aria-label','付款凭证');dialog.style.cssText='max-width:850px;width:90%;border:0;border-radius:12px;padding:20px';
     dialog.innerHTML=`<button type="button" class="btn ghost">关闭凭证</button><p>${r.is_test?'测试凭证 · 未发生真实转账':'付款凭证 · 请核实银行到账'}</p><img alt="${r.is_test?'测试':'转账'}凭证" style="max-width:100%;max-height:70vh">`;
-    dialog.querySelector('img').src=url.href;dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+    const img=dialog.querySelector('img');img.src=source;img.onerror=()=>{img.remove();const error=document.createElement('p');error.textContent='图片加载失败，请关闭后重新查看。 / Gagal memuat gambar. Tutup dan coba lagi.';error.setAttribute('role','alert');dialog.append(error)};
+    dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+    if(typeof localizeKnownDom==='function')localizeKnownDom();
     setTimeout(()=>{if(dialog.isConnected)dialog.close()},60000);
   }catch(e){toast('凭证读取失败，请重新点击查看',5000)}
 }

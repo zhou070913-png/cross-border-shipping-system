@@ -117,21 +117,53 @@ test('warehouse pending is hierarchical by customer, not order or parcel count',
  assert.equal(document.querySelectorAll('details.customer-group').length,2);assert.equal(document.querySelectorAll('[data-combined-receive]').length,3);assert.match(document.querySelector('h2').textContent,/2/);
 });
 test('warehouse receipt history retains received parcels through shipment and delivery, with search and pagination',async()=>{
- const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';workspace.parcels=Array.from({length:22},(_,n)=>({id:'receipt-'+n,tracking_no:'RECEIPT-'+n,item_name:n===21?'<img src=x>':'TEST item',received_at:new Date(Date.UTC(2026,9,28,0,n)).toISOString(),status:'received'}));workspace.parcels.push({id:'not-received',tracking_no:'PENDING',status:'pre_advised'});o.order_parcels=[{parcel_id:'receipt-0',parcels:workspace.parcels[0]}];o.status='shipped';window.MospaceSupabase.orderTracking=async()=>[];render()`);
- assert.match(document.querySelector('#content').textContent,/当前没有待收货包裹/);
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';workspace.parcels=Array.from({length:22},(_,n)=>({id:'receipt-'+n,merchant_id:'m',tracking_no:'RECEIPT-'+n,item_name:n===21?'<img src=x>':'TEST item',received_at:new Date(Date.UTC(2026,9,28,0,n)).toISOString(),status:'received'}));workspace.parcels.push({id:'not-received',merchant_id:'m',tracking_no:'PENDING',status:'pre_advised'});o.order_parcels=[{parcel_id:'receipt-0',parcels:workspace.parcels[0]}];o.status='shipped';window.MospaceSupabase.orderTracking=async()=>[];render()`);
+ document.querySelector('[data-combined-customer="m"]').onclick();assert.match(document.querySelector('#content').textContent,/当前没有待收货包裹/);
  document.querySelector('[data-combined-inbound-tab="received"]').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,10);assert.match(document.querySelector('#content').textContent,/共 22 条记录/);assert.equal(document.querySelectorAll('tbody img').length,0);
  document.querySelector('[data-combined-receipt-page="2"]').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,10);
  document.querySelector('#combinedReceiptQuery').value='TEST-ORDER';document.querySelector('#combinedReceiptSearch').onsubmit({preventDefault(){}});assert.equal(run('combined.receiptPage'),1);assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,1);assert.match(document.querySelector('tbody').textContent,/头程运输中/);
- await document.querySelector('[data-combined-open="o"]').onclick();const back=document.querySelector('#content [data-page="inbound"]');assert.match(back.textContent,/返回收货记录/);back.onclick();assert.equal(run('state.page'),'inbound');assert.equal(document.querySelector('#combinedReceiptQuery').value,'TEST-ORDER');
+ await document.querySelector('[data-combined-open="o"]').onclick();const back=document.querySelector('#content [data-page="inbound"]');assert.match(back.textContent,/返回客户详情/);back.onclick();assert.equal(run('state.page'),'inbound');assert.equal(document.querySelector('#combinedReceiptQuery').value,'TEST-ORDER');
  run(`o.status='delivered';render()`);assert.match(document.querySelector('tbody').textContent,/已签收/);
  document.querySelector('#combinedReceiptReset').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,10);
  run(`combined.receiptPage=3;workspace.parcels=workspace.parcels.slice(0,1);render()`);assert.equal(run('combined.receiptPage'),1);
  run(`workspace.errors.parcels='failed';render()`);assert.match(document.querySelector('#content').textContent,/收货记录读取失败/);assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,0);
 });
 test('confirming receipt moves the parcel from pending to retained history without a page reload',async()=>{
- const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';workspace.parcels=[{id:'received-now',tracking_no:'NEW-RECEIPT',item_name:'TEST',status:'pre_advised'}];combined.pending=[{member_no:'M-TEST',merchant_id:'m',parcel_count:1,parcels:workspace.parcels}];rpcWorkspace=async()=>{workspace.parcels[0].received_at='2026-10-28T00:00:00Z';workspace.parcels[0].status='received';combined.pending=[]};refreshDbState=async()=>{render();return true};render()`);
- await document.querySelector('[data-combined-receive]').onclick();assert.equal(document.querySelectorAll('[data-combined-receive]').length,0);
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';workspace.parcels=[{id:'received-now',merchant_id:'m',tracking_no:'NEW-RECEIPT',item_name:'TEST',status:'pre_advised'}];combined.pending=[{member_no:'M-TEST',merchant_id:'m',parcel_count:1,parcels:workspace.parcels}];rpcWorkspace=async()=>{workspace.parcels[0].received_at='2026-10-28T00:00:00Z';workspace.parcels[0].status='received';combined.pending=[]};refreshDbState=async()=>{render();return true};render()`);
+ document.querySelector('[data-combined-customer="m"]').onclick();await document.querySelector('[data-combined-receive]').onclick();assert.equal(document.querySelectorAll('[data-combined-receive]').length,0);
  document.querySelector('[data-combined-inbound-tab="received"]').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,1);assert.match(document.querySelector('tbody').textContent,/NEW-RECEIPT/);
+});
+test('receiving starts with customers and drills into only that merchant parcels, orders and fees',async()=>{
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';window.MospaceSupabase.orderTracking=async()=>[];
+ combined.customers=[{merchant_id:'a',member_no:'M-A',display_name:'客户A'},{merchant_id:'b',member_no:'M-B',display_name:'客户B'}];
+ workspace.parcels=[{id:'a1',merchant_id:'a',tracking_no:'A-PENDING',status:'pre_advised'},{id:'a2',merchant_id:'a',tracking_no:'A-RECEIVED',status:'received',received_at:'2026-10-28T01:00:00Z'},{id:'b1',merchant_id:'b',tracking_no:'B-RECEIVED',status:'received',received_at:'2026-10-28T02:00:00Z'}];
+ combined.pending=[{merchant_id:'a',member_no:'M-A',parcel_count:1,parcels:[workspace.parcels[0]]}];state.dbOrders=[{...o,id:'oa',merchant_id:'a',order_no:'ORDER-A',fees:[{total_amount:108,confirmed_at:'now'}],order_parcels:[{parcel_id:'a2',parcels:workspace.parcels[1]}]},{...o,id:'ob',merchant_id:'b',order_no:'ORDER-B',fees:[{total_amount:999,confirmed_at:'now'}],order_parcels:[{parcel_id:'b1',parcels:workspace.parcels[2]}]}];render()`);
+ assert.equal(document.querySelectorAll('[data-combined-customer-row]').length,2);assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,0);assert.equal(document.querySelectorAll('[data-combined-receive]').length,0);
+ document.querySelector('#combinedCustomerQuery').value='A-RECEIVED';document.querySelector('#combinedCustomerSearch').onsubmit({preventDefault(){}});assert.equal(document.querySelectorAll('[data-combined-customer-row]').length,1);
+ document.querySelector('[data-combined-customer="a"]').onclick();assert.match(document.querySelector('#content').textContent,/客户A/);assert.match(document.querySelector('.combined-customer-summary').textContent,/待收货 1.*已收货 1.*¥108\.00/s);assert.doesNotMatch(document.querySelector('#content').textContent,/B-RECEIVED|ORDER-B|¥999/);
+ document.querySelector('[data-combined-inbound-tab="received"]').onclick();assert.equal(document.querySelectorAll('[data-combined-received-parcel]').length,1);assert.match(document.querySelector('tbody').textContent,/A-RECEIVED/);
+ document.querySelector('[data-combined-inbound-tab="orders"]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);await document.querySelector('[data-combined-open="oa"]').onclick();document.querySelector('#content [data-page="inbound"]').onclick();assert.equal(run('combined.inboundCustomer'),'a');assert.equal(run('combined.inboundTab'),'orders');
+ document.querySelector('[data-combined-customers-back]').onclick();assert.equal(run('combined.inboundCustomer'),null);assert.equal(document.querySelector('#combinedCustomerQuery').value,'A-RECEIVED');
+ document.querySelector('#combinedCustomerReset').onclick();document.querySelector('[data-combined-customer="b"]').onclick();document.querySelector('[data-combined-inbound-tab="received"]').onclick();assert.match(document.querySelector('tbody').textContent,/B-RECEIVED/);assert.doesNotMatch(document.querySelector('tbody').textContent,/A-RECEIVED/);
+});
+test('customer list paginates, clamps results and uses merchant identity rather than consumer recipient',()=>{
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';state.dbOrders=Array.from({length:23},(_,n)=>({...o,id:'ord-'+n,merchant_id:'merchant-'+n,recipient_name:'same consumer'}));render()`);
+ assert.equal(document.querySelectorAll('[data-combined-customer-row]').length,10);document.querySelector('[data-combined-customer-page="2"]').onclick();document.querySelector('[data-combined-customer-page="3"]').onclick();assert.equal(document.querySelectorAll('[data-combined-customer-row]').length,3);
+ run(`state.dbOrders=state.dbOrders.slice(0,1);render()`);assert.equal(run('combined.customerPage'),1);assert.equal(document.querySelectorAll('[data-combined-customer-row]').length,1);
+});
+test('private proof sources accept isolated local raster images without allowing other data URLs or external signed links',()=>{
+ const {run}=setup();run(`window.location={origin:'http://127.0.0.1:4175'};window.MospaceSupabase.isLocalPreview=true`);
+ assert.equal(run(`paymentProofSource('data:image/png;base64,aGVsbG8=')`),'data:image/png;base64,aGVsbG8=');
+ for(const source of ['data:image/svg+xml;base64,aGVsbG8=','javascript:alert(1)','https://evil.example/proof.png'])assert.throws(()=>run(`paymentProofSource(${JSON.stringify(source)})`));
+ run(`window.MospaceSupabase.isLocalPreview=false;window.MospaceSupabase.config={url:'https://project.supabase.co'}`);
+ assert.throws(()=>run(`paymentProofSource('data:image/png;base64,aGVsbG8=')`));
+ assert.equal(run(`paymentProofSource('https://project.supabase.co/storage/v1/object/sign/payment-proofs/m/o/image.png?token=TEST')`),'https://project.supabase.co/storage/v1/object/sign/payment-proofs/m/o/image.png?token=TEST');
+ for(const source of ['https://evil.example/storage/v1/object/sign/payment-proofs/proof.png','http://project.supabase.co/storage/v1/object/sign/payment-proofs/proof.png','https://project.supabase.co/public/proof.png'])assert.throws(()=>run(`paymentProofSource(${JSON.stringify(source)})`));
+});
+test('payment proof opens an image dialog and ignores stale responses after role changes',async()=>{
+ const {run,document}=setup();run(`window.location={origin:'http://127.0.0.1:4175'};window.MospaceSupabase.isLocalPreview=true;paymentWorkspace.receipts=[{id:'r',object_path:'m/o/image.png',is_test:true}];document.defaultView.HTMLElement.prototype.showModal=function(){this.setAttribute('open','')};document.defaultView.HTMLElement.prototype.close=function(){this.remove()};window.MospaceSupabase.getClient=()=>({storage:{from:()=>({createSignedUrl:async()=>({data:{signedUrl:'data:image/png;base64,aGVsbG8='},error:null})})}});`);
+ await run(`showPaymentProof('r')`);assert.equal(document.querySelector('#paymentProofDialog img').getAttribute('src'),'data:image/png;base64,aGVsbG8=');assert.ok(document.querySelector('#paymentProofDialog').hasAttribute('open'));document.querySelector('#paymentProofDialog button').onclick();assert.equal(document.querySelector('#paymentProofDialog'),null);
+ run(`window.MospaceSupabase.getClient=()=>({storage:{from:()=>({createSignedUrl:()=>new Promise(resolve=>{resolveProof=resolve})})}});pendingProof=showPaymentProof('r');state.role='warehouse';resolveProof({data:{signedUrl:'data:image/png;base64,aGVsbG8='}})`);await run('pendingProof');assert.equal(document.querySelector('#paymentProofDialog'),null);
 });
 test('admin dashboard and order detail open the exact receipt review and return to admin orders',()=>{
  const {run,document}=setup();
@@ -232,4 +264,9 @@ test('releasing a save lock never enables buttons disabled by business rules',as
  await run(`combinedSave(document.querySelector('#save'),async()=>{})`);
  assert.equal(document.querySelector('#allowed').disabled,false);
  assert.equal(document.querySelector('#unavailable').disabled,true);
+});
+
+test('fully received combined orders show awaiting packing instead of awaiting receipt',()=>{
+ const {run}=setup();run(`o.order_parcels=[{parcel_id:'p',parcels:{id:'p',received_at:'2026-10-28T00:00:00Z'}}]`);assert.equal(run('combinedProgress(o)[1]'),'待合包实测');
+ run(`o.order_parcels.push({parcel_id:'q',parcels:{id:'q',received_at:null}})`);assert.equal(run('combinedProgress(o)[1]'),'待收货 / 合包');
 });

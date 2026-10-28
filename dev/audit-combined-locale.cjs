@@ -17,7 +17,8 @@ function audit(){
  run(`state.role='merchant';workspace.parcels=[{id:'p',status:'pre_advised',tracking_no:'TEST-PARCEL',item_name:'用户原文'}];workspace.editParcelId='p';state.events=[{title:'合包实测已保存',desc:'头程预估已更新，尾程费用待仓库复核',time:'10/28 16:00'}]`);
  for(const expr of ['combinedDashboard()','combinedAdvice()','combinedAdvice(true)','combinedParcelList()','combinedPackingRequest()','combinedOrderList()','combinedCalculator()','combinedAddresses()','combinedProfile()','merchantAddress()','combinedDetail(o)','combinedSupport()','adminReceivingConfig()','adminPaymentReview()','combinedConfig()','adminAudit()','combinedAccounts()'])inspect(run(expr),expr);
  run(`state.role='warehouse';combined.pending=[{merchant_id:'m',member_no:'TEST-MERCHANT',parcel_count:1,parcels:[{id:'p',tracking_no:'TEST-PARCEL',item_name:'原文商品'}]}]`);
- for(const expr of ['combinedWarehouseDashboard()','combinedPending()','combinedSupport()','combinedDetail(o)'])inspect(run(expr),expr);
+ run(`workspace.parcels=[{id:'p',merchant_id:'m',tracking_no:'TEST-PARCEL',item_name:'原文商品',status:'pre_advised'}];combined.inboundCustomer='m'`);
+ for(const expr of ['combinedWarehouseDashboard()','combinedPending()','combinedInboundCustomers()','combinedInboundCustomerDetail()','combinedSupport()','combinedDetail(o)'])inspect(run(expr),expr);
  run(`state.role='admin';paymentWorkspace.receipts=[{id:'r',order_id:'o',amount:108,currency:'CNY',is_test:true,status:'pending',account_snapshot:paymentWorkspace.account,transferred_at:'2026-10-28',created_at:'2026-10-28',payer_name:'TEST'}];paymentWorkspace.selected='r'`);
  for(const status of ['pending','approved','rejected']){run(`paymentWorkspace.receipts[0].status='${status}';paymentWorkspace.receipts[0].reviewed_at='2026-10-28'`);inspect(run('adminPaymentReview()'),'review '+status)}
  return [...missing];
