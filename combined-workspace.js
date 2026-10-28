@@ -43,9 +43,33 @@ const combinedOldParcelProgress=parcelProgress;
 parcelProgress=function(p){const o=p.order||associatedOrder(p.id);if(isCombined(o)&&p.received_at){const [group,label]=combinedProgress(o);return {group:group==='pending'?'received':group,label}}return combinedOldParcelProgress(p)};
 function combinedHeadAmount(o){const f=feeRecord(o);return f?.shipping_fee!=null?Number(f.shipping_fee)+Number(f.handling_fee||0):null}
 function combinedMoney(n,missing=bi('待仓库实测预估','Menunggu pengukuran gudang')){return n==null?missing:money(n)}
+function combinedFeeDetails(o){
+ const f=feeRecord(o),s=f?.pricing_snapshot||{},sea=f?.billing_basis==='cbm',final=!!f?.confirmed_at;
+ const missing=()=>bi('尚未记录','Belum tercatat');
+ const number=(v,unit,digits=3)=>v==null||v===''||!Number.isFinite(Number(v))?missing():`${Number(v).toFixed(digits)} ${unit}`;
+ const amount=v=>combinedMoney(v,bi('待复核费用','Menunggu verifikasi biaya'));
+ const row=(z,i,value)=>`<div class="metric">${bi(z,i)}<b>${value}</b></div>`;
+ const basis=[row('运输线路','Jalur pengiriman',raw(o.route_name)),row('实际重量','Berat aktual',number(f?.actual_weight_kg,'kg'))];
+ if(sea){
+  basis.push(row('实际体积','Volume aktual',number(f.volume_cbm,'m³',6)),row('计费体积','Volume ditagih',number(f.billable_cbm,'m³',6)),row('体积单价','Tarif volume',s.price_per_cbm==null?missing():money(s.price_per_cbm)+'/m³'),row('重量单价','Tarif berat',s.sea_price_per_kg==null?missing():money(s.sea_price_per_kg)+'/kg'));
+  if(s.minimum_cbm!=null)basis.push(row('最低计费体积','Volume minimum ditagih',number(s.minimum_cbm,'m³',6)));
+  if(s.sea_charge_rule==='higher_of_weight_volume'){
+   if(f.billable_cbm!=null&&s.price_per_cbm!=null)basis.push(row('按体积计算','Biaya berdasarkan volume',money(Math.round(Number(f.billable_cbm)*Number(s.price_per_cbm)*100)/100)));
+   if(f.actual_weight_kg!=null&&s.sea_price_per_kg!=null)basis.push(row('按重量计算','Biaya berdasarkan berat',money(Math.round(Number(f.actual_weight_kg)*Number(s.sea_price_per_kg)*100)/100)));
+   basis.push(row('计费规则','Aturan perhitungan',bi('体积费与重量费取高，体积按最低起运量计费','Pilih biaya volume atau berat yang lebih tinggi; volume mengikuti minimum pengiriman')));
+  }
+ }else{
+  basis.push(row('体积重量','Berat volumetrik',number(f?.volume_weight_kg,'kg')),row('计费重量','Berat ditagih',number(f?.billable_weight_kg,'kg')));
+  if(s.first_weight_kg!=null&&s.first_price!=null)basis.push(row('首重 / 首重费','Berat awal / biaya awal',`${number(s.first_weight_kg,'kg')} / ${money(s.first_price)}`));
+  if(s.additional_price_per_kg!=null)basis.push(row('续重单价','Tarif berat tambahan',money(s.additional_price_per_kg)+'/kg'));
+  if(s.volume_divisor!=null)basis.push(row('体积重系数','Pembagi berat volumetrik',number(s.volume_divisor,'',0)),row('计费规则','Aturan perhitungan',bi('实重与体积重取大，超出首重部分按续重计费','Gunakan berat aktual atau volumetrik yang lebih besar; kelebihan berat awal dikenakan tarif tambahan')));
+ }
+ const boxes=Array.isArray(s.packed_boxes)?s.packed_boxes:[];
+ return `<details class="combined-fee-details" data-combined-fees="${esc(o.id)}"><summary>${bi('查看费用明细','Lihat rincian biaya')}</summary><p class="page-note">${bi(final?'以下为本订单已复核费用，金额单位为人民币（CNY）。':'以下为已记录的头程预估，尾程及整单金额以仓库复核为准。',final?'Biaya pesanan ini telah diverifikasi, dalam Yuan (CNY).':'Biaya ke Indonesia masih berupa perkiraan. Biaya akhir dan total menunggu verifikasi gudang.')}</p><div class="combined-fee-columns"><section><h3>${bi('费用组成','Komponen biaya')}</h3>${row('头程运费','Ongkos ke Indonesia',amount(f?.shipping_fee))}${row('国内仓操作费','Penanganan gudang domestik',amount(f?.handling_fee))}${row('头程小计','Subtotal ke Indonesia',amount(combinedHeadAmount(o)))}${row('尾程派送费','Ongkos pengiriman akhir',amount(f?.last_mile_fee))}${f?.last_mile_note?`<p>${bi('尾程核价说明','Dasar biaya pengiriman akhir')}<br>${raw(f.last_mile_note)}</p>`:''}${row('整单合计','Total pesanan',amount(final?f.total_amount:null))}</section><section><h3>${bi('头程计费依据','Dasar biaya ke Indonesia')}</h3>${basis.join('')}${s.is_test_rate?`<p>${bi('本单使用测试运价','Pesanan ini menggunakan tarif pengujian')}</p>`:''}<p class="page-note">${bi('按本订单保存的计费记录展示，不随当前线路价格变化。','Ditampilkan dari catatan tarif pesanan ini, tanpa mengikuti perubahan tarif terbaru.')}</p></section></div>${boxes.length?`<section class="combined-fee-boxes"><h3>${bi('仓库实测外箱','Pengukuran karton oleh gudang')}</h3>${boxes.map((b,n)=>row('外箱 '+(n+1),'Karton '+(n+1),`${number(b.weight,'kg')} · ${number(b.length,'cm',2)} × ${number(b.width,'cm',2)} × ${number(b.height,'cm',2)}`)).join('')}</section>`:''}</details>`;
+}
 function combinedSummary(o){
  const f=feeRecord(o),head=combinedHeadAmount(o),final=!!f?.confirmed_at;
- return `<section class="card combined-summary"><div class="card-title"><b class="mono">${esc(o.order_no)}</b>${cs(o)}</div><div class="combined-price-grid"><div>${bi('头程费用（含操作费）','Biaya ke Indonesia (termasuk penanganan)')}<strong>${combinedMoney(head)}</strong>${!final&&head!=null?bi('预估，以仓库复核为准','Perkiraan, menunggu verifikasi gudang'):''}</div><div>${bi('尾程费用','Biaya pengiriman akhir')}<strong>${combinedMoney(f?.last_mile_fee,bi('待复核费用','Menunggu verifikasi biaya'))}</strong></div><div>${bi('整单合计 · 一次付款','Total pesanan · satu pembayaran')}<strong>${combinedMoney(final?f.total_amount:null,bi('待费用复核完成','Menunggu verifikasi semua biaya'))}</strong></div></div><div class="combined-recipient">${bi('收件地址','Alamat penerima')}<p>${raw(o.recipient_name)} · ${raw(o.recipient_phone)}<br>${raw(o.destination_city)} · ${raw(o.destination_address)}</p></div></section>`;
+ return `<section class="card combined-summary"><div class="card-title"><b class="mono">${esc(o.order_no)}</b>${cs(o)}</div><div class="combined-price-grid"><div>${bi('头程费用（含操作费）','Biaya ke Indonesia (termasuk penanganan)')}<strong>${combinedMoney(head)}</strong>${!final&&head!=null?bi('预估，以仓库复核为准','Perkiraan, menunggu verifikasi gudang'):''}</div><div>${bi('尾程费用','Biaya pengiriman akhir')}<strong>${combinedMoney(f?.last_mile_fee,bi('待复核费用','Menunggu verifikasi biaya'))}</strong></div><div>${bi('整单合计 · 一次付款','Total pesanan · satu pembayaran')}<strong>${combinedMoney(final?f.total_amount:null,bi('待费用复核完成','Menunggu verifikasi semua biaya'))}</strong></div></div>${combinedFeeDetails(o)}<div class="combined-recipient">${bi('收件地址','Alamat penerima')}<p>${raw(o.recipient_name)} · ${raw(o.recipient_phone)}<br>${raw(o.destination_city)} · ${raw(o.destination_address)}</p></div></section>`;
 }
 function combinedOpenButton(o,zh='查看订单',id='Lihat pesanan'){return `<button type="button" class="btn small ghost" data-combined-open="${o.id}">${bi(zh,id)}</button>`}
 function combinedOrders(rows){return rows.length?`<div class="combined-order-list">${rows.map(o=>isCombined(o)?`<div class="combined-order-row">${combinedSummary(o)}<div class="combined-order-actions">${combinedOpenButton(o)}</div></div>`:`<div class="card"><b class="mono">${esc(o.order_no)}</b> ${bi('历史订单 · 保留原流程','Pesanan lama · alur sebelumnya')} ${overallOrderButton(o,'查看历史订单 / Lihat riwayat')}</div>`).join('')}</div>`:ce()}
@@ -159,12 +183,13 @@ function combinedView(){
 }
 const combinedRenderPrevious=render;
 render=function(){
+ const openFees=[...document.querySelectorAll('details[data-combined-fees][open]')].map(el=>el.dataset.combinedFees);
  const openCustomers=[...document.querySelectorAll('details.customer-group[open]')].map(el=>el.querySelector('summary b')?.textContent);
  if(!state.auth.user||!combined.ready){combinedRenderPrevious();if(state.auth.user&&!combined.ready){$('#content').innerHTML=ch('正在连接业务数据库','Menghubungkan basis data')+cn('新流程数据库尚未就绪，请安装 combined-delivery 迁移后刷新。','Basis data alur baru belum siap. Pasang migrasi combined-delivery lalu muat ulang.')}localizeKnownDom();return}
  const html=combinedView();if(html===null){combinedRenderPrevious();localizeKnownDom();return}
  $('#appShell').classList.remove('login-mode');renderNav();$('#content').innerHTML=state.role==='merchant'?combinedMerchantFrame(html):html;
  $('#avatar').textContent=state.role==='merchant'?'M':state.role==='warehouse'?'W':'O';$('#userName').textContent=state.auth.profile?.member_no||'';$('#authBtn').innerHTML=bi('退出登录','Keluar');$('#envLabel').innerHTML=bi('数据库已连接','Basis data terhubung');$('#crumb').innerHTML=bi(state.role==='merchant'?'商家端':state.role==='warehouse'?'仓库端':'运营后台',state.role==='merchant'?'Pelanggan':state.role==='warehouse'?'Gudang':'Admin');
- bind();localizeKnownDom();document.querySelectorAll('details.customer-group').forEach(el=>{el.toggleAttribute('open',openCustomers.includes(el.querySelector('summary b')?.textContent))});
+ bind();localizeKnownDom();document.querySelectorAll('details[data-combined-fees]').forEach(el=>el.toggleAttribute('open',openFees.includes(el.dataset.combinedFees)));document.querySelectorAll('details.customer-group').forEach(el=>{el.toggleAttribute('open',openCustomers.includes(el.querySelector('summary b')?.textContent))});
 };
 async function combinedSave(form,fn,page){
  if(combined.busy)return;const owner=state.auth.user?.id+':'+state.role;combined.busy=true;

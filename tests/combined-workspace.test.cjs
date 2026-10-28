@@ -24,6 +24,24 @@ test('dashboard every workflow card routes to an actual workflow; filters naviga
  const b=document.querySelector('[data-combined-filter=awaiting_payment]');b.onclick();
  assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'awaiting_payment');
 });
+test('fee details use the saved air tariff and measured cartons, retaining pending fees and zero charges',()=>{
+ const {run,document}=setup();
+ run(`o.fees[0]={shipping_fee:75,handling_fee:18,last_mile_fee:null,total_amount:null,actual_weight_kg:1,volume_weight_kg:.5,billable_weight_kg:1,billing_basis:'kg',pricing_snapshot:{first_weight_kg:.5,first_price:50,additional_price_per_kg:50,volume_divisor:6000,packed_boxes:[{weight:1,length:20,width:15,height:10}]}};workspace.routes[0].first_price=9999`);
+ document.querySelector('#content').innerHTML=run('combinedSummary(o)');
+ const details=document.querySelector('[data-combined-fees]');assert.ok(details);assert.equal(details.hasAttribute('open'),false);
+ for(const text of ['头程运费','国内仓操作费','¥75.00','¥18.00','¥93.00','1.000 kg','20.00 cm','¥50.00','待复核费用'])assert.ok(details.textContent.includes(text),text);
+ assert.doesNotMatch(details.textContent,/9999|9,999|¥0\.00/);
+ run(`o.fees[0].last_mile_fee=0;o.fees[0].total_amount=93;o.fees[0].confirmed_at='now';o.fees[0].last_mile_note='<img src=x onerror=alert(1)>'`);
+ document.querySelector('#content').innerHTML=run('combinedFeeDetails(o)');
+ assert.match(document.querySelector('#content').textContent,/¥0\.00/);assert.equal(document.querySelectorAll('#content img').length,0);
+});
+test('sea fee details explain weight and volume pricing from the order snapshot and stay expanded after refresh',()=>{
+ const {run,document}=setup();
+ run(`o.route_name='印尼海运';o.fees[0]={shipping_fee:150,handling_fee:18,last_mile_fee:30,total_amount:198,confirmed_at:'now',billing_basis:'cbm',actual_weight_kg:100,volume_cbm:.2,billable_cbm:.2,pricing_snapshot:{price_per_cbm:600,sea_price_per_kg:1.5,sea_charge_rule:'higher_of_weight_volume'}};state.page='fee';state.order.record=o;render()`);
+ const details=document.querySelector('[data-combined-fees]');
+ for(const text of ['体积费与重量费取高','0.200000 m³','¥600.00/m³','¥1.50/kg','按体积计算','¥120.00','按重量计算','¥150.00','¥198.00'])assert.ok(details.textContent.includes(text),text);
+ details.setAttribute('open','');run('render()');assert.equal(document.querySelector('[data-combined-fees]').hasAttribute('open'),true);
+});
 test('warehouse pending is hierarchical by customer, not order or parcel count',()=>{
  const {run,document}=setup();run(`combined.pending=[{member_no:'TEST-A',merchant_id:'a',parcel_count:2,parcels:[{id:'p1',tracking_no:'P1'},{id:'p2',tracking_no:'P2'}]},{member_no:'TEST-B',merchant_id:'b',parcel_count:1,parcels:[{id:'p3',tracking_no:'P3'}]}]`);
  document.querySelector('#content').innerHTML=run('combinedPending()');
