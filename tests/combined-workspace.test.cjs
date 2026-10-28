@@ -18,22 +18,29 @@ test('overall order shows pending tail as unknown, then single combined total an
  run(`o.fees[0]={shipping_fee:60,handling_fee:18,last_mile_fee:30,total_amount:108,confirmed_at:'now'};o.status='awaiting_payment'`);
  const html=run('combinedSummary(o)');for(const s of ['¥78.00','¥30.00','¥108.00','TEST address','TEST name','TEST phone','一次付款'])assert.ok(html.includes(s));
 });
-test('dashboard every workflow card routes to an actual workflow; filters navigate',()=>{
- const {run,document}=setup();run(`state.page='dashboard';render()`);
- assert.equal(document.querySelectorAll('.combined-flow [data-page]').length,4);assert.equal(document.querySelectorAll('[data-combined-filter]').length,7);
- const b=document.querySelector('[data-combined-filter=awaiting_payment]');b.onclick();
- assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'awaiting_payment');
+test('compact merchant home keeps four prominent working shortcuts and moves details into parcel and order entries',()=>{
+ const {run,document}=setup();run(`workspace.parcels=[{id:'p',tracking_no:'TEST-PARCEL',item_name:'测试包裹',status:'pre_advised'}];state.page='dashboard';render()`);
+ assert.equal(document.querySelectorAll('.combined-shortcuts [data-page]').length,4);assert.equal(document.querySelectorAll('[data-combined-filter]').length,0);assert.equal(document.querySelectorAll('.combined-order-row').length,0);
+ assert.equal(document.querySelectorAll('[data-page="pre-advise"]').length,1);assert.ok(document.querySelector('.combined-shortcut-primary[data-page="pre-advise"]'));
+ assert.match(document.querySelector('.combined-home-entry[data-page="parcels"]').textContent,/1 个包裹/);assert.match(document.querySelector('.combined-home-entry[data-page="orders"]').textContent,/1 个订单/);
+ for(const page of ['pre-advise','parcels','orders','tracking-list']){
+  run(`state.page='dashboard';render()`);document.querySelector('.combined-shortcuts [data-page="'+page+'"]').onclick();assert.equal(run('state.page'),page);
+ }
+ for(const page of ['parcels','orders']){
+  run(`state.page='dashboard';combined.filter='paid';render()`);document.querySelector('.combined-home-entry[data-page="'+page+'"]').onclick();assert.equal(run('state.page'),page);assert.equal(run('combined.filter'),'all');
+ }
+ assert.equal(run('workspace.parcels.length'),1);assert.equal(run('state.dbOrders.length'),1);
 });
-test('merchant waiting shipment is separate from fee review and pending payment and links to the matching orders',()=>{
+test('order list retains waiting shipment between payment and transport after homepage simplification',()=>{
  const {run,document}=setup();
- run(`state.dbOrders=['measuring','awaiting_payment','paid','ready_to_ship','shipped','delivered'].map((status,n)=>({...o,id:'o'+n,order_no:'TEST-STAGE-'+status,status}));state.page='dashboard';render()`);
- const paid=document.querySelector('[data-combined-filter="paid"]');assert.ok(paid);assert.match(paid.textContent,/待出货/);assert.equal(paid.querySelector('strong').textContent,'2');
- const filters=[...document.querySelectorAll('.combined-kpi')].map(b=>b.dataset.combinedFilter);
+ run(`state.dbOrders=['measuring','awaiting_payment','paid','ready_to_ship','shipped','delivered'].map((status,n)=>({...o,id:'o'+n,order_no:'TEST-STAGE-'+status,status}));state.page='orders';render()`);
+ const paid=document.querySelector('[data-combined-filter="paid"]');assert.ok(paid);assert.match(paid.textContent,/待出货/);
+ const filters=[...document.querySelectorAll('[data-combined-filter]')].map(b=>b.dataset.combinedFilter);
  assert.equal(filters.indexOf('paid'),filters.indexOf('awaiting_payment')+1);assert.equal(filters.indexOf('shipped'),filters.indexOf('paid')+1);
- assert.equal(document.querySelector('[data-combined-filter="pending"] strong').textContent,'1');assert.equal(document.querySelector('[data-combined-filter="awaiting_payment"] strong').textContent,'1');
  paid.onclick();assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'paid');assert.equal(document.querySelectorAll('.combined-order-row').length,2);
  const text=document.querySelector('.combined-order-list').textContent;assert.match(text,/TEST-STAGE-paid/);assert.match(text,/TEST-STAGE-ready_to_ship/);assert.doesNotMatch(text,/TEST-STAGE-awaiting_payment|TEST-STAGE-shipped/);
- run(`state.dbOrders[2].status='shipped';state.page='dashboard';render()`);assert.equal(document.querySelector('[data-combined-filter="paid"] strong').textContent,'1');assert.equal(document.querySelector('[data-combined-filter="shipped"] strong').textContent,'2');
+ run(`state.dbOrders[2].status='shipped';render()`);assert.equal(document.querySelectorAll('.combined-order-row').length,1);
+ document.querySelector('[data-combined-filter="shipped"]').onclick();assert.equal(document.querySelectorAll('.combined-order-row').length,2);
 });
 test('fee details use the saved air tariff and measured cartons, retaining pending fees and zero charges',()=>{
  const {run,document}=setup();
