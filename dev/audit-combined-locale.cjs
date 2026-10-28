@@ -21,6 +21,14 @@ function audit(){
  for(const expr of ['combinedWarehouseDashboard()','combinedPending()','combinedInboundCustomers()','combinedInboundCustomerDetail()','combinedSupport()','combinedDetail(o)'])inspect(run(expr),expr);
  run(`state.role='admin';paymentWorkspace.receipts=[{id:'r',order_id:'o',amount:108,currency:'CNY',is_test:true,status:'pending',account_snapshot:paymentWorkspace.account,transferred_at:'2026-10-28',created_at:'2026-10-28',payer_name:'TEST'}];paymentWorkspace.selected='r'`);
  for(const status of ['pending','approved','rejected']){run(`paymentWorkspace.receipts[0].status='${status}';paymentWorkspace.receipts[0].reviewed_at='2026-10-28'`);inspect(run('adminPaymentReview()'),'review '+status)}
+ for(const role of ['warehouse','admin']){
+  run(`state.role='${role}';state.auth.role='${role==='warehouse'?'warehouse_operator':'admin'}';workspace.tickets=[{id:'t',merchant_id:'m',subject:'USER',message:'USER',status:'open'}]`);
+  for(const page of role==='warehouse'?['confirm','ship','support-warehouse']:['orders','payment-review','support-admin']){
+   run(`state.page='${page}';staffCustomerState().customer=null`);inspect(run('staffCustomerView(state.page)'),role+' '+page+' directory');
+   run(`staffCustomerState().customer='m';paymentWorkspace.selected='r'`);inspect(run('staffCustomerView(state.page)'),role+' '+page+' detail');
+  }
+  inspect(run('staffCustomerDashboard()'),role+' customer dashboard');
+ }
  return [...missing];
 }
 module.exports=audit;

@@ -61,7 +61,7 @@ warehouseShip=function(){
 const separateTracking=merchantTracking;
 merchantTracking=function(){return separateTracking()+settlementContext(state.order.record)};
 const separateReview=adminPaymentReview;
-adminPaymentReview=function(){const r=paymentWorkspace.receipts.find(x=>x.id===paymentWorkspace.selected),o=r&&state.dbOrders.find(x=>x.id===r.order_id);return separateReview()+settlementContext(o)};
+adminPaymentReview=function(customerId=null){const r=paymentWorkspace.receipts.find(x=>x.id===paymentWorkspace.selected&&(!customerId||state.dbOrders.some(o=>o.id===x.order_id&&o.merchant_id===customerId))),o=r&&state.dbOrders.find(x=>x.id===r.order_id);return separateReview(customerId)+settlementContext(o)};
 const separateBind=bind;
 bind=function(){
  separateBind();

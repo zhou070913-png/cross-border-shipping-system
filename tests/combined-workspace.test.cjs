@@ -80,27 +80,27 @@ test('order table preserves pending fees, actual zero tail, historical navigatio
  run(`state.dbOrders=[{...o,id:'legacy',fulfillment_mode:null}];render()`);assert.ok(document.querySelector('[data-overall-order="legacy"]'));assert.match(document.querySelector('tbody').textContent,/历史订单/);
 });
 test('warehouse consolidation table filters in place, summarizes all matching pages and preserves query when returning from detail',async()=>{
- const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='confirm';window.MospaceSupabase.orderTracking=async()=>[];state.dbOrders=Array.from({length:25},(_,n)=>({...o,id:'w'+n,order_no:'WAREHOUSE-'+n,recipient_name:'Recipient',parcel_count:2,status:n%2?'awaiting_payment':'measuring',packed_at:'2026-10-28',packed_boxes:[{weight:2}],fees:n%2?[{shipping_fee:60,handling_fee:18,last_mile_fee:0,total_amount:78,actual_weight_kg:2,confirmed_at:'now'}]:[{shipping_fee:60,handling_fee:18,last_mile_fee:null,total_amount:null,actual_weight_kg:2}]}));render()`);
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='confirm';window.MospaceSupabase.orderTracking=async()=>[];state.dbOrders=Array.from({length:25},(_,n)=>({...o,id:'w'+n,order_no:'WAREHOUSE-'+n,recipient_name:'Recipient',parcel_count:2,status:n%2?'awaiting_payment':'measuring',packed_at:'2026-10-28',packed_boxes:[{weight:2}],fees:n%2?[{shipping_fee:60,handling_fee:18,last_mile_fee:0,total_amount:78,actual_weight_kg:2,confirmed_at:'now'}]:[{shipping_fee:60,handling_fee:18,last_mile_fee:null,total_amount:null,actual_weight_kg:2}]}));render()`);document.querySelector('[data-staff-customer="m"]').onclick();
  assert.match(document.querySelector('h1').textContent,/合包与费用复核/);assert.equal(document.querySelectorAll('.combined-order-row').length,0);assert.equal(document.querySelectorAll('[data-combined-order-row]').length,10);
  const summary=document.querySelector('.combined-order-stats').textContent;assert.match(summary,/25 个订单.*50 个包裹.*¥936\.00.*13 单待核价/);
  document.querySelector('[data-combined-order-page="2"]').onclick();assert.equal(document.querySelector('.combined-order-stats').textContent,summary);
  document.querySelector('#orderSearchText').value='WAREHOUSE-';document.querySelector('#orderSearch').onsubmit({preventDefault(){}});document.querySelector('[data-combined-filter="pending"]').onclick();assert.equal(run('state.page'),'confirm');assert.equal(run('workspace.orderQuery'),'WAREHOUSE-');assert.equal(document.querySelectorAll('[data-combined-order-row]').length,10);assert.match(document.querySelector('[data-combined-filter="pending"]').textContent,/13 单/);
  document.querySelector('[data-combined-order-page="2"]').onclick();await document.querySelector('[data-combined-order-row="w22"] [data-combined-open]').onclick();assert.ok(document.querySelector('#combinedQuote'));
- document.querySelector('[data-combined-back-warehouse]').onclick();assert.equal(run('state.page'),'confirm');assert.equal(run('combined.orderPage'),2);assert.equal(run('combined.warehouseFilter'),'pending');assert.equal(document.querySelector('#orderSearchText').value,'WAREHOUSE-');
+ document.querySelector('[data-staff-order-back]').onclick();assert.equal(run('state.page'),'confirm');assert.equal(run('combined.orderPage'),2);assert.equal(run('combined.warehouseFilter'),'pending');assert.equal(document.querySelector('#orderSearchText').value,'WAREHOUSE-');
  run(`state.dbOrders[22].status='awaiting_payment';render()`);assert.match(document.querySelector('.combined-order-stats').textContent,/12 个订单/);
  document.querySelector('#combinedOrderReset').onclick();assert.equal(run('combined.warehouseFilter'),'all');assert.equal(run('combined.orderPage'),1);
 });
 test('warehouse shipping table exposes correct next steps, searches waybills and opens the selected shipment',async()=>{
- const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='ship';window.MospaceSupabase.orderTracking=async()=>[];state.dbOrders=[{...o,id:'paid',status:'ready_to_ship'},{...o,id:'head',status:'shipped',shipment_tracking_no:'HEAD-TRACK',shipment_carrier:'<img src=x>'},{...o,id:'overseas',status:'shipped',overseas_received_at:'now'},{...o,id:'tail',status:'shipped',overseas_received_at:'now',tail_shipped_at:'now',tail_tracking_no:'TAIL-TRACK'},{...o,id:'delivered',status:'delivered'}];render()`);
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='ship';window.MospaceSupabase.orderTracking=async()=>[];state.dbOrders=[{...o,id:'paid',status:'ready_to_ship'},{...o,id:'head',status:'shipped',shipment_tracking_no:'HEAD-TRACK',shipment_carrier:'<img src=x>'},{...o,id:'overseas',status:'shipped',overseas_received_at:'now'},{...o,id:'tail',status:'shipped',overseas_received_at:'now',tail_shipped_at:'now',tail_tracking_no:'TAIL-TRACK'},{...o,id:'delivered',status:'delivered'}];render()`);document.querySelector('[data-staff-customer="m"]').onclick();
  assert.match(document.querySelector('h1').textContent,/出货与物流/);
  for(const [id,label]of [['paid','登记出货'],['head','登记印尼到仓'],['overseas','登记尾程快递'],['tail','登记签收'],['delivered','查看订单']])assert.match(document.querySelector('[data-combined-open="'+id+'"]').textContent,new RegExp(label));
  assert.match(document.querySelector('tbody').textContent,/HEAD-TRACK/);assert.match(document.querySelector('tbody').textContent,/TAIL-TRACK/);assert.equal(document.querySelectorAll('tbody img').length,0);
  document.querySelector('#orderSearchText').value='TAIL-TRACK';document.querySelector('#orderSearch').onsubmit({preventDefault(){}});document.querySelector('[data-combined-filter="shipped"]').onclick();assert.equal(run('state.page'),'ship');assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);assert.match(document.querySelector('[data-combined-filter="all"]').textContent,/1 单/);
- await document.querySelector('[data-combined-open="tail"]').onclick();assert.equal(document.querySelector('#combinedAdvance').dataset.action,'delivered');document.querySelector('[data-combined-back-warehouse]').onclick();assert.equal(run('state.page'),'ship');assert.equal(document.querySelector('#orderSearchText').value,'TAIL-TRACK');
+ await document.querySelector('[data-combined-open="tail"]').onclick();assert.equal(document.querySelector('#combinedAdvance').dataset.action,'delivered');document.querySelector('[data-staff-order-back]').onclick();assert.equal(run('state.page'),'ship');assert.equal(document.querySelector('#orderSearchText').value,'TAIL-TRACK');
  document.querySelector('#orderSearchText').value='MISSING';document.querySelector('#orderSearch').onsubmit({preventDefault(){}});assert.equal(document.querySelectorAll('[data-combined-order-row]').length,0);assert.match(document.querySelector('.combined-order-stats').textContent,/0 个订单/);assert.doesNotMatch(document.querySelector('tbody').textContent,/我的包裹/);
 });
 test('warehouse status counts include historical orders and amount summaries do not double count child legs',()=>{
- const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='ship';const head={...o,id:'legacy-head',order_no:'LEGACY-HEAD',fulfillment_mode:null,status:'shipped',parcel_count:2,fees:[{total_amount:78,confirmed_at:'now'}]};state.dbOrders=[head,{...head,id:'legacy-tail',order_no:'LEGACY-TAIL',parent_order_id:'legacy-head',transport_leg:'last_mile',parcel_count:2}, {...o,id:'completed',status:'delivered',parcel_count:1,fees:[{total_amount:22,confirmed_at:'now'}]}];render()`);
+ const {run,document}=setup();run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='ship';const head={...o,id:'legacy-head',order_no:'LEGACY-HEAD',fulfillment_mode:null,status:'shipped',parcel_count:2,fees:[{total_amount:78,confirmed_at:'now'}]};state.dbOrders=[head,{...head,id:'legacy-tail',order_no:'LEGACY-TAIL',parent_order_id:'legacy-head',transport_leg:'last_mile',parcel_count:2}, {...o,id:'completed',status:'delivered',parcel_count:1,fees:[{total_amount:22,confirmed_at:'now'}]}];render()`);document.querySelector('[data-staff-customer="m"]').onclick();
  assert.match(document.querySelector('[data-combined-filter="all"]').textContent,/2 单/);assert.match(document.querySelector('[data-combined-filter="shipped"]').textContent,/1 单/);assert.match(document.querySelector('.combined-order-stats').textContent,/2 个订单.*3 个包裹.*¥100\.00/);
  document.querySelector('[data-combined-filter="shipped"]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);assert.ok(document.querySelector('[data-overall-order="legacy-head"]'));
 });
@@ -168,7 +168,7 @@ test('payment proof opens an image dialog and ignores stale responses after role
 test('admin dashboard and order detail open the exact receipt review and return to admin orders',()=>{
  const {run,document}=setup();
  run(`state.role='admin';state.auth.role='admin';state.page='dashboard';o.status='awaiting_payment';o.fees[0]={shipping_fee:60,handling_fee:18,last_mile_fee:30,total_amount:108,confirmed_at:'now'};paymentWorkspace.selected='other';paymentWorkspace.filter='approved';paymentWorkspace.receipts=[{id:'other',order_id:'other-order',status:'approved',amount:999,created_at:'2026-10-28T01:00:00Z'},{id:'old',order_id:'o',status:'rejected',amount:108,created_at:'2026-10-28T02:00:00Z'},{id:'current',order_id:'o',status:'pending',amount:108,currency:'CNY',is_test:true,payer_name:'TEST',created_at:'2026-10-28T03:00:00Z'}];render()`);
- const entry=document.querySelector('[data-combined-review="o"]');assert.ok(entry);entry.onclick();
+ document.querySelector('[data-staff-section="payment-review"]').onclick();document.querySelector('[data-staff-customer="m"]').onclick();const entry=document.querySelector('[data-review-receipt="current"]');assert.ok(entry);entry.onclick();
  assert.equal(run('state.page'),'payment-review');assert.equal(run('paymentWorkspace.selected'),'current');assert.equal(run('paymentWorkspace.filter'),'pending');
  assert.equal(document.querySelector('#paymentReviewForm').dataset.receiptId,'current');assert.match(document.querySelector('#paymentReviewDetail h3').textContent,/TEST-ORDER/);
  run(`state.page='overall-order';state.order.record=o;render()`);
@@ -242,16 +242,16 @@ test('combined writes block duplicate submit and navigation until refreshed; fai
 
 test('warehouse can receive consecutive parcels after each refresh replaces the pending customer buttons',async()=>{
  const {run,document}=setup();
- run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='dashboard';state.dbOrders=[];
+ run(`state.role='warehouse';state.auth.role='warehouse_operator';state.page='inbound';state.dbOrders=[];
  combined.pending=[{merchant_id:'m',member_no:'TEST-MERCHANT',parcel_count:3,parcels:[{id:'p1',tracking_no:'TEST-1'},{id:'p2',tracking_no:'TEST-2'},{id:'p3',tracking_no:'TEST-3'}]}];
  let received=[];rpcWorkspace=async(name,args)=>{received.push(args.p_parcel_id);const c=combined.pending[0];c.parcels=c.parcels.filter(p=>p.id!==args.p_parcel_id);c.parcel_count=c.parcels.length;if(!c.parcel_count)combined.pending=[]};
  refreshDbState=async()=>{render();return true};render()`);
- document.querySelector('details.customer-group').setAttribute('open','');
+ document.querySelector('[data-combined-customer="m"]').onclick();
  for(const id of ['p1','p2','p3']){
   const button=document.querySelector('[data-combined-receive="'+id+'"]');
   assert.equal(button.disabled,false,'remaining receive button must be usable without manual refresh');
   await button.onclick();assert.equal(run('combined.busy'),false);
-  if(id!=='p3')assert.equal(document.querySelector('details.customer-group').hasAttribute('open'),true);
+  if(id!=='p3')assert.equal(run('combined.inboundCustomer'),'m');
  }
  assert.deepEqual(Array.from(run('received')),['p1','p2','p3']);
  assert.equal(document.querySelectorAll('[data-combined-receive]').length,0);

@@ -41,7 +41,7 @@ warehouseActualFees=function(o){
  return `<div class="card section-space" data-warehouse-actual-fees><h3>仓库实际费用</h3>${transportFeesHtml(f)}<p class="page-note">头程单与尾程单各自核价、付款；本单已确认金额独立锁定。</p></div>`+seaFeeDetails(f);
 };
 const transportAdminReview=adminPaymentReview;
-adminPaymentReview=function(){const r=paymentWorkspace.receipts.find(r=>r.id===paymentWorkspace.selected),o=r&&state.dbOrders.find(o=>o.id===r.order_id);return transportAdminReview()+(o?`<div class="card section-space"><h3>本段费用核对</h3>${transportFeesHtml(feeRecord(o))}</div>`:'')};
+adminPaymentReview=function(customerId=null){const r=paymentWorkspace.receipts.find(r=>r.id===paymentWorkspace.selected&&(!customerId||state.dbOrders.some(o=>o.id===r.order_id&&o.merchant_id===customerId))),o=r&&state.dbOrders.find(o=>o.id===r.order_id);return transportAdminReview(customerId)+(o?`<div class="card section-space"><h3>本段费用核对</h3>${transportFeesHtml(feeRecord(o))}</div>`:'')};
 adminConfig=function(){
  const route=workspace.routes.find(r=>r.route_code===transportWorkspace.routeCode)||workspace.routes[0];
  const heading=shell('线路与运价配置','分别维护海运 / 空运的普货和敏感货；已确认订单保留费用快照。');
