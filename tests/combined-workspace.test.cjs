@@ -20,9 +20,20 @@ test('overall order shows pending tail as unknown, then single combined total an
 });
 test('dashboard every workflow card routes to an actual workflow; filters navigate',()=>{
  const {run,document}=setup();run(`state.page='dashboard';render()`);
- assert.equal(document.querySelectorAll('.combined-flow [data-page]').length,4);assert.equal(document.querySelectorAll('[data-combined-filter]').length,6);
+ assert.equal(document.querySelectorAll('.combined-flow [data-page]').length,4);assert.equal(document.querySelectorAll('[data-combined-filter]').length,7);
  const b=document.querySelector('[data-combined-filter=awaiting_payment]');b.onclick();
  assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'awaiting_payment');
+});
+test('merchant waiting shipment is separate from fee review and pending payment and links to the matching orders',()=>{
+ const {run,document}=setup();
+ run(`state.dbOrders=['measuring','awaiting_payment','paid','ready_to_ship','shipped','delivered'].map((status,n)=>({...o,id:'o'+n,order_no:'TEST-STAGE-'+status,status}));state.page='dashboard';render()`);
+ const paid=document.querySelector('[data-combined-filter="paid"]');assert.ok(paid);assert.match(paid.textContent,/待出货/);assert.equal(paid.querySelector('strong').textContent,'2');
+ const filters=[...document.querySelectorAll('.combined-kpi')].map(b=>b.dataset.combinedFilter);
+ assert.equal(filters.indexOf('paid'),filters.indexOf('awaiting_payment')+1);assert.equal(filters.indexOf('shipped'),filters.indexOf('paid')+1);
+ assert.equal(document.querySelector('[data-combined-filter="pending"] strong').textContent,'1');assert.equal(document.querySelector('[data-combined-filter="awaiting_payment"] strong').textContent,'1');
+ paid.onclick();assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'paid');assert.equal(document.querySelectorAll('.combined-order-row').length,2);
+ const text=document.querySelector('.combined-order-list').textContent;assert.match(text,/TEST-STAGE-paid/);assert.match(text,/TEST-STAGE-ready_to_ship/);assert.doesNotMatch(text,/TEST-STAGE-awaiting_payment|TEST-STAGE-shipped/);
+ run(`state.dbOrders[2].status='shipped';state.page='dashboard';render()`);assert.equal(document.querySelector('[data-combined-filter="paid"] strong').textContent,'1');assert.equal(document.querySelector('[data-combined-filter="shipped"] strong').textContent,'2');
 });
 test('fee details use the saved air tariff and measured cartons, retaining pending fees and zero charges',()=>{
  const {run,document}=setup();
