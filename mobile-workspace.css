@@ -1,0 +1,148 @@
+/* Independent merchant H5 surface; loaded only by /h5/. */
+html{background:#e8edf5;-webkit-text-size-adjust:100%}
+body.h5-mode{max-width:560px;min-height:100vh;min-height:100dvh;margin:0 auto;background:#f5f7fb;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;box-shadow:0 0 80px #14275410;overflow-wrap:anywhere;-webkit-tap-highlight-color:transparent}
+body.h5-mode .app{display:block;min-height:100dvh}
+body.h5-mode .sidebar{display:none!important}
+body.h5-mode .main{width:100%;min-width:0}
+body.h5-mode .content{padding:20px 16px calc(100px + env(safe-area-inset-bottom));width:100%;max-width:none}
+body.h5-mode .topbar{padding:calc(10px + env(safe-area-inset-top)) 16px 10px;min-height:64px;gap:8px;flex-wrap:nowrap;background:#ffffffed;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:5}
+body.h5-mode .topbar>.crumb,body.h5-mode .top-actions>.user,body.h5-mode #authBtn,body.h5-mode #envLabel,body.h5-mode #workspaceGlobalRefresh{display:none}
+body.h5-mode .top-actions{gap:4px;flex-wrap:nowrap;flex-shrink:0}
+body.h5-mode #workspaceSyncStatus{position:absolute;left:16px;top:100%;font-size:10px!important;padding:2px 7px;background:#f5f7fbf2;border-radius:0 0 6px 6px;max-width:calc(100% - 32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.h5-heading{display:flex;align-items:center;gap:9px;min-width:0;font-size:17px;font-weight:750;letter-spacing:-.3px}
+.h5-heading .brand-mark{width:29px;height:29px;border-radius:9px;flex-shrink:0}
+.h5-heading-title{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#h5Back{background:transparent;color:#243654;display:grid;place-items:center;width:36px;min-height:44px;margin-left:-10px;flex-shrink:0}
+.h5-heading svg{width:23px;height:23px}
+body.h5-mode .language-control{gap:0}
+body.h5-mode .language-control>span{display:none}
+body.h5-mode .language-control select{font-size:12px;min-height:40px;max-width:128px;padding:6px 23px 6px 9px;background:#f5f7fb;border-color:transparent}
+body.h5-mode .workspace-breadcrumb{display:none}
+body.h5-mode .page-head{margin:10px 0 20px;display:block}
+body.h5-mode .page-head .eyebrow{display:none}
+body.h5-mode .page-head h1{font-size:23px;line-height:1.35;margin:0 0 8px;letter-spacing:-.5px}
+body.h5-mode .page-head p{font-size:12px;line-height:1.7}
+body.h5-mode .head-actions{margin:14px 0 0;display:flex;gap:8px;align-items:stretch}
+body.h5-mode .head-actions>.btn{flex:1;text-align:center;padding:11px 9px}
+body.h5-mode .card{padding:17px;border-radius:16px;box-shadow:0 3px 15px #20305b04;min-width:0}
+body.h5-mode .card h2{font-size:17px;line-height:1.5;margin:0 0 14px}
+body.h5-mode .card h3{font-size:15px;line-height:1.5}
+body.h5-mode .grid.layout-2,body.h5-mode .grid.layout-3,body.h5-mode .split,body.h5-mode .freight-layout{grid-template-columns:minmax(0,1fr);gap:16px}
+body.h5-mode .form-grid{grid-template-columns:minmax(0,1fr);gap:17px}
+body.h5-mode .field input,body.h5-mode .field select,body.h5-mode .field textarea,body.h5-mode .workspace-toolbar input,body.h5-mode #crRoute,body.h5-mode #crSaved{font-size:16px;min-height:48px;padding:12px;border-radius:10px;max-width:100%;min-width:0;background:#fcfdff}
+body.h5-mode input[type=file]{font-size:13px;width:100%;max-width:100%;overflow:hidden}
+body.h5-mode input[type=checkbox]{width:21px;height:21px;flex-shrink:0;accent-color:var(--brand)}
+body.h5-mode .field label{font-size:13px;color:#586982}
+body.h5-mode .btn{min-height:44px;border-radius:10px;font-size:13px;line-height:1.5;padding:10px 13px;white-space:normal}
+body.h5-mode .btn.small{min-height:42px;padding:9px 12px}
+body.h5-mode .btn:disabled{opacity:.5;cursor:default;box-shadow:none}
+body.h5-mode .btn:focus-visible,body.h5-mode .h5-bottom-nav button:focus-visible{outline:3px solid #829dff;outline-offset:2px}
+body.h5-mode .form-actions{flex-wrap:wrap;gap:10px;justify-content:stretch}
+body.h5-mode .form-actions>.btn{flex:1}
+body.h5-mode .workspace-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding:0 0 9px;margin:0 0 14px;scrollbar-width:none}
+body.h5-mode .workspace-tabs::-webkit-scrollbar{display:none}
+body.h5-mode .workspace-tabs button{flex-shrink:0;min-height:42px;padding:9px 15px;font-size:12px;white-space:nowrap}
+body.h5-mode .workspace-tabs button.active,body.h5-mode .workspace-tabs button[aria-pressed=true],body.h5-mode .workspace-tabs button[aria-selected=true]{background:#eaf0ff;color:#234bd8;border-color:#c8d6ff;font-weight:750;box-shadow:inset 0 0 0 1px #cfdaff}
+body.h5-mode .workspace-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:stretch}
+body.h5-mode .workspace-toolbar>input{flex:1;min-width:100px;width:0}
+body.h5-mode .workspace-toolbar>.btn{flex-shrink:0}
+body.h5-mode .workspace-toolbar>select{font-size:16px;max-width:100%;min-height:44px}
+.h5-welcome{padding:12px 3px 17px}
+.h5-welcome>span{color:#71819a;font-size:12px}
+.h5-welcome h1{font-size:24px;letter-spacing:-.65px;line-height:1.45;max-width:300px;margin:8px 0 6px;font-weight:800}
+.h5-welcome p{color:#8490a5;font-size:11px;margin:0}
+.h5-primary-action{width:100%;border-radius:18px;display:flex;align-items:center;gap:14px;text-align:left;padding:22px 18px;background:linear-gradient(115deg,#315efb,#2148d8);color:white;box-shadow:0 8px 22px #315efb24;min-height:105px}
+.h5-primary-action strong{font-size:20px;line-height:1.5;display:block;letter-spacing:-.3px}
+.h5-primary-action small{font-size:11px;line-height:1.6;display:block;margin-top:5px;color:#dfe7ff;max-width:250px}
+.h5-action-icon{display:grid;place-items:center;border-radius:14px;background:#ffffff20;flex-shrink:0;width:45px;height:45px}
+.h5-primary-action svg{width:23px;height:23px;flex-shrink:0}
+.h5-primary-action>svg{margin-left:auto;width:21px}
+.h5-task-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;background:white;border:1px solid #e8edf6;border-radius:16px;margin:16px 0 22px;padding:19px 5px 16px}
+.h5-task-grid button{display:flex;flex-direction:column;align-items:center;gap:7px;color:#74819a;background:transparent;font-size:10px;line-height:1.55;min-height:64px;padding:0 3px}
+.h5-task-grid button strong{font-size:25px;color:#202e4d;line-height:1.3;font-weight:750}
+.h5-task-grid button+button{border-left:1px solid #eff2f7}
+.h5-review-notice{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid #f2deba;background:#fff7e9;color:#936017;border-radius:12px;padding:13px;font-size:12px;margin:-7px 0 20px;min-height:48px}
+.h5-review-notice>span:last-child{margin-left:auto}
+body.h5-mode .h5-service-card{padding:18px 16px;margin-bottom:17px}
+.h5-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.h5-service{display:flex;align-items:center;gap:12px;min-height:60px;width:100%;padding:12px 0;color:#30415e;background:transparent;text-align:left;font-size:13px;border-bottom:1px solid #eef1f7}
+.h5-service:last-child{border:0}
+.h5-service-icon{width:35px;height:35px;background:#edf2ff;border-radius:10px;display:grid;place-items:center;color:#315efb;flex-shrink:0}
+.h5-service svg{width:21px;height:21px;flex-shrink:0}
+.h5-chevron{margin-left:auto;color:#a9b3c6;font-size:22px;font-weight:400}
+.h5-shortcuts .h5-service{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#f8faff;border:1px solid #edf1f9;border-radius:12px;min-height:104px;padding:13px 7px;text-align:center;font-size:12px}
+.h5-shortcuts .h5-chevron{display:none}
+.h5-info-note{display:flex;gap:10px;padding:0 5px;margin:23px 0;color:#8995a9}
+.h5-info-note>svg{width:18px;height:18px;flex-shrink:0;margin-top:3px}
+.h5-info-note p{font-size:11px;line-height:1.9;margin:0}
+.h5-bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#fffffff5;border-top:1px solid #e6ecf5;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);z-index:12;box-shadow:0 -3px 20px #283b6a04}
+.h5-bottom-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:50px;padding:4px 3px;color:#8994a8;background:transparent;font-size:10px;border-radius:10px}
+.h5-bottom-nav svg{width:23px;height:23px}
+.h5-bottom-nav button[aria-current=page]{color:#315efb;font-weight:750;background:#f1f5ff}
+body.h5-mode .table-wrap{overflow:visible}
+body.h5-mode .h5-card-table{display:block;min-width:0;width:100%;table-layout:auto;white-space:normal}
+body.h5-mode .h5-card-table thead{position:absolute;clip:rect(0,0,0,0);clip-path:inset(50%);height:1px;width:1px;overflow:hidden}
+body.h5-mode .h5-card-table tbody{display:grid;gap:14px}
+body.h5-mode .h5-card-table tr{display:block;border:1px solid #e5ebf4;border-radius:13px;padding:10px 13px;background:#fff;min-width:0;box-shadow:0 2px 9px #21325803}
+body.h5-mode .h5-card-table td{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;padding:8px 0!important;position:static!important;right:auto;box-shadow:none;border:0!important;font-size:12px;line-height:1.7;min-width:0;width:auto!important;white-space:normal}
+.h5-cell-label{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;font-size:11px;color:#8692a7;line-height:1.7;min-width:0}
+.h5-cell-value{min-width:0;overflow-wrap:anywhere}
+body.h5-mode .h5-card-table .h5-card-actions{display:block;margin-top:5px;padding-top:11px!important;border-top:1px solid #f0f3f8!important}
+.h5-card-actions>.h5-cell-label{display:none}
+.h5-card-actions>.h5-cell-value{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+body.h5-mode .h5-card-actions .btn{margin:0;max-width:100%;font-size:12px}
+body.h5-mode .h5-card-table .h5-empty-row td{display:block}
+body.h5-mode .combined-order-address{white-space:normal;overflow:visible}
+body.h5-mode .combined-order-address>[data-user-content]{white-space:normal}
+body.h5-mode .combined-table-fee{margin:1px 0}
+body.h5-mode .parcel-pagination{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;font-size:11px;margin-top:17px}
+body.h5-mode .pagination-summary{width:100%;text-align:center}
+body.h5-mode .pagination-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:100%}
+body.h5-mode .pagination-size select{font-size:16px;min-height:44px}
+body.h5-mode .pagination-pages{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+body.h5-mode .pagination-pages .btn{min-width:35px;font-size:11px;padding:8px}
+body.h5-mode .combined-price-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+body.h5-mode .combined-price-grid>div:last-child{grid-column:1/-1;background:#edf3ff;border-radius:12px;padding:15px;border:0}
+body.h5-mode .combined-price-grid strong{font-size:23px}
+body.h5-mode .combined-fee-columns{grid-template-columns:minmax(0,1fr);padding:0 12px 12px;gap:10px}
+body.h5-mode .combined-steps{gap:12px 8px;flex-wrap:wrap;padding:0;display:flex}
+body.h5-mode .combined-steps li{flex:1 1 28%;font-size:10px;min-width:0;gap:5px}
+body.h5-mode .check{flex-wrap:wrap;gap:9px;min-height:56px;word-break:break-word;font-size:12px}
+body.h5-mode .metric{gap:12px;font-size:12px;align-items:flex-start}
+body.h5-mode .metric>b{font-size:14px;max-width:65%;text-align:right;overflow-wrap:anywhere}
+body.h5-mode .notice{font-size:12px;line-height:1.7;padding:12px}
+body.h5-mode .notice p{font-size:12px}
+body.h5-mode .account-facts{grid-template-columns:minmax(0,1fr);gap:16px}
+body.h5-mode .h5-signout{width:100%;margin-top:8px;color:#bc4b4b}
+.h5-account-services{margin-top:20px}
+body.h5-mode .toast{left:50%;right:auto;bottom:calc(87px + env(safe-area-inset-bottom));transform:translate(-50%,10px);width:max-content;max-width:calc(min(100vw,560px) - 32px);font-size:12px;text-align:center;z-index:1400}
+body.h5-mode .toast.show{transform:translate(-50%,0)}
+body.h5-mode .modal{padding:16px;align-items:center;overflow-y:auto;z-index:1300}
+body.h5-mode .modal-card{padding:23px 20px;border-radius:20px;max-height:calc(100dvh - 32px);overflow-y:auto}
+body.h5-mode .modal-actions{flex-wrap:wrap;gap:9px}
+body.h5-mode .modal-actions>.btn{flex:1;min-width:80px}
+body.h5-mode .login-mode .content{padding:0}
+body.h5-mode .login-page{display:block;min-height:100dvh;background:linear-gradient(155deg,#0d2051,#2148bf 50%,#f5f7fb 50%)}
+body.h5-mode .login-intro{display:block;padding:calc(60px + env(safe-area-inset-top)) 28px 27px;background:transparent}
+body.h5-mode .login-brand{font-size:21px}
+body.h5-mode .login-intro h1{font-size:29px;line-height:1.4;letter-spacing:-.7px;margin:24px 0 10px;max-width:350px}
+body.h5-mode .login-intro p{font-size:12px;line-height:1.8;color:#cedbff;max-width:340px}
+.h5-login-route{font-size:9px;letter-spacing:.18em;display:inline-flex;gap:15px;align-items:center;color:#a8bff4;margin-top:22px;font-weight:600}
+body.h5-mode .login-panel{padding:0 16px calc(30px + env(safe-area-inset-bottom));background:transparent}
+body.h5-mode .login-card{padding:28px 22px;width:100%;border-radius:24px;box-shadow:0 12px 40px #182b5912}
+body.h5-mode .login-card h2{font-size:22px}
+body.h5-mode .login-card>p{font-size:12px}
+body.h5-mode .login-card .field{margin-top:19px}
+body.h5-mode .login-submit{font-size:15px;min-height:49px;margin-top:24px}
+body.h5-mode .login-links{font-size:12px;margin-top:22px}
+body.h5-mode .login-links button{min-height:36px}
+body.h5-mode .login-note{font-size:11px;line-height:1.8;margin-top:21px;padding:12px}
+body.h5-mode .login-language-control{top:calc(12px + env(safe-area-inset-top));right:max(16px,calc((100vw - 560px)/2 + 16px));background:#ffffff12;box-shadow:none;padding:3px;position:fixed}
+body.h5-mode .login-language-control select{background:transparent;color:white;border:0;max-width:140px;font-size:12px}
+body.h5-mode .login-language-control option{color:#172033;background:white}
+.h5-staff-handoff{margin:90px 20px;max-width:520px;line-height:1.8}
+.h5-staff-handoff a{display:inline-block;text-decoration:none;margin-top:14px}
+body.h5-mode #localPreviewBar{position:static!important;margin:0 16px calc(90px + env(safe-area-inset-bottom));font-size:10px;border-radius:10px;background:#fff8ed}
+body.h5-mode:has(#localPreviewBar){padding-bottom:0!important}
+@media(max-width:360px){.h5-task-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 0}.h5-task-grid button:nth-child(3){border-left:0}body.h5-mode .content{padding-left:12px;padding-right:12px}.h5-primary-action{gap:10px;padding:19px 14px}.h5-primary-action small{font-size:10px}body.h5-mode .h5-card-table td{grid-template-columns:78px minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){body.h5-mode *,body.h5-mode *:before,body.h5-mode *:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
