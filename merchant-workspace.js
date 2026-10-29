@@ -71,8 +71,8 @@ function icon(name){
 }
 Object.assign(pageRoles,{'parcel-edit':'merchant','pre-advise':'merchant','packing-request':'merchant','packing-history':'merchant',receivers:'merchant','tracking-list':'merchant','sea-tracking':'merchant',rates:'merchant',messages:'merchant',support:'merchant',offers:'merchant',billing:'merchant',profile:'merchant','support-admin':'admin'});
 async function queryData(table,columns='*'){
-  // 分批读取包裹，避免接口默认行数上限截断列表和分页总数。
-  if(table==='parcels'){
+  // 分批读取包裹和客服记录，避免接口默认行数上限截断列表与对话。
+  if(['parcels','support_tickets','support_replies'].includes(table)){
     const rows=[],batchSize=500;
     for(let offset=0;;offset+=batchSize){
       const {data,error}=await window.MospaceSupabase.getClient().from(table).select(columns)
@@ -89,6 +89,7 @@ async function queryData(table,columns='*'){
 }
 async function loadMerchantWorkspace(){
   if(!state.auth.user)return;
+  const owner=state.auth.user.id,role=state.role;
   if(workspace.owner!==state.auth.user.id){
     workspace.lastMileZones=[];
     Object.assign(workspace,{owner:state.auth.user.id,parcels:[],routes:[],warehouses:[],overseasWarehouses:[],tickets:[],errors:{},selected:new Set(),editingAddress:null,addressReturn:null,packingDraft:{},supportOrderId:null,read:[],quote:null,parcelQuery:'',parcelPage:1,parcelPageSize:10,editParcelId:null,parcelBusy:false,orderQuery:'',trackingQuery:'',parcelTab:'all',orderTab:'all'});
@@ -101,7 +102,7 @@ async function loadMerchantWorkspace(){
   if(state.role==='admin')jobs.routes=()=>queryData('route_pricing');
   if(['merchant','admin'].includes(state.role)){jobs.tickets=()=>queryData('support_tickets');jobs.overseasWarehouses=()=>queryData('overseas_warehouses');}
   await Promise.all(Object.entries(jobs).map(async([key,fn])=>{
-    try{workspace[key]=await fn();delete workspace.errors[key]}catch(e){workspace[key]=[];workspace.errors[key]=e.message}
+    try{const rows=await fn();if(state.auth.user?.id!==owner||state.role!==role)return;workspace[key]=rows;delete workspace.errors[key]}catch(e){if(state.auth.user?.id!==owner||state.role!==role)return;workspace.errors[key]=e.message}
   }));
   if(!state.dbOrders.length){
     state.activeOrderId=null;state.order={id:'',status:'draft',parcels:0,confirmed:0,estimated:0,confirmedAmount:null,paidAmount:null,consolidated:false,record:null};state.parcels=[];state.events=[];

@@ -55,7 +55,7 @@ test('background tail delivery refresh updates head list, detail and tracking wi
  assert.match(run('warehouseOrderRows(state.dbOrders)'),/class="status green">已签收<\/span>/);assert.equal(run('state.order.record.status'),'shipped');assert.equal(run('feeRecord(state.order.record).total_amount'),78);
 });
 test('subscription invalidations are debounced and data is reread with merchant filters',async()=>{
- const {run,channels,timers}=setup();run('ensureProgressChannel()');const channel=channels[0];assert.deepEqual(channel.events.map(e=>e.filter.table),['orders','parcels','tracking_events','payment_notifications']);assert.equal(channel.events[0].filter.filter,'merchant_id=eq.m');
+ const {run,channels,timers}=setup();run('ensureProgressChannel()');const channel=channels[0];assert.deepEqual(channel.events.map(e=>e.filter.table),['orders','parcels','tracking_events','payment_notifications','support_tickets','support_replies']);assert.equal(channel.events[0].filter.filter,'merchant_id=eq.m');assert.equal(channel.events.find(e=>e.filter.table==='support_tickets').filter.filter,'merchant_id=eq.m');
  for(let i=0;i<8;i++)channel.events[0].callback({new:{status:'fake-delivered'}});assert.equal(timers.size,1);assert.equal(run('parcelLabel(allParcels()[0])'),'头程运输中');
  run(`reads=0;readProgressSnapshot=async()=>{reads++;let s=snapshot();s.orders[0].overseas_received_at='2026-10-22';return s}`);
  assert.equal(await run('runProgressSync()'),true);assert.equal(run('reads'),1);assert.equal(run('parcelLabel(allParcels()[0])'),'已到印尼仓');assert.match(run('rendered'),/已到印尼仓/);

@@ -223,8 +223,9 @@ test('Indonesia arrival completes head step; tail dispatch advances to signature
 });
 
 test('missing combined migration prevents customers from submitting legacy order forms',()=>{
- const {run,document}=setup();run(`combined.ready=false;combined.error='missing migration';state.page='packing-request';render()`);
- assert.match(document.querySelector('#content').textContent,/combined-delivery/);
+ const {run,document}=setup();run(`combined.ready=false;combined.error=combinedLoadError({code:'PGRST202'});state.page='packing-request';render()`);
+ assert.match(document.querySelector('#content').textContent,/版本不匹配/);
+ assert.ok(document.querySelector('[data-combined-retry]'));
  assert.equal(document.querySelectorAll('#content form').length,0);
 });
 

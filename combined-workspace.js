@@ -1,6 +1,6 @@
 /* Eaztrans v3.1: one shipment, one recipient, one combined payment. */
 'use strict';
-const combined={owner:null,ready:false,error:null,pending:[],replies:[],contacts:null,busy:false,filter:'all',warehouseFilter:'all',orderPage:1,orderPageSize:10,inboundTab:'pending',receiptQuery:'',receiptPage:1,warehouseReturnPage:null,receiptReturnId:null,inboundCustomer:null,customerQuery:'',customerPage:1,customers:[],requestId:null,draft:{},boxes:[{weight:'',length:'',width:'',height:''}],packOrder:null,replyDraft:{}};
+const combined={owner:null,ready:false,loading:false,error:null,pending:[],replies:[],contacts:null,busy:false,filter:'all',warehouseFilter:'all',orderPage:1,orderPageSize:10,inboundTab:'pending',receiptQuery:'',receiptPage:1,warehouseReturnPage:null,receiptReturnId:null,inboundCustomer:null,customerQuery:'',customerPage:1,customers:[],requestId:null,draft:{},boxes:[{weight:'',length:'',width:'',height:''}],packOrder:null,replyDraft:{}};
 const bi=(zh,id)=>localeMarkup(zh,id);
 const raw=v=>`<span data-user-content>${esc(v??'—')}</span>`;
 const cb=(zh,id,page,primary=false)=>`<button type="button" class="btn ${primary?'primary':'ghost'}" data-page="${page}">${bi(zh,id)}</button>`;
@@ -8,21 +8,51 @@ const cf=(zh,id,key,value='',type='text',extra='')=>`<div class="field"><label f
 const cn=(zh,id)=>`<div class="notice">${bi(zh,id)}</div>`;
 const ch=(zh,id,actions='')=>`<div class="page-head"><div><h1>${bi(zh,id)}</h1></div><div class="page-actions">${actions}</div></div>`;
 const ce=()=>`<div class="empty-state">${bi('暂无记录','Belum ada data')}</div>`;
+function combinedLoadError(error){
+ const code=String(error?.code||''),message=String(error?.message||''),status=Number(error?.status||error?.statusCode||0);
+ if(status===401||/^PGRST30[123]$/.test(code)||/jwt.*(expired|invalid)|session.*expired|refresh.token/i.test(message))return {kind:'session',zh:'登录已过期，请退出后重新登录。',id:'Sesi telah berakhir. Keluar lalu masuk kembali.',en:'Your session has expired. Sign out and sign in again.'};
+ if(status===403||code==='42501'||/permission denied|无权|仅启用/.test(message))return {kind:'permission',zh:'当前账号没有读取此资料的权限，请联系运营核对。',id:'Akun ini tidak memiliki izin membaca data. Hubungi admin.',en:'This account cannot read these records. Contact operations.'};
+ if(code==='PGRST202'||code==='PGRST205'||code==='42883'||code==='42P01'||error?.kind==='migration')return {kind:'migration',zh:'业务功能版本不匹配，请联系管理员检查数据库更新。',id:'Versi fitur tidak cocok. Minta admin memeriksa pembaruan basis data.',en:'The feature version does not match. Ask an administrator to check database updates.'};
+ return {kind:'network',zh:'资料暂时读取失败，请检查网络后重试。',id:'Data belum dapat dimuat. Periksa jaringan lalu coba lagi.',en:'Unable to load records. Check your connection and retry.'};
+}
+function combinedErrorHtml(){
+ const e=typeof combined.error==='string'?combinedLoadError(Error(combined.error)):combined.error;if(!e)return '';
+ return `<div class="notice" id="combinedLoadError" role="alert"><div>${localeMarkup(e.zh,e.id,e.en)}${combined.ready?`<p>${localeMarkup('已保留上次资料，当前内容可能尚未更新。','Data sebelumnya dipertahankan dan mungkin belum diperbarui.','Previous records are retained and may be out of date.')}</p>`:''}<button type="button" class="btn ghost" data-combined-retry>${localeMarkup('重新加载','Muat ulang','Retry')}</button></div></div>`;
+}
+function showCombinedLoadError(){
+ document.getElementById('combinedLoadError')?.remove();if(!combined.error||!state.auth.user)return;
+ const content=document.getElementById('content');if(!content)return;
+ const holder=document.createElement('div');holder.innerHTML=combinedErrorHtml();content.prepend(holder.firstChild);
+ const retry=content.querySelector('[data-combined-retry]');if(retry)retry.onclick=async()=>{
+  if(combined.loading||combined.busy||paymentWorkspace.busy)return;
+  // Never discard an active business form to retry a background read.
+  if(combined.ready){if(typeof queueProgressRefresh==='function')queueProgressRefresh();return}
+  retry.disabled=true;const owner=state.auth.user?.id+':'+state.role,page=state.page;
+  await loadMerchantWorkspace();if(owner===state.auth.user?.id+':'+state.role&&page===state.page)render();
+ };
+}
+async function readCombinedProgressSnapshot(){
+ const [tickets,replies,pending,customers,profiles]=await Promise.all([queryData('support_tickets'),queryData('support_replies'),state.role==='merchant'?null:rpcWorkspace('warehouse_pending_customers',{}),state.role==='warehouse'?rpcWorkspace('warehouse_customer_directory',{}):[],state.role==='admin'?queryData('profiles'):[]]);
+ return {tickets,replies,pending,customers,profiles};
+}
+function currentCombinedProgressSnapshot(){return {tickets:workspace.tickets,replies:combined.replies,pending:state.role==='merchant'?null:combined.pending,customers:combined.customers||[],profiles:combined.profiles||[]}}
+function applyCombinedProgressSnapshot(s){workspace.tickets=s.tickets;delete workspace.errors.tickets;Object.assign(combined,{replies:s.replies,customers:s.customers,profiles:s.profiles});if(s.pending!==null)combined.pending=s.pending}
 const isCombined=o=>o?.fulfillment_mode==='combined_delivery';
 Object.assign(pageRoles,{'support-warehouse':'warehouse','overall-order':'warehouse'});
 navs.merchant=[['dashboard','首页'],['rates','运输计算器'],['parcels','我的包裹'],['orders','我的订单'],['receivers','地址管理'],['messages','消息与客服'],['profile','我的账户']];
 navs.warehouse=[['dashboard','仓库工作台'],['inbound','收货管理'],['confirm','合包与费用复核'],['ship','出货与物流'],['support-warehouse','消息与客服']];
 const combinedLoadPrevious=loadMerchantWorkspace;
 loadMerchantWorkspace=async function(){
- await combinedLoadPrevious();const key=state.auth.user?.id+':'+state.role;
+ const key=state.auth.user?.id+':'+state.role;await combinedLoadPrevious();if(key!==state.auth.user?.id+':'+state.role)return;
  if(combined.owner!==key)Object.assign(combined,{owner:key,ready:false,error:null,pending:[],replies:[],contacts:null,filter:'all',warehouseFilter:'all',orderPage:1,orderPageSize:10,inboundTab:'pending',receiptQuery:'',receiptPage:1,warehouseReturnPage:null,receiptReturnId:null,inboundCustomer:null,customerQuery:'',customerPage:1,customers:[],requestId:null,draft:{},packOrder:null,replyDraft:{}});
- if(!state.auth.user)return;
+ if(!state.auth.user)return;combined.loading=true;
  try{
-  const version=await rpcWorkspace('combined_capabilities',{});if(version!==1)throw Error('migration');
-  const [tickets,replies,contacts,pending,routes,profiles,customers]=await Promise.all([queryData('support_tickets'),queryData('support_replies'),queryData('support_contacts'),state.role==='merchant'?[]:rpcWorkspace('warehouse_pending_customers',{}),queryData('route_pricing'),state.role==='admin'?queryData('profiles'):[],state.role==='warehouse'?rpcWorkspace('warehouse_customer_directory',{}).catch(()=>[]):[]]);
+  const version=await rpcWorkspace('combined_capabilities',{});if(version==null)throw Object.assign(Error('capabilities'),{code:'42501'});if(version!==1)throw Object.assign(Error('capabilities'),{kind:'migration'});
+  const [tickets,replies,contacts,pending,routes,profiles,customers]=await Promise.all([queryData('support_tickets'),queryData('support_replies'),queryData('support_contacts'),state.role==='merchant'?[]:rpcWorkspace('warehouse_pending_customers',{}),queryData('route_pricing'),state.role==='admin'?queryData('profiles'):[],state.role==='warehouse'?rpcWorkspace('warehouse_customer_directory',{}):[]]);
   if(key!==state.auth.user?.id+':'+state.role)return;
   Object.assign(combined,{ready:true,error:null,pending,replies,contacts:contacts[0]||null,profiles,customers});workspace.tickets=tickets;workspace.routes=routes;
- }catch(e){if(combined.owner===key){combined.ready=false;combined.error=e.message}}
+ }catch(e){if(combined.owner===key&&key===state.auth.user?.id+':'+state.role)combined.error=combinedLoadError(e)}
+ finally{if(combined.owner===key)combined.loading=false}
 };
 function combinedProgress(o){
  if(o.status==='cancelled')return ['cancelled','已取消','Dibatalkan'];
@@ -219,7 +249,7 @@ function combinedSupportContacts(){const contact=combined.contacts;return `<div 
 function combinedSupport(customerId=null){
  const contact=combined.contacts,isMerchant=state.role==='merchant',roles={merchant:['商家','Pelanggan'],warehouse_operator:['仓库','Gudang'],admin:['运营','Admin']};
  return (customerId?'':ch('消息与客服','Pesan dan bantuan'))+combinedSupportContacts()+
- (isMerchant?`<div class="card section-space"><h3>${bi('提交咨询','Kirim pertanyaan')}</h3><form id="combinedTicket"><div class="form-grid"><div class="field"><label for="ctOrder">${bi('关联订单（选填）','Pesanan terkait (opsional)')}</label><select id="ctOrder"><option value="">一般咨询 / Pertanyaan umum</option>${state.dbOrders.filter(o=>!isLastMile(o)).map(o=>`<option value="${o.id}" ${workspace.supportOrderId===o.id?'selected':''}>${esc(o.order_no)}</option>`).join('')}</select></div>${cf('标题','Judul','ctSubject','','text','required minlength="2" maxlength="120"')}<div class="field full"><label for="ctMessage">${bi('问题描述','Uraian pertanyaan')}</label><textarea id="ctMessage" required minlength="5" maxlength="4000"></textarea></div></div><div class="form-actions"><button class="btn primary" type="submit">${bi('提交咨询','Kirim')}</button></div></form></div>`:'')+`<div class="section-space">${workspace.tickets.filter(t=>!customerId||t.merchant_id===customerId).map(t=>`<article class="card section-space"><div class="card-title"><h3>${raw(t.subject)}</h3><span>${t.status==='open'?bi('待回复','Menunggu jawaban'):bi('已回复','Sudah dijawab')}</span></div><p>${raw(state.dbOrders.find(o=>o.id===t.order_id)?.order_no||'—')}</p><p>${bi('客户问题','Pertanyaan pelanggan')}<br>${raw(t.message)}</p>${t.reply?`<p>${bi('历史回复','Jawaban sebelumnya')}<br>${raw(t.reply)}</p>`:''}${combined.replies.filter(r=>r.ticket_id===t.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)).map(r=>`<div class="support-message"><b>${bi(...roles[r.actor_role])}</b><time>${dateText(r.created_at)}</time><p>${raw(r.message)}</p></div>`).join('')}<form data-combined-reply="${t.id}"><label>${bi('追加回复','Tambahkan balasan')}<textarea required maxlength="4000">${esc(combined.replyDraft[t.id]||'')}</textarea></label><div class="form-actions"><button type="submit" class="btn ghost">${bi('发送回复','Kirim balasan')}</button></div></form></article>`).join('')||ce()}</div>`;
+ (isMerchant?`<div class="card section-space"><h3>${bi('提交咨询','Kirim pertanyaan')}</h3><form id="combinedTicket"><div class="form-grid"><div class="field"><label for="ctOrder">${bi('关联订单（选填）','Pesanan terkait (opsional)')}</label><select id="ctOrder"><option value="">一般咨询 / Pertanyaan umum</option>${state.dbOrders.filter(o=>!isLastMile(o)).map(o=>`<option value="${o.id}" ${workspace.supportOrderId===o.id?'selected':''}>${esc(o.order_no)}</option>`).join('')}</select></div>${cf('标题','Judul','ctSubject','','text','required minlength="2" maxlength="120"')}<div class="field full"><label for="ctMessage">${bi('问题描述','Uraian pertanyaan')}</label><textarea id="ctMessage" required minlength="5" maxlength="4000"></textarea></div></div><div class="form-actions"><button class="btn primary" type="submit">${bi('提交咨询','Kirim')}</button></div></form></div>`:'')+`<div class="section-space" data-support-conversations>${workspace.tickets.filter(t=>!customerId||t.merchant_id===customerId).map(t=>`<article class="card section-space" data-support-ticket="${esc(t.id)}"><div class="card-title"><h3>${raw(t.subject)}</h3><span>${t.status==='open'?bi('待回复','Menunggu jawaban'):bi('已回复','Sudah dijawab')}</span></div><p>${raw(state.dbOrders.find(o=>o.id===t.order_id)?.order_no||'—')}</p><p>${bi('客户问题','Pertanyaan pelanggan')}<br>${raw(t.message)}</p>${t.reply?`<p>${bi('历史回复','Jawaban sebelumnya')}<br>${raw(t.reply)}</p>`:''}${combined.replies.filter(r=>r.ticket_id===t.id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)).map(r=>`<div class="support-message"><b>${bi(...roles[r.actor_role])}</b><time>${dateText(r.created_at)}</time><p>${raw(r.message)}</p></div>`).join('')}<form data-combined-reply="${t.id}"><label>${bi('追加回复','Tambahkan balasan')}<textarea required maxlength="4000">${esc(combined.replyDraft[t.id]||'')}</textarea></label><div class="form-actions"><button type="submit" class="btn ghost">${bi('发送回复','Kirim balasan')}</button></div></form></article>`).join('')||ce()}</div>`;
 }
 // Same rate engine, only the two base channels are exposed for new customers.
 freightChannels=function(){return workspace.routes.filter(r=>r.is_active&&['ID-AIR','ID-SEA'].includes(r.route_code)).sort((a,b)=>a.route_code.localeCompare(b.route_code))};
@@ -270,6 +300,30 @@ const combinedParcelPagerPrevious=parcelPager;
 parcelPager=function(p){return combinedParcelPagerPrevious(p).replace(/>(10|20|50) 条<\/option>/g,'>$1 条 / data</option>')};
 merchantPaymentSection=function(o){return isCombined(o)?separatePaymentSection(o).replaceAll("进入待打包","进入待出货"):combinedPaymentLegacy(o)};
 const combinedReviewLegacy=adminPaymentReview;
+function refreshCombinedSupportView(){
+ const current=document.querySelector('[data-support-conversations]');if(!current)return;
+ const customer=state.role==='merchant'?null:staffCustomerState().customer;
+ const holder=document.createElement('div');holder.innerHTML=combinedSupport(customer);
+ const next=holder.querySelector('[data-support-conversations]');if(!next)return;
+ // Retain every existing reply form node, including caret, focus and unsubmitted text.
+ const ids=new Set([...next.querySelectorAll('[data-support-ticket]')].map(el=>el.dataset.supportTicket));
+ for(const old of [...current.children])if(!old.hasAttribute('data-support-ticket')||!ids.has(old.dataset.supportTicket))old.remove();
+ for(const article of next.querySelectorAll('[data-support-ticket]')){
+  const old=[...current.querySelectorAll('[data-support-ticket]')].find(el=>el.dataset.supportTicket===article.dataset.supportTicket);
+  const form=old?.querySelector('[data-combined-reply]');
+  if(old&&form){
+   const freshForm=article.querySelector('[data-combined-reply]');freshForm.remove();
+   // Replace only history siblings; do not detach a focused input from the document.
+   for(const child of [...old.children])if(child!==form)child.remove();
+   for(const child of [...article.children])old.insertBefore(child,form);
+  }else current.append(article);
+ }
+ if(!ids.size)current.innerHTML=ce();
+ bindCombinedReplies();localizeKnownDom(current);
+}
+function bindCombinedReplies(){
+ document.querySelectorAll('[data-combined-reply]').forEach(f=>{f.querySelector('textarea').oninput=e=>combined.replyDraft[f.dataset.combinedReply]=e.target.value;f.onsubmit=e=>{e.preventDefault();combinedSave(f,async()=>{await rpcWorkspace('submit_support',{p_ticket_id:f.dataset.combinedReply,p_order_id:null,p_subject:null,p_message:f.querySelector('textarea').value.trim()});delete combined.replyDraft[f.dataset.combinedReply]})}});
+}
 adminPaymentReview=function(customerId=null){const r=paymentWorkspace.receipts.find(x=>x.id===paymentWorkspace.selected&&(!customerId||state.dbOrders.some(o=>o.id===x.order_id&&o.merchant_id===customerId))),o=r&&state.dbOrders.find(x=>x.id===r.order_id);return !o||isCombined(o)?transportAdminReview(customerId).replace('提交凭证 → 运营核对 → 付款成功 → 仓库作业；整包转寄直接出库。','提交凭证 → 运营核对整单金额 → 待出货；头程尾程无需再次付款。')+(o?combinedSummary(o):''):combinedReviewLegacy(customerId)};
 function combinedView(){
  const p=state.page;
@@ -292,11 +346,11 @@ const combinedRenderPrevious=render;
 render=function(){
  const openFees=[...document.querySelectorAll('details[data-combined-fees][open]')].map(el=>el.dataset.combinedFees);
  const openCustomers=[...document.querySelectorAll('details.customer-group[open]')].map(el=>el.querySelector('summary b')?.textContent);
- if(!state.auth.user||!combined.ready){combinedRenderPrevious();if(state.auth.user&&!combined.ready){$('#content').innerHTML=ch('正在连接业务数据库','Menghubungkan basis data')+cn('新流程数据库尚未就绪，请安装 combined-delivery 迁移后刷新。','Basis data alur baru belum siap. Pasang migrasi combined-delivery lalu muat ulang.')}localizeKnownDom();return}
- const html=combinedView();if(html===null){combinedRenderPrevious();localizeKnownDom();return}
+ if(!state.auth.user||!combined.ready){combinedRenderPrevious();if(state.auth.user&&!combined.ready){$('#content').innerHTML=ch('业务资料暂不可用','Data bisnis belum tersedia');showCombinedLoadError()}localizeKnownDom();return}
+ const html=combinedView();if(html===null){combinedRenderPrevious();showCombinedLoadError();localizeKnownDom();return}
  $('#appShell').classList.remove('login-mode');renderNav();$('#content').innerHTML=state.role==='merchant'?combinedMerchantFrame(html):html;
  $('#avatar').textContent=state.role==='merchant'?'M':state.role==='warehouse'?'W':'O';$('#userName').textContent=state.auth.profile?.member_no||'';$('#authBtn').innerHTML=bi('退出登录','Keluar');$('#envLabel').innerHTML=bi('数据库已连接','Basis data terhubung');$('#crumb').innerHTML=bi(state.role==='merchant'?'商家端':state.role==='warehouse'?'仓库端':'运营后台',state.role==='merchant'?'Pelanggan':state.role==='warehouse'?'Gudang':'Admin');
- bind();localizeKnownDom();document.querySelectorAll('details[data-combined-fees]').forEach(el=>el.toggleAttribute('open',openFees.includes(el.dataset.combinedFees)));document.querySelectorAll('details.customer-group').forEach(el=>{el.toggleAttribute('open',openCustomers.includes(el.querySelector('summary b')?.textContent))});
+ bind();showCombinedLoadError();localizeKnownDom();document.querySelectorAll('details[data-combined-fees]').forEach(el=>el.toggleAttribute('open',openFees.includes(el.dataset.combinedFees)));document.querySelectorAll('details.customer-group').forEach(el=>{el.toggleAttribute('open',openCustomers.includes(el.querySelector('summary b')?.textContent))});
 };
 async function combinedSave(form,fn,page){
  if(combined.busy)return;const owner=state.auth.user?.id+':'+state.role;combined.busy=true;
@@ -350,6 +404,6 @@ bind=function(){
  const quote=$('#combinedQuote');if(quote)quote.onsubmit=e=>{e.preventDefault();combinedSave(quote,()=>rpcWorkspace('warehouse_confirm_combined_fees',{p_order_id:quote.dataset.order,p_last_mile_fee:Number($('#cqAmount').value),p_note:$('#cqNote').value.trim(),p_expected_updated_at:quote.dataset.version}))};
  const advance=$('#combinedAdvance');if(advance)advance.onsubmit=e=>{e.preventDefault();combinedSave(advance,()=>rpcWorkspace('warehouse_advance_combined',{p_order_id:advance.dataset.order,p_action:advance.dataset.action,p_carrier:$('#cxCarrier')?.value.trim()||null,p_tracking_no:$('#cxTracking')?.value.trim()||null,p_expected_updated_at:advance.dataset.version}))};
  const ticket=$('#combinedTicket');if(ticket)ticket.onsubmit=e=>{e.preventDefault();combinedSave(ticket,()=>rpcWorkspace('submit_support',{p_ticket_id:null,p_order_id:$('#ctOrder').value||null,p_subject:$('#ctSubject').value.trim(),p_message:$('#ctMessage').value.trim()}))};
- document.querySelectorAll('[data-combined-reply]').forEach(f=>{f.querySelector('textarea').oninput=e=>combined.replyDraft[f.dataset.combinedReply]=e.target.value;f.onsubmit=e=>{e.preventDefault();combinedSave(f,async()=>{await rpcWorkspace('submit_support',{p_ticket_id:f.dataset.combinedReply,p_order_id:null,p_subject:null,p_message:f.querySelector('textarea').value.trim()});delete combined.replyDraft[f.dataset.combinedReply]})}});
+ bindCombinedReplies();
  const contacts=$('#combinedContacts');if(contacts)contacts.onsubmit=e=>{e.preventDefault();combinedSave(contacts,()=>rpcWorkspace('admin_save_support_contacts',{p_wechat:$('#ccWechat').value.trim(),p_whatsapp:$('#ccWhatsapp').value.trim(),p_is_test:$('#ccTest').checked,p_expected_updated_at:contacts.dataset.version}))};
 };

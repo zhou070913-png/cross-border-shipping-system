@@ -26,7 +26,7 @@ async function loadPaymentWorkspace(){
       role==='warehouse'?[]:paymentRows('payment_receipts'),paymentRows('payment_notifications')]);
     if(state.auth.user?.id!==owner||state.role!==role)return;
     Object.assign(paymentWorkspace,{account:accounts[0]||null,receipts,notices,error:null});
-  }catch(e){if(state.auth.user?.id===owner)Object.assign(paymentWorkspace,{account:null,receipts:[],notices:[],error:'付款资料读取失败，请刷新重试；持续失败请联系运营。'})}
+  }catch(e){if(state.auth.user?.id===owner&&state.role===role)paymentWorkspace.error='付款资料读取失败，请刷新重试；持续失败请联系运营。'}
   finally{if(state.auth.user?.id===owner)paymentWorkspace.loading=false}
 }
 const beforePaymentLoad=loadMerchantWorkspace;

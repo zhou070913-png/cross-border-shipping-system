@@ -4,21 +4,29 @@ const progressSync={key:null,client:null,channel:null,epoch:0,revision:0,busy:fa
 function progressOwnerKey(){return state.auth.user?.id?`${state.auth.user.id}:${state.role}`:null}
 function progressOnline(){return typeof navigator==='undefined'||navigator.onLine!==false}
 function progressReady(){return !!(!authFlow.busy&&progressOwnerKey()&&window.MospaceSupabase.isConfigured()&&document.visibilityState==='visible'&&progressOnline())}
+function progressSupportView(){return typeof combined!=='undefined'&&combined.ready&&['messages','support','support-admin','support-warehouse'].includes(state.page)&&!!document.querySelector('[data-support-conversations]')}
 function progressHasDraft(){
  const focused=document.activeElement;
- if(focused?.matches?.('input,textarea,select,[contenteditable="true"]'))return true;
+ const support=progressSupportView();
+ // Support refresh replaces conversation history only; input nodes remain in place.
+ if(focused?.matches?.('input,textarea,select,[contenteditable="true"]')&&!support)return true;
  if(document.querySelector('dialog[open],#authDialog.open'))return true;
  const content=document.getElementById('content');if(!content)return true;
  // 搜索框允许自动更新结果，但尚未提交的搜索词也必须保留。
  for(const form of content.querySelectorAll('form')){
-  if(!['parcelSearch','orderSearch','trackingSearch','warehouseSearchForm','warehouseTrackingSearch'].includes(form.id))return true;
-  for(const input of form.querySelectorAll('input,textarea'))if(input.value!==input.defaultValue)return true;
+  if(support&&(form.id==='combinedTicket'||form.id==='combinedContacts'||form.hasAttribute('data-combined-reply')))continue;
+  if(form.id==='combinedContacts'){
+   for(const input of form.querySelectorAll('input'))if(input.type==='checkbox'?!!(input.checked??input.hasAttribute('checked'))!==!!(input.defaultChecked??input.hasAttribute('checked')):input.value!==(input.defaultValue??input.getAttribute('value')??''))return true;
+   continue;
+  }
+  if(!['parcelSearch','orderSearch','trackingSearch','warehouseSearchForm','warehouseTrackingSearch','combinedCustomerSearch','staffCustomerSearch','combinedReceiptSearch'].includes(form.id))return true;
+  for(const input of form.querySelectorAll('input,textarea'))if(input.value!==(input.defaultValue??input.getAttribute?.('value')??''))return true;
  }
  return false;
 }
 function progressCanApply(){
- if(!progressReady()||progressSync.manual||paymentWorkspace.busy||paymentWorkspace.loading||warehouseWorkspace.busy||warehouseWorkspace.loading||workspace.parcelBusy||(typeof combined!=='undefined'&&combined.busy))return false;
- if(!['dashboard','inbound','confirm','ship','overall-order','overseas-stock','overseas-stock-warehouse','parcels','parcel-detail','orders','fee','tracking','tracking-list','sea-tracking','packing-history','billing','warehouse-tracking','warehouse-tracking-detail','messages'].includes(state.page))return false;
+ if(!progressReady()||progressSync.manual||paymentWorkspace.busy||paymentWorkspace.loading||warehouseWorkspace.busy||warehouseWorkspace.loading||workspace.parcelBusy||(typeof combined!=='undefined'&&(combined.busy||combined.loading)))return false;
+ if(!['dashboard','inbound','confirm','ship','overall-order','overseas-stock','overseas-stock-warehouse','parcels','parcel-detail','orders','fee','tracking','tracking-list','sea-tracking','packing-history','billing','warehouse-tracking','warehouse-tracking-detail','payment-review','messages','support','support-admin','support-warehouse'].includes(state.page))return false;
  return !progressHasDraft();
 }
 function progressLabel(){
@@ -54,7 +62,7 @@ function ensureProgressChannel(){
  progressSync.error=false;progressSync.lastSuccess=0;
  try{
  const channel=client.channel('workspace-progress-'+uid+'-'+state.role);progressSync.channel=channel;
- for(const table of ['orders','parcels','tracking_events','payment_notifications']){
+ for(const table of ['orders','parcels','tracking_events','payment_notifications','support_tickets','support_replies']){
   const config={event:'*',schema:'public',table};
   if(['orders','parcels'].includes(table)){
    if(merchant)config.filter=`merchant_id=eq.${uid}`;
@@ -64,6 +72,7 @@ function ensureProgressChannel(){
    if(merchant)config.filter=`recipient_user_id=eq.${uid}`;
    else if(warehouse&&warehouseId)config.filter=`warehouse_id=eq.${warehouseId}`;
   }
+  if(table==='support_tickets'&&merchant)config.filter=`merchant_id=eq.${uid}`;
   channel.on('postgres_changes',config,()=>{if(epoch===progressSync.epoch&&key===progressOwnerKey())queueProgressRefresh()});
  }
  channel.subscribe(status=>{
@@ -87,12 +96,12 @@ async function readProgressSnapshot(){
   state.page==='warehouse-tracking-detail'&&trackingId?window.MospaceSupabase.orderTracking(trackingId):Promise.resolve(null)
  ]);
  const forwardingSnapshot=typeof forwarding!=='undefined'&&forwarding.ready?await readForwardingSnapshot():null;
- const combinedPending=typeof combined!=='undefined'&&combined.ready&&role!=='merchant'?await rpcWorkspace('warehouse_pending_customers',{}):null;
- return {orders,parcels,receipts,notices,events,warehouseEvents,forwardingSnapshot,combinedPending};
+ const combinedSnapshot=typeof combined!=='undefined'&&combined.ready?await readCombinedProgressSnapshot():null;
+ return {orders,parcels,receipts,notices,events,warehouseEvents,forwardingSnapshot,combinedPending:combinedSnapshot?.pending??null,combinedSnapshot};
 }
 function progressTrackingFingerprint(events){return events===null?null:(events||[]).map(e=>[e.event_title??e.title,e.event_description??e.desc??'',e.occurred_at?new Date(e.occurred_at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):e.time])}
-function progressFingerprint(snapshot){return JSON.stringify([snapshot.orders,snapshot.parcels,snapshot.receipts,snapshot.notices,progressTrackingFingerprint(snapshot.events),snapshot.warehouseEvents,snapshot.forwardingSnapshot||null,snapshot.combinedPending||null])}
-function currentProgressSnapshot(){return {orders:state.dbOrders,parcels:workspace.parcels,receipts:paymentWorkspace.receipts,notices:paymentWorkspace.notices,events:['tracking','fee','overall-order'].includes(state.page)?state.events:null,warehouseEvents:state.page==='warehouse-tracking-detail'?warehouseWorkspace.tracking.events:null,forwardingSnapshot:typeof forwarding!=='undefined'&&forwarding.ready?{packages:forwarding.packages,items:forwarding.items,staff:forwarding.staff}:null,combinedPending:typeof combined!=='undefined'&&combined.ready&&state.role!=='merchant'?combined.pending:null}}
+function progressFingerprint(snapshot){return JSON.stringify([snapshot.orders,snapshot.parcels,snapshot.receipts,snapshot.notices,progressTrackingFingerprint(snapshot.events),snapshot.warehouseEvents,snapshot.forwardingSnapshot||null,snapshot.combinedPending||null,snapshot.combinedSnapshot||null])}
+function currentProgressSnapshot(){return {orders:state.dbOrders,parcels:workspace.parcels,receipts:paymentWorkspace.receipts,notices:paymentWorkspace.notices,events:['tracking','fee','overall-order'].includes(state.page)?state.events:null,warehouseEvents:state.page==='warehouse-tracking-detail'?warehouseWorkspace.tracking.events:null,forwardingSnapshot:typeof forwarding!=='undefined'&&forwarding.ready?{packages:forwarding.packages,items:forwarding.items,staff:forwarding.staff}:null,combinedPending:typeof combined!=='undefined'&&combined.ready&&state.role!=='merchant'?combined.pending:null,combinedSnapshot:typeof combined!=='undefined'&&combined.ready?currentCombinedProgressSnapshot():null}}
 async function runProgressSync(){
  if(progressSync.busy||!progressCanApply())return false;
  const owner=progressOwnerKey(),revision=progressSync.revision,epoch=progressSync.epoch,page=state.page,id=state.activeOrderId,warehouseId=warehouseWorkspace.selectedId;
@@ -105,30 +114,33 @@ async function runProgressSync(){
   const changed=progressFingerprint(snapshot)!==progressFingerprint(currentProgressSnapshot());
   state.dbOrders=snapshot.orders;workspace.parcels=snapshot.parcels;delete workspace.errors.parcels;
   paymentWorkspace.receipts=snapshot.receipts;paymentWorkspace.notices=snapshot.notices;
+  if(state.role==='warehouse'||paymentWorkspace.account)paymentWorkspace.error=null;
   if(snapshot.forwardingSnapshot)applyForwardingSnapshot(snapshot.forwardingSnapshot);
   if(snapshot.combinedPending!==null&&typeof combined!=='undefined')combined.pending=snapshot.combinedPending;
+  if(snapshot.combinedSnapshot)applyCombinedProgressSnapshot(snapshot.combinedSnapshot);
   const order=currentDbOrder(snapshot.orders);
   if(order)applyDbOrder(order);
   else{state.activeOrderId=null;state.order={id:'',status:'draft',record:null};state.parcels=[];state.events=[]}
   if(snapshot.events!==null)applyTracking(snapshot.events);
   if(snapshot.warehouseEvents!==null)warehouseWorkspace.tracking={orderId:warehouseId,events:snapshot.warehouseEvents,loading:false,error:null,request:warehouseWorkspace.tracking.request};
   progressSync.error=false;progressSync.lastSuccess=Date.now();success=true;
-  if(changed){const scroll=window.scrollY;render();if(Number.isFinite(scroll)&&typeof window.scrollTo==='function')window.scrollTo(0,scroll)}
+  if(typeof combined!=='undefined'){combined.error=null;showCombinedLoadError()}
+  if(changed){const scroll=window.scrollY;if(progressSupportView())refreshCombinedSupportView();else render();if(Number.isFinite(scroll)&&typeof window.scrollTo==='function')window.scrollTo(0,scroll)}
   return true;
- }catch(e){if(owner===progressOwnerKey()&&epoch===progressSync.epoch)progressSync.error=true;return false}
+ }catch(e){if(owner===progressOwnerKey()&&epoch===progressSync.epoch&&revision===progressSync.revision&&page===state.page){progressSync.error=true;if(typeof combined!=='undefined'&&combined.ready){combined.error=combinedLoadError(e);showCombinedLoadError()}}return false}
  finally{progressSync.busy=false;showProgressSync();if(success&&progressSync.dirty&&progressCanApply())queueProgressRefresh()}
 }
 const progressBaseRefresh=refreshDbState;
 refreshDbState=async function(...args){
  progressSync.manual++;progressSync.revision++;showProgressSync();
- try{const ok=await progressBaseRefresh(...args);if(ok){progressSync.error=false;progressSync.lastSuccess=Date.now()}return ok}
+ try{const ok=await progressBaseRefresh(...args),healthy=ok&&!(typeof combined!=='undefined'&&combined.error)&&!paymentWorkspace.error;if(healthy){progressSync.error=false;progressSync.lastSuccess=Date.now()}return healthy}
  finally{progressSync.manual--;progressSync.revision++;showProgressSync()}
 };
 const progressBaseRender=render;
 render=function(){progressSync.revision++;progressBaseRender();ensureProgressChannel();showProgressSync()};
 if(typeof setInterval==='function')setInterval(()=>{
  ensureProgressChannel();
- const cadence=typeof forwarding!=='undefined'&&forwarding.ready?10000:progressSync.connected?30000:10000;
+ const cadence=(typeof combined!=='undefined'&&combined.ready)||(typeof forwarding!=='undefined'&&forwarding.ready)?10000:progressSync.connected?30000:10000;
  if(progressReady()&&(progressSync.dirty||Date.now()-progressSync.lastAttempt>=cadence))void runProgressSync();
 },10000);
 if(typeof document.addEventListener==='function'){
