@@ -43,7 +43,8 @@ notify pgrst,'reload schema';
 select 'latest-development' as environment, (select count(*) from public.orders) as orders, (select count(*) from public.profiles) as accounts;
 `);return parts.join('\n');
 }
-export async function buildLatest({url,key,repository=latestRepository,output=path.join(root,'.deployment','latest-site')}){
+export async function buildLatest({url,key,signupVerification='link',repository=latestRepository,output=path.join(root,'.deployment','latest-site')}){
+ if(!['link','otp'].includes(signupVerification))throw Error('Invalid signup verification mode');
  const project=validateTarget({url,key,repository});
  // Refuse to overwrite source, a prior build or an arbitrary directory.
  await fs.mkdir(path.dirname(output),{recursive:true});await fs.mkdir(output);
@@ -54,7 +55,7 @@ export async function buildLatest({url,key,repository=latestRepository,output=pa
   let data=await fs.readFile(path.join(root,name),'utf8');
   if(name==='supabase-client.js'){
    const config=/const config = \{[\s\S]*?\n  \};/;if(!config.test(data))throw Error('Client configuration block changed');
-   data=data.replace(config,'const config = '+JSON.stringify({url:new URL(url).origin,anonKey:key})+';');
+   data=data.replace(config,'const config = '+JSON.stringify({url:new URL(url).origin,anonKey:key,signupVerification})+';');
   }
   if(name==='locale-switch.js')data=data.replace(/Eaztrans集运｜产品原型/g,'Eaztrans集运｜最新开发版').replace(/Eaztrans Logistik · Demo/g,'Eaztrans Logistik · Pengembangan terbaru').replace(/Eaztrans Logistics · Demo/g,'Eaztrans Logistics · Latest development');
   if(data.includes(firstProject))throw Error('First-version project found in public asset: '+name);

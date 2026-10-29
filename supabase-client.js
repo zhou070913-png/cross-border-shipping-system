@@ -92,7 +92,7 @@
     const { data, error } = await instance.auth.signUp({
       email,
       password,
-      options: { data: { full_name: '跨境商家' } }
+      options: { emailRedirectTo: global.location.origin + global.location.pathname, data: { full_name: '跨境商家' } }
     });
     if (error) throw error;
     return data;
@@ -106,6 +106,18 @@
       options: { emailRedirectTo: window.location.origin + window.location.pathname }
     });
     if (error) throw error;
+  }
+
+  function registrationVerificationMode() {
+    // Enable OTP only after the project's confirmation email actually contains {{ .Token }}.
+    return config.signupVerification === 'otp' ? 'otp' : 'link';
+  }
+
+  async function verifyRegistrationCode(email, token) {
+    const instance = await requireClient();
+    const { data, error } = await instance.auth.verifyOtp({ email, token, type: 'email' });
+    if (error) throw error;
+    return data;
   }
 
   async function signOut() {
@@ -306,6 +318,8 @@
     memberNoByEmail,
     signUp,
     resendConfirmation,
+    registrationVerificationMode,
+    verifyRegistrationCode,
     signOut,
     myOrders,
     orderTracking,

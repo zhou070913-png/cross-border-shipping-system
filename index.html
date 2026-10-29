@@ -68,12 +68,13 @@
       <p id="authHint">商家、仓库操作员和管理员均从这里登录，系统按账号权限进入对应工作台。</p>
       <div class="field"><label id="authIdentifierLabel">会员号 / 邮箱</label><input id="authIdentifier" type="text" placeholder="M12345678 或 name@company.com" autocomplete="username" /></div>
       <div class="field"><label>密码</label><input id="authPassword" type="password" placeholder="至少 6 位" /></div>
+      <div class="field" id="authCodeField" hidden style="margin-top:12px"><label for="authCode" id="authCodeLabel">邮箱验证码</label><input id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" /></div>
       <p id="authSignupNote" class="muted" hidden style="margin:12px 0 0;font-size:12px">注册仅需邮箱和密码；注册成功后系统会生成会员号，之后可用会员号或邮箱登录。</p>
       <div class="modal-actions"><button class="btn ghost" id="authCancel">取消</button><button class="btn ghost" id="authResend">重发验证邮件</button><button class="btn ghost" id="authMode">注册账号</button><button class="btn primary" id="authSubmit">登录</button></div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-client.js?v=forwarding-1"></script>
+  <script src="supabase-client.js?v=registration-2"></script>
   <script>
     const state = {
       role:'merchant', page:'dashboard',
@@ -639,6 +640,7 @@
   <script src="locale-en.js?v=3"></script>
   <script src="bilingual-workspace.js?v=4"></script>
   <script src="locale-switch.js?v=3"></script>
+  <script src="registration-workspace.js?v=1"></script>
   <script src="progress-sync.js?v=6"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
