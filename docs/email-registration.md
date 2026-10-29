@@ -24,4 +24,6 @@ link 模式保留注册弹窗，提示打开最新邮件，返回点击“已验
 
 当前不需要数据库表结构迁移，不清理用户或订单。
 
+用户后续选择保留第三种“邮件链接验证”，因此保持 link 模式，不配置 SMTP 或升级套餐。验证码模块和模板仅作为后续可选能力，不代表已启用。
+
 官方参考：https://supabase.com/docs/reference/javascript/auth-verifyotp 、https://supabase.com/docs/guides/auth/auth-email-templates

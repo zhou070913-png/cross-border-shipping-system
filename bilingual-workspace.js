@@ -133,7 +133,7 @@ function indonesianFor(s){
 }
 function translatedText(s){const id=indonesianFor(String(s));return id?bi(s,id):raw(s)}
 function localizeKnownDom(root=document.body){
- if(!root)return;
+ if(!root||typeof localeMarkup!=='function')return;
  const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[];
  while(walk.nextNode())nodes.push(walk.currentNode);
  for(const n of nodes){

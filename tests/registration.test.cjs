@@ -38,3 +38,10 @@ test('adapter sends explicit full Pages return path and verifies code through Su
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../supabase-client.js'),'utf8'),{window:w});
  await w.MospaceSupabase.signUp('test@example.com','test-password');assert.equal(signup.options.emailRedirectTo,'https://example.github.io/latest/');await w.MospaceSupabase.verifyRegistrationCode('test@example.com','12345678');assert.deepEqual(JSON.parse(JSON.stringify(verification)),{email:'test@example.com',token:'12345678',type:'email'});assert.equal(w.MospaceSupabase.registrationVerificationMode(),'link');
 });
+
+test('initial script parsing does not invoke language markup before the language module is loaded',()=>{
+ const fs=require('node:fs'),vm=require('node:vm');let callback,observed=0,walked=0;
+ const context=vm.createContext({toast:()=>{},loginPage:()=>'',NodeFilter:{SHOW_TEXT:4},document:{body:{},createTreeWalker:()=>{walked++;return {nextNode:()=>false}}},MutationObserver:class{constructor(fn){callback=fn}disconnect(){}observe(){observed++}}});
+ vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../bilingual-workspace.js'),'utf8'),context);
+ assert.doesNotThrow(()=>callback());assert.equal(walked,0);vm.runInContext('function localeMarkup(){return ""}',context);callback();assert.equal(walked,1);assert.equal(observed,3);
+});
