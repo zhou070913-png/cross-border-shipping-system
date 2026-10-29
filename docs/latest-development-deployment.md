@@ -5,7 +5,7 @@
 | 名称 | 网站 | Supabase | 发布来源 |
 | --- | --- | --- | --- |
 | 开发首版 | https://zhou070913-png.github.io/cross-border-shipping-system/ | bdxqphmzwojamyuboqmz | 原仓库 master，保持原配置 |
-| 最新开发版 | 新仓库 Pages，待独立数据库就绪后启用 | eaztrans-latest-development，新项目创建中 | 独立仓库 zhou070913-png/eaztrans-latest-development |
+| 最新开发版 | https://zhou070913-png.github.io/eaztrans-latest-development/ | sqnxjyckgbazsqsafgrc，eaztrans-latest-development | 独立仓库 zhou070913-png/eaztrans-latest-development，main |
 | 本地验收 | http://127.0.0.1:4175/ | 临时 PGlite | feature/overseas-forwarding |
 
 最新开发版从空业务数据开始。首版客户账号、订单、地址、凭证及 Storage 均不复制，不运行任何清理或迁移。
@@ -25,6 +25,18 @@
 ## 验证与当前进度
 
 2026-10-29：独立仓库已创建；现有首版 `master` 为 `0d21f4110144d750d410542cce6f3b3047a0f005`，Pages 从 master 根目录发布，仍为 built。
-新 Supabase 项目创建页名称已填写，等待用户完成密码与创建。数据库尚未安装，新公网尚未启用。
+新 Supabase 项目 `sqnxjyckgbazsqsafgrc` 已安装全部 15 份迁移，环境标记为 latest-development。项目沿用创建时的 Free / Ireland 配置，Site URL 已设为新站完整网址，邮箱验证保持开启。
+独立网站已发布，Pages 状态 built，发布提交 `ee5b019`，功能源提交 `cbca091`。构建只包含网站资产和公开 publishable key，不包含数据库密码、管理密钥、本地免密测试客户端或旧数据库项目 ID。
+首版 master、Pages 来源、公开 index.html 和 supabase-client.js 的 SHA-256 均与部署前一致；本次没有操作首版数据库。
 新安装脚本已在临时数据库验证空库安装、私有凭证和会员登录函数；再次对已有库执行会在任何迁移之前拒绝并回滚。
-此验证不代表已通过云端 Auth、Storage 或真实业务验收。
+云端额外验证：Auth 设置接口返回正常，允许注册并要求邮箱验证；匿名访问业务表无数据返回；SQL 检查所有 public 表均启用 RLS，付款凭证桶为私有。在事务内创建两个临时无密码身份，商家 A 预报包裹，B 和 anon 均不可读，随后回滚。最终账号、包裹、订单数量均为 0。
+公网登录页已验证中文 / English / Bahasa Indonesia 切换。未以真实账号完成邮箱收信、注册登录、凭证上传与签名查看、仓库和运营的整单流程验收，不应将数据库层检查等同于这些业务验收。
+
+## 新环境首次使用
+
+1. 打开最新开发版，选择商家端，点击注册商家账号，用本人可接收邮件的邮箱注册并完成验证。新环境需要重新注册，旧环境账号和本地免密身份不迁移。
+2. 仓库与运营也需要新环境中的独立身份，并在数据库中按明确的邮箱 / UUID 分配角色，仓库账号还需绑定深圳仓。不得按注册顺序自动提权，也不发布通用管理员密码。
+3. 用户自行设置、保存密码，不在聊天或 Git 中发送密码。确认身份和角色后，再进行完整的预报、收货、合包、费用、付款凭证审核、出货测试。
+4. 后续功能开发仍在原源代码仓库的 feature/overseas-forwarding 分支；使用本文件的构建器发布到独立新仓库，避免将源文件中首版的默认连接直接推到新站。不要将功能分支合入旧 master 或调整旧站 Pages。
+
+本地部署证据保存在忽略目录 `.deployment/`：首版发布前快照、云接口验证 JSON、初始化 SQL、事务隔离检查 SQL 和发布目录。复查时只读对比首版，不覆盖原始快照。
