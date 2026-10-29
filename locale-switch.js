@@ -9,6 +9,8 @@ function englishFor(text,id=''){
  for(const [prefix,enPrefix]of [['操作失败：','Operation failed: '],['删除失败：','Delete failed: '],['发送失败：','Send failed: ']])if(s.startsWith(prefix)){const detail=s.slice(prefix.length);return enPrefix+(englishFor(detail)||detail)}
  if(s.endsWith('，列表刷新失败，请点击刷新数据'))return (englishFor(s.replace('，列表刷新失败，请点击刷新数据',''))||'Saved')+'. Unable to refresh the list. Click Refresh data.';
  const patterns=[
+  [/^(\d+) 个客户 · (\d+) 个订单$/,(a,c,n)=>`${c} customers · ${n} orders`],
+  [/^待尾程登记 (\d+) 单 · 运输中 (\d+) 单$/,(a,n,t)=>`${n} awaiting last-mile registration · ${t} in transit`],
   [/^共 (\d+) 个(订单|地址|包裹) · 显示 (\d+)–(\d+) 条 · 第 (\d+) \/ (\d+) 页$/,(a,n,type,from,to,page,pages)=>`${n} ${{订单:'orders',地址:'addresses',包裹:'parcels'}[type]} · showing ${from}–${to} · page ${page} / ${pages}`],
   [/^共 (\d+) 条记录 · 显示 (\d+)–(\d+) 条 · 第 (\d+) \/ (\d+) 页$/,(a,n,from,to,page,pages)=>`${n} records · showing ${from}–${to} · page ${page} / ${pages}`],
   [/^共 (\d+) 个客户 · 第 (\d+) \/ (\d+) 页$/,(a,n,page,pages)=>`${n} customers · page ${page} / ${pages}`],

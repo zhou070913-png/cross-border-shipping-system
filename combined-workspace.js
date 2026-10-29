@@ -29,7 +29,7 @@ function combinedProgress(o){
  if(o.status==='exception')return ['exception','异常待处理','Perlu penanganan'];
  if(o.status==='delivered')return ['delivered','已签收','Diterima penerima'];
  if(o.tail_shipped_at)return ['shipped','尾程派送中','Pengiriman akhir berlangsung'];
- if(o.overseas_received_at)return ['shipped','印尼仓已到货','Tiba di gudang Indonesia'];
+ if(o.overseas_received_at)return ['shipped','待尾程登记','Menunggu pencatatan pengiriman akhir'];
  if(o.status==='shipped')return ['shipped','头程运输中','Pengiriman ke Indonesia'];
  if(['paid','ready_to_ship'].includes(o.status))return ['paid','已付款，待出货','Lunas, menunggu pengiriman'];
  if(o.status==='awaiting_payment')return orderReceipt(o.id)?.status==='pending'?['awaiting_payment','付款审核中','Bukti pembayaran diperiksa']:['awaiting_payment','待付款','Menunggu pembayaran'];
@@ -37,6 +37,18 @@ function combinedProgress(o){
  if(safeRows(o.order_parcels).length&&safeRows(o.order_parcels).every(x=>x.parcels?.received_at))return ['pending','待合包实测','Menunggu pengukuran paket gabungan'];
  return ['pending','待收货 / 合包','Menunggu penerimaan / penggabungan'];
 }
+// Operational shipping stages are shared by the workbench, customer list and order table.
+const warehouseShippingFilters=[['all','全部','Semua'],['head_pending','待头程出货','Menunggu pengiriman awal'],['head_transit','头程运输中','Dalam pengiriman ke Indonesia'],['tail_pending','待尾程登记','Menunggu pencatatan pengiriman akhir'],['tail_transit','尾程派送中','Pengiriman akhir berlangsung'],['delivered','已签收','Diterima penerima']];
+function warehouseShippingStage(o){
+ if(['delivered','cancelled','exception'].includes(o.status))return o.status;
+ if(isCombined(o)){
+  if(o.status==='shipped')return o.tail_shipped_at?'tail_transit':o.overseas_received_at?'tail_pending':'head_transit';
+  return ['paid','ready_to_ship'].includes(o.status)?'head_pending':null;
+ }
+ const g=orderProgress(o).group;
+ return ['paid','ready_to_ship'].includes(g)?'head_pending':g==='shipped'?'head_transit':g;
+}
+function warehouseShippingMatch(o,filter){return filter==='all'||warehouseShippingStage(o)===filter}
 function cs(o){const [g,z,i]=combinedProgress(o);return `<span class="status ${['paid','delivered'].includes(g)?'green':'blue'}">${bi(z,i)}</span>`}
 const combinedOldProgress=orderProgress;
 orderProgress=function(o){if(isCombined(o)){const [group,label]=combinedProgress(o);return {group,label}}return combinedOldProgress(o)};
@@ -115,9 +127,11 @@ function combinedWarehouseOrderAction(o){
  if(!isCombined(o))return overallOrderButton(o,bi('查看历史订单','Lihat riwayat'));
  let label=['查看订单','Lihat pesanan'];
  if(combinedProgress(o)[0]==='pending')label=o.packed_at?['复核费用','Verifikasi biaya']:safeRows(o.order_parcels).some(x=>!x.parcels?.received_at)?['查看收货进度','Lihat penerimaan']:['合包实测','Ukur paket gabungan'];
- else if(['paid','ready_to_ship'].includes(o.status))label=['登记出货','Catat pengiriman'];
- else if(o.status==='shipped')label=o.tail_shipped_at?['登记签收','Catat penerimaan']:o.overseas_received_at?['登记尾程快递','Catat kurir akhir']:['登记印尼到仓','Catat tiba di Indonesia'];
- return combinedOpenButton(o,...label);
+ else if(['paid','ready_to_ship'].includes(o.status))label=['登记头程出货','Catat pengiriman ke Indonesia'];
+ else if(o.status==='shipped')label=o.tail_shipped_at?['登记签收','Catat penerimaan']:o.overseas_received_at?['登记尾程派送','Catat pengiriman akhir']:['确认到达印尼仓','Konfirmasi tiba di gudang Indonesia'];
+ const actionable=['paid','head_pending','head_transit','tail_pending','tail_transit'].includes(warehouseShippingStage(o));
+ const button=`<button type="button" class="btn small ${actionable?'primary':'ghost'}" data-combined-open="${esc(o.id)}" ${actionable?'data-combined-focus="action"':''}>${bi(...label)}</button>`;
+ return `<div class="warehouse-shipping-actions">${button}${o.tail_shipped_at?combinedOpenButton(o,'查看派送详情','Lihat rincian pengiriman'):''}</div>`;
 }
 function combinedOrderStats(rows){
  const confirmed=rows.filter(o=>{const f=feeRecord(o);return f?.confirmed_at&&f.total_amount!=null&&Number.isFinite(Number(f.total_amount))});
@@ -132,10 +146,11 @@ function combinedOrderTable(rows,warehouse=false){
 }
 function combinedOrderList(warehouse=false,customerId=null){
  const filter=warehouse?combined.warehouseFilter:combined.filter,matched=overallOrderRoots(state.dbOrders).filter(o=>(!customerId||o.merchant_id===customerId)&&overallOrderSearch(o,workspace.orderQuery));
- const matches=(o,f)=>{if(f==='all')return true;if(isCombined(o))return combinedProgress(o)[0]===f;if(!warehouse)return false;const g=orderProgress(o).group;return (g==='ready_to_ship'?'paid':g)===f},rows=matched.filter(o=>matches(o,filter)),p=combinedOrderPagination(rows);
+ const shipping=warehouse&&state.role==='warehouse'&&state.page==='ship';
+ const matches=(o,f)=>{if(shipping)return warehouseShippingMatch(o,f);if(f==='all')return true;if(isCombined(o))return combinedProgress(o)[0]===f;if(!warehouse)return false;const g=orderProgress(o).group;return (g==='ready_to_ship'?'paid':g)===f},rows=matched.filter(o=>matches(o,filter)),p=combinedOrderPagination(rows);
  const target=warehouse&&state.role==='warehouse'?(state.page==='confirm'?'confirm':'ship'):'orders';
  const title=warehouse&&state.role==='warehouse'?(target==='confirm'?['合包与费用复核','Penggabungan dan verifikasi biaya']:['出货与物流','Pengiriman dan pelacakan']):['我的订单','Pesanan saya'];
- return (customerId?'':ch(...title))+`<div class="workspace-tabs">${[['all','全部','Semua'],['pending','待仓库确认','Verifikasi gudang'],['awaiting_payment','待付款 / 审核','Pembayaran'],['paid','待出货','Siap dikirim'],['shipped','运输中','Dalam pengiriman'],['delivered','已签收','Selesai']].map(([f,z,i])=>`<button type="button" data-combined-filter="${f}" data-target-page="${target}" class="${filter===f?'active':''}" aria-pressed="${filter===f}">${bi(warehouse?`${z}（${matched.filter(o=>matches(o,f)).length} 单）`:z,warehouse?`${i} (${matched.filter(o=>matches(o,f)).length} pesanan)`:i)}</button>`).join('')}</div><div class="card"><form id="orderSearch" class="workspace-toolbar"><input id="orderSearchText" aria-label="搜索订单 / Cari pesanan" placeholder="订单号 / 收件人 / 运单号 · Pesanan / penerima / resi" value="${esc(workspace.orderQuery)}"><button class="btn ghost">${bi('查询','Cari')}</button><button type="button" class="btn ghost" id="combinedOrderReset">${bi('重置','Atur ulang')}</button></form>${warehouse?combinedOrderStats(rows):''}${combinedOrderTable(p.rows,warehouse)+combinedOrderPager(p)}</div>`;
+ return (customerId?'':ch(...title))+`<div class="workspace-tabs">${(shipping?warehouseShippingFilters:[['all','全部','Semua'],['pending','待仓库确认','Verifikasi gudang'],['awaiting_payment','待付款 / 审核','Pembayaran'],['paid','待出货','Siap dikirim'],['shipped','运输中','Dalam pengiriman'],['delivered','已签收','Selesai']]).map(([f,z,i])=>`<button type="button" data-combined-filter="${f}" data-target-page="${target}" class="${filter===f?'active':''}" aria-pressed="${filter===f}">${bi(warehouse?`${z}（${matched.filter(o=>matches(o,f)).length} 单）`:z,warehouse?`${i} (${matched.filter(o=>matches(o,f)).length} pesanan)`:i)}</button>`).join('')}</div><div class="card"><form id="orderSearch" class="workspace-toolbar"><input id="orderSearchText" aria-label="搜索订单 / Cari pesanan" placeholder="订单号 / 收件人 / 运单号 · Pesanan / penerima / resi" value="${esc(workspace.orderQuery)}"><button class="btn ghost">${bi('查询','Cari')}</button><button type="button" class="btn ghost" id="combinedOrderReset">${bi('重置','Atur ulang')}</button></form>${warehouse?combinedOrderStats(rows):''}${combinedOrderTable(p.rows,warehouse)+combinedOrderPager(p)}</div>`;
 }
 function combinedMerchantFrame(html){const root=['pre-advise','packing-request','parcel-edit','parcel-detail','parcels'].includes(state.page)?['我的包裹','Paket saya','parcels']:['rates','receivers','messages','support','profile','address'].includes(state.page)?null:['我的订单','Pesanan saya','orders'];return `<nav class="workspace-breadcrumb"><button data-page="dashboard">${bi('首页','Beranda')}</button>${state.page!=='dashboard'&&root?`<span>/</span>${cb(...root)}`:''}</nav>`+html}
 function combinedDetail(o,tracking=false){
@@ -146,7 +161,7 @@ function combinedDetail(o,tracking=false){
  if(state.role==='merchant')body+=`<div class="form-actions">${cb('咨询此订单','Tanya tentang pesanan','support')}</div>`+(o.status==='awaiting_payment'?merchantPaymentSection(o):['paid','ready_to_ship','shipped','delivered'].includes(o.status)?cn('整单付款已确认，无需再次付款。','Pembayaran pesanan sudah dikonfirmasi. Tidak perlu membayar lagi.')+paymentHistory(o.id):cn('等待仓库收货、合包实测和费用复核。','Menunggu penerimaan, penggabungan, pengukuran, dan verifikasi biaya gudang.'));
  else if(state.role==='warehouse')body+=combinedWarehouseActions(o);
  else if(state.role==='admin')body+=`<div class="form-actions">${combinedReviewButton(o)||cn('客户尚未提交付款凭证，暂不能审核。','Pelanggan belum mengirim bukti pembayaran, sehingga belum dapat diverifikasi.')}</div>`;
- body+=`<div class="card section-space"><h3>${bi('物流信息','Informasi pengiriman')}</h3><div class="metric">${bi('头程承运商 / 运单号','Pengangkut / resi ke Indonesia')}<b>${raw(o.shipment_carrier)} · ${raw(o.shipment_tracking_no)}</b></div><div class="metric">${bi('尾程快递 / 运单号','Kurir / resi pengiriman akhir')}<b>${raw(o.tail_carrier)} · ${raw(o.tail_tracking_no)}</b></div>${cn('显示仓库登记的节点，可复制尾程单号到快递官网查询。','Menampilkan pembaruan yang dicatat gudang. Salin resi akhir untuk melacak di situs kurir.')}<div class="timeline">${state.events?.length?state.events.map(e=>`<div class="event"><div></div><div><h4>${translatedText(e.title)}</h4><p>${translatedText(e.desc)}<br>${raw(e.time)}</p></div></div>`).join(''):ce()}</div></div>`;
+ body+=`<div class="card section-space"><h3>${bi('物流信息','Informasi pengiriman')}</h3><div class="metric">${bi('头程承运商 / 运单号','Pengangkut / resi ke Indonesia')}<b>${raw(o.shipment_carrier)} · ${raw(o.shipment_tracking_no)}</b></div><div class="metric">${bi('尾程快递 / 运单号','Kurir / resi pengiriman akhir')}<b>${raw(o.tail_carrier)} · ${raw(o.tail_tracking_no)}</b></div>${o.tail_shipped_at?`<div class="metric">${bi('尾程派送登记时间','Waktu pencatatan pengiriman akhir')}<b>${raw(dateText(o.tail_shipped_at))}</b></div>`:''}${cn('显示仓库登记的节点，可复制尾程单号到快递官网查询。','Menampilkan pembaruan yang dicatat gudang. Salin resi akhir untuk melacak di situs kurir.')}<div class="timeline">${state.events?.length?state.events.map(e=>`<div class="event"><div></div><div><h4>${translatedText(e.title)}</h4><p>${translatedText(e.desc)}<br>${raw(e.time)}</p></div></div>`).join(''):ce()}</div></div>`;
  return body;
 }
 function combinedWarehouseDashboard(){
@@ -195,10 +210,10 @@ function combinedWarehouseActions(o){
  let action='',z='',id='';
  if(stage==='paid'){action='head_ship';z='登记头程出货';id='Catat pengiriman ke Indonesia'}
  else if(o.status==='shipped'&&!o.overseas_received_at){action='overseas_receive';z='确认印尼仓到货';id='Konfirmasi tiba di gudang Indonesia'}
- else if(o.overseas_received_at&&!o.tail_shipped_at){action='tail_ship';z='登记尾程发货';id='Catat pengiriman akhir'}
+ else if(o.status==='shipped'&&o.overseas_received_at&&!o.tail_shipped_at){action='tail_ship';z='登记尾程派送';id='Catat pengiriman akhir'}
  else if(o.tail_shipped_at&&o.status==='shipped'){action='delivered';z='确认客户签收';id='Konfirmasi diterima pelanggan'}
  if(!action)return '';
- return `<div class="card section-space"><h3>${bi(z,id)}</h3><form id="combinedAdvance" data-action="${action}" data-order="${o.id}" data-version="${esc(o.updated_at)}">${['head_ship','tail_ship'].includes(action)?`<div class="form-grid">${cf('承运商 / 快递公司','Pengangkut / kurir','cxCarrier',action==='tail_ship'?'J&T':'','text','required maxlength="120"')}${cf('运单号','Nomor resi','cxTracking','','text','required minlength="3" maxlength="160"')}</div>`:''}<p><label><input type="checkbox" required> ${bi('已核对实际作业结果','Saya sudah memeriksa hasil operasional')}</label></p><button type="submit" class="btn primary">${bi(z,id)}</button></form></div>`;
+ return `<div class="card section-space warehouse-shipping-task"><h3>${bi(z,id)}</h3>${action==='tail_ship'?cn('印尼仓已到货，请填写实际承运快递及尾程单号；保存后商家可查看派送信息。','Paket sudah tiba di gudang Indonesia. Catat kurir dan resi akhir agar pelanggan dapat melihat pengirimannya.'):''}<form id="combinedAdvance" data-action="${action}" data-order="${o.id}" data-version="${esc(o.updated_at)}">${['head_ship','tail_ship'].includes(action)?`<div class="form-grid">${cf('承运商 / 快递公司','Pengangkut / kurir','cxCarrier',action==='tail_ship'?'J&T':'','text','required maxlength="120"')}${cf('运单号','Nomor resi','cxTracking','','text','required minlength="3" maxlength="160"')}</div>`:''}<p><label><input type="checkbox" required> ${bi('已核对实际作业结果','Saya sudah memeriksa hasil operasional')}</label></p><button type="submit" class="btn primary">${bi(z,id)}</button></form></div>`;
 }
 function combinedSupportContacts(){const contact=combined.contacts;return `<div class="card"><h3>${bi('联系客服','Hubungi layanan pelanggan')}</h3>${contact?.is_test?cn('以下为测试联系方式，不能用于实际联系。','Kontak berikut hanya untuk pengujian dan tidak dapat dihubungi.'):''}<div class="metric">${bi('微信','WeChat')}<b>${raw(contact?.wechat)}</b></div><div class="metric">${bi('WhatsApp','WhatsApp')}<b>${raw(contact?.whatsapp)}</b></div><p>${bi('同一工单由仓库和运营共同处理。','Tim gudang dan admin menangani tiket yang sama.')}</p></div>`+(state.role==='admin'&&contact?`<div class="card section-space"><h3>${bi('客服联系方式配置','Pengaturan kontak bantuan')}</h3><form id="combinedContacts" data-version="${esc(contact.updated_at)}"><div class="form-grid">${cf('微信号','ID WeChat','ccWechat',contact.wechat,'text','required maxlength="120"')}${cf('WhatsApp','WhatsApp','ccWhatsapp',contact.whatsapp,'text','required maxlength="120"')}</div><p><label><input type="checkbox" id="ccTest" ${contact.is_test?'checked':''}> ${bi('测试联系方式','Kontak pengujian')}</label></p><button class="btn primary" type="submit">${bi('保存配置','Simpan pengaturan')}</button></form></div>`:'');}
 function combinedSupport(customerId=null){

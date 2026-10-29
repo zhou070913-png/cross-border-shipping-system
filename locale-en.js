@@ -664,3 +664,17 @@ const enLocale={
   "测试凭证": "Test receipt",
   "转账凭证": "Transfer receipt"
 };
+
+Object.assign(enLocale,{
+ '待头程出货':'Awaiting first-leg dispatch',
+ '待头程出货客户':'Customers awaiting first-leg dispatch',
+ '待登记尾程':'Register last-mile dispatch',
+ '待尾程登记':'Awaiting last-mile registration',
+ '待尾程登记 / 运输中':'Awaiting last-mile registration / in transit',
+ '登记尾程派送':'Register last-mile dispatch',
+ '确认到达印尼仓':'Confirm arrival at Indonesia warehouse',
+ '查看派送详情':'View delivery details',
+ '尾程派送登记时间':'Last-mile registration time',
+ '印尼仓已到货，请填写实际承运快递及尾程单号；保存后商家可查看派送信息。':'The shipment has arrived at the Indonesia warehouse. Enter the actual courier and last-mile tracking number so the customer can view delivery details.',
+ '印尼仓确认到货后，订单进入待尾程登记；登记快递后自动转为尾程派送中。':'After the Indonesia warehouse confirms arrival, register the last-mile courier. The order then moves to last-mile delivery.'
+});

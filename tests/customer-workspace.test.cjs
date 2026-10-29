@@ -64,3 +64,43 @@ test('operations can open a historical order under the same customer and return 
 test('receiving order navigation does not inherit a previous consolidation return destination',async()=>{
  const {run,document}=staff();document.querySelector('[data-staff-customer="a"]').onclick();await document.querySelector('[data-combined-open="a1"]').onclick();document.querySelector('#nav [data-page="inbound"]').onclick();assert.equal(run('staffCustomers.orderReturn'),null);document.querySelector('[data-combined-customer="a"]').onclick();document.querySelector('[data-combined-inbound-tab="orders"]').onclick();await document.querySelector('[data-combined-open="a1"]').onclick();assert.ok(document.querySelector('[data-page="inbound"]'));assert.equal(document.querySelector('[data-staff-order-back]'),null);
 });
+
+test('shipping stages route workbench tasks through customers and remove completed tail tasks after refresh',async()=>{
+ const {run,document}=staff('warehouse','dashboard');
+ run(`window.MospaceSupabase.orderTracking=async()=>[];state.dbOrders=[
+ {...o,id:'a-tail',merchant_id:'a',order_no:'A-TAIL',status:'shipped',overseas_received_at:'2026-10-29'},
+ {...o,id:'b-tail',merchant_id:'b',order_no:'B-TAIL',status:'shipped',overseas_received_at:'2026-10-29'},
+ {...o,id:'a-head',merchant_id:'a',order_no:'A-HEAD',status:'shipped'},
+ {...o,id:'a-paid',merchant_id:'a',order_no:'A-PAID',status:'ready_to_ship'},
+ {...o,id:'a-done',merchant_id:'a',order_no:'A-DONE',status:'delivered',overseas_received_at:'2026-10-29'},
+ {...o,id:'a-exception',merchant_id:'a',order_no:'A-EXCEPTION',status:'exception',overseas_received_at:'2026-10-29'}];render()`);
+ let task=document.querySelector('[data-staff-filter="tail_pending"]');assert.equal(task.querySelector('strong').textContent,'2');assert.match(task.textContent,/2 个客户 · 2 个订单/);
+ task.onclick();assert.equal(run('state.page'),'ship');assert.equal(document.querySelectorAll('[data-staff-customer-row]').length,2);
+ assert.equal(document.querySelectorAll('[data-combined-order-row]').length,0);
+ document.querySelector('[data-staff-customer="a"]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);assert.match(document.querySelector('tbody').textContent,/A-TAIL/);assert.doesNotMatch(document.querySelector('tbody').textContent,/B-TAIL|A-DONE|A-EXCEPTION/);
+ run('combined.busy=true');await document.querySelector('[data-combined-focus="action"]').onclick();assert.equal(run('state.page'),'ship');run('combined.busy=false');
+ await document.querySelector('[data-combined-focus="action"]').onclick();assert.equal(document.querySelector('#combinedAdvance').dataset.action,'tail_ship');
+ // Exercise the existing save path and simulate the refreshed server response.
+ run(`rpcWorkspace=async(n,a)=>{if(n!=='warehouse_advance_combined'||a.p_action!=='tail_ship')throw Error('wrong task');state.dbOrders.find(o=>o.id===a.p_order_id).tail_shipped_at='2026-10-29T06:00:00Z';};refreshDbState=async()=>{render();return true}`);
+ document.querySelector('#cxCarrier').value='J&T';document.querySelector('#cxTracking').value='TAIL-A-001';
+ await run(`combinedSave(document.querySelector('#combinedAdvance'),()=>rpcWorkspace('warehouse_advance_combined',{p_order_id:'a-tail',p_action:'tail_ship'}))`);
+ document.querySelector('[data-staff-order-back]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,0);
+ document.querySelector('[data-combined-filter="tail_transit"]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,1);assert.ok(document.querySelector('[data-combined-open="a-tail"]'));
+ assert.match(document.querySelector('tbody').textContent,/查看派送详情/);
+ run(`state.page='dashboard';render()`);task=document.querySelector('[data-staff-filter="tail_pending"]');assert.equal(task.querySelector('strong').textContent,'1');assert.match(task.textContent,/1 个客户 · 1 个订单/);
+});
+test('shipping stage filters preserve all prior orders and terminal states and retain client isolation',()=>{
+ const {run,document}=staff('warehouse','ship');
+ run(`state.dbOrders=[{...o,id:'head',merchant_id:'a',status:'shipped'},{...o,id:'tail',merchant_id:'b',status:'shipped',overseas_received_at:'2026-10-29'},{...o,id:'cancelled',merchant_id:'a',status:'cancelled',overseas_received_at:'2026-10-29'}];render()`);
+ document.querySelector('[data-staff-customer-filter="tail_pending"]').onclick();assert.equal(document.querySelectorAll('[data-staff-customer-row]').length,1);assert.ok(document.querySelector('[data-staff-customer="b"]'));
+ document.querySelector('[data-staff-customer="b"]').onclick();document.querySelector('[data-combined-filter="head_transit"]').onclick();assert.equal(document.querySelectorAll('[data-combined-order-row]').length,0);
+ run(`state.page='dashboard';render()`);document.querySelector('[data-staff-section="ship"]:not([data-staff-filter])').onclick();assert.equal(run('staffCustomerState().filter'),'all');assert.equal(document.querySelectorAll('[data-staff-customer-row]').length,2);
+ assert.equal(run(`warehouseShippingStage(state.dbOrders.find(o=>o.id==='cancelled'))`),'cancelled');
+});
+test('tail workbench counters, shipping filters and dispatch form work in English and Indonesian',()=>{
+ const {run,document}=staff('warehouse','dashboard');
+ run(`state.dbOrders=[{...o,id:'a-tail',merchant_id:'a',status:'shipped',overseas_received_at:'2026-10-29'}];setUiLanguage('en');render()`);
+ assert.match(document.querySelector('[data-staff-filter="tail_pending"]').textContent,/Register last-mile dispatch.*1 customers · 1 orders/);
+ document.querySelector('[data-staff-filter="tail_pending"]').onclick();assert.equal(document.querySelector('[data-staff-customer-filter="tail_pending"]').textContent,'Awaiting last-mile registration');assert.doesNotMatch(document.querySelector('#content').textContent,/待尾程|运输中/);
+ run(`setUiLanguage('id');render()`);assert.match(document.querySelector('[data-staff-customer-filter="tail_pending"]').textContent,/Menunggu pencatatan/);
+});
