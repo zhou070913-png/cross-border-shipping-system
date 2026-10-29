@@ -6,7 +6,8 @@ body .side-nav button{display:flex;align-items:center;gap:10px;padding:11px 12px
 body .side-nav button.active{background:#315efb;box-shadow:0 5px 14px #070e262b}
 .workspace-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px}
 .workspace-tabs button{background:#fff;border:1px solid var(--line);border-radius:24px;padding:10px 17px;color:#69788f;min-height:42px}
-.workspace-tabs button[aria-selected=true]{background:#183779;border-color:#183779;color:#fff}
+.workspace-tabs button:hover{background:#f0f4ff;border-color:#a9bce9;color:#183779}
+.workspace-tabs button.active,.workspace-tabs button[aria-selected=true],.workspace-tabs button[aria-pressed=true]{background:#183779;border-color:#183779;color:#fff;font-weight:700;box-shadow:0 2px 6px #18377926}
 .workspace-tabs small{margin-left:6px;opacity:.8}
 .parcel-pagination{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:20px;padding-top:18px;border-top:1px solid var(--line);font-size:13px}
 .pagination-summary{color:var(--muted);font-variant-numeric:tabular-nums}
