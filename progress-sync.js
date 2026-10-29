@@ -33,7 +33,9 @@ function showProgressSync(){
  let el=document.getElementById('workspaceSyncStatus');
  if(!progressOwnerKey()){el?.remove();return}
  if(!el){const actions=document.querySelector('.top-actions');if(!actions)return;el=document.createElement('span');el.id='workspaceSyncStatus';el.className='muted';el.style.fontSize='12px';el.setAttribute('role','status');actions.prepend(el)}
- el.textContent=progressLabel();
+ const label=progressLabel();
+ if(typeof localeMarkup==='function')el.innerHTML=localeMarkup(label,typeof indonesianFor==='function'?indonesianFor(label)||'':'');
+ else el.textContent=label;
 }
 function stopProgressChannel(){
  const channel=progressSync.channel,client=progressSync.client;

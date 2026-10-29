@@ -8,6 +8,19 @@ function audit(){
    const n=walk.currentNode,t=n.textContent.trim();
    if(n.nodeType===3&&/[\u4e00-\u9fff]/.test(t)&&!n.parentElement.closest('[data-i18n],[data-user-content],script,style,input,textarea,option'))missing.add(label+': '+t);
   }
+  for(const language of ['en','id']){
+   run(`setUiLanguage('${language}')`);
+   for(const el of document.querySelectorAll('#content [data-i18n]')){
+    if(language==='en'&&!el.dataset.en)missing.add(label+' missing English: '+el.dataset.zh);
+    if(/[\u4e00-\u9fff]/.test(el.textContent))missing.add(label+' '+language+': '+el.textContent);
+   }
+   for(const el of document.querySelectorAll('#content [placeholder],#content [aria-label],#content option')){
+    if(el.closest('[data-user-content],[data-language-control]'))continue;
+    const text=el.tagName==='OPTION'?el.textContent:(el.getAttribute('placeholder')||el.getAttribute('aria-label'));
+    if(/[\u4e00-\u9fff]/.test(text))missing.add(label+' '+language+' attribute/option: '+text);
+   }
+  }
+  run("setUiLanguage('zh')");
  };
  run(`paymentWorkspace.account={id:'a',mode:'test',bank_name:'TEST-BANK',account_holder:'TEST-OWNER',account_number:'TEST-NOT-A-BANK',currency:'CNY',is_active:true,updated_at:'v1'};o.status='awaiting_payment';o.fees=[{shipping_fee:60,handling_fee:18,last_mile_fee:30,total_amount:108,confirmed_at:'now',fee_breakdown_version:2}];`);
  for(const role of ['merchant','warehouse','admin']){
@@ -28,6 +41,10 @@ function audit(){
    run(`staffCustomerState().customer='m';paymentWorkspace.selected='r'`);inspect(run('staffCustomerView(state.page)'),role+' '+page+' detail');
   }
   inspect(run('staffCustomerDashboard()'),role+' customer dashboard');
+ }
+ for(const role of ['merchant','warehouse','admin'])for(const stage of ['submitted','warehouse_received','measuring','awaiting_payment','ready_to_ship','shipped','delivered']){
+  run(`state.role='${role}';o.status='${stage}';o.route_name='印尼海运普货';o.packed_at=['submitted','warehouse_received'].includes(o.status)?null:'now';o.order_parcels=[{parcels:{id:'p',received_at:'now'}}];o.packed_boxes=[{weight:2,length:20,width:20,height:20}];o.overseas_received_at=o.status==='delivered'?'now':null;o.tail_shipped_at=o.status==='delivered'?'now':null;`);
+  inspect(run('combinedDetail(o)'),role+' order '+stage);
  }
  return [...missing];
 }

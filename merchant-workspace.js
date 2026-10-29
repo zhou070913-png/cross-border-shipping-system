@@ -402,7 +402,7 @@ bind=function(){
     if(workspace.parcelBusy)return;
     const p=workspace.parcels.find(p=>p.id===el.dataset.deleteParcel);
     if(!canMaintainParcel(p)){toast('此包裹当前不能删除，请刷新后核对');return}
-    if(!window.confirm(`确定删除包裹「${p.tracking_no}」吗？\n品名：${p.item_name||'未填写'}\n删除后将从包裹列表移除，无法自行撤销。`))return;
+    if(!window.confirm(parcelDeleteConfirmation(p)))return;
     try{await maintainParcel(p.id,'delete')}catch(e){toast('删除失败：'+e.message,6000)}
   });
   on('parcelEditForm','submit',e=>{e.preventDefault();busyForm(e.target,()=>maintainParcel(workspace.editParcelId,'edit',{
@@ -493,4 +493,10 @@ function merchantPageFrame(html){
  }
  $('#crumb').textContent=isChild?`${names[root]} / ${names[page]}`:names[root];
  return crumb+local+journey+html;
+}
+
+function parcelDeleteConfirmation(parcel){
+ const name=parcel.item_name||(typeof uiText==='function'?uiText('未填写','Belum diisi','Not provided'):'未填写');
+ const zh=`确定删除包裹「${parcel.tracking_no}」吗？\n品名：${name}\n删除后将从包裹列表移除，无法自行撤销。`;
+ return typeof uiText==='function'?uiText(zh,`Hapus paket "${parcel.tracking_no}"?\nIsi paket: ${name}\nPaket akan dihapus dari daftar. Tindakan ini tidak dapat dibatalkan.`,`Delete parcel "${parcel.tracking_no}"?\nContents: ${name}\nThe parcel will be removed from the list. This cannot be undone.`):zh;
 }

@@ -203,10 +203,10 @@ test('support contacts test flag and both staff replies are visible; raw content
  assert.equal(document.querySelectorAll('.support-message').length,2);assert.equal(document.querySelectorAll('#content script').length,0);assert.match(document.querySelector('#content').textContent,/TEST-WECHAT.*TEST-WHATSAPP/s);
  assert.equal(document.querySelector('h3 [data-user-content]').textContent,'测试用户标题');
 });
-test('localization is idempotent, Chinese above Indonesian, and preserves values and user data',()=>{
+test('localization is idempotent, uses one selected language, and preserves values and user data',()=>{
  const {run,document}=setup();document.querySelector('#content').innerHTML='<button>我的包裹</button><input value="我的包裹"><p data-user-content>我的包裹</p>';
  run('localizeKnownDom();localizeKnownDom()');assert.equal(document.querySelectorAll('#content [data-i18n]').length,1);
- assert.equal(document.querySelector('#content [lang=zh-CN]').textContent,'我的包裹');assert.equal(document.querySelector('#content [lang=id]').textContent,'Paket saya');assert.equal(document.querySelector('#content input').value,'我的包裹');assert.equal(document.querySelector('#content p').textContent,'我的包裹');
+ assert.equal(document.querySelector('#content [lang=zh-CN]').textContent,'我的包裹');run("setUiLanguage('id')");assert.equal(document.querySelector('#content [lang=id]').textContent,'Paket saya');assert.equal(document.querySelectorAll('#content [lang=zh-CN]').length,0);assert.equal(document.querySelector('#content input').value,'我的包裹');assert.equal(document.querySelector('#content p').textContent,'我的包裹');
 });
 
 test('all new role views, receipt states, login and signup text have Indonesian translations',()=>{
