@@ -1,7 +1,7 @@
 import {PGlite} from '@electric-sql/pglite';
 import fs from 'node:fs/promises';
-export const fixtureUsers={merchant:'10000000-0000-0000-0000-000000000001',admin:'10000000-0000-0000-0000-000000000002',warehouse:'10000000-0000-0000-0000-000000000003'};
-export async function createForwardingDb(){
+export const fixtureUsers={merchant:'10000000-0000-0000-0000-000000000001',admin:'10000000-0000-0000-0000-000000000002',warehouse:'10000000-0000-0000-0000-000000000003',merchant2:'10000000-0000-0000-0000-000000000004'};
+export async function createForwardingDb({secondMerchant=false}={}){
  const db=new PGlite();
  await db.exec(`create role anon;create role authenticated;create schema auth;create schema storage;
  create table auth.users(id uuid primary key default gen_random_uuid(),email text,raw_user_meta_data jsonb default '{}');
@@ -17,9 +17,11 @@ export async function createForwardingDb(){
  const migrations=['schema','warehouse-operations','admin-operations','merchant-workspace','parcel-maintenance','parcel-estimates','payment-review','sea-route','separate-settlement','overseas-addresses','cargo-channels','last-mile-pricing','overseas-forwarding','combined-delivery'];
  for(const name of migrations){let sql=await fs.readFile(new URL('../supabase/'+name+'.sql',import.meta.url),'utf8');await db.exec(sql.replace('create extension if not exists pgcrypto;',''))}
  for(const [role,id] of Object.entries(fixtureUsers)){
+  if(role==='merchant2'&&!secondMerchant)continue;
   await db.query('insert into auth.users(id,email) values($1,$2)',[id,role+'@local.test']);
-  await db.query("update public.profiles set role=$1,member_no=$2,warehouse_id=(select id from public.warehouses where code='SZ-LG-01') where id=$3",[role==='warehouse'?'warehouse_operator':role,'LOCAL-'+role.toUpperCase(),id]);
+  await db.query("update public.profiles set role=$1,member_no=$2,warehouse_id=(select id from public.warehouses where code='SZ-LG-01') where id=$3",[role==='warehouse'?'warehouse_operator':role==='merchant2'?'merchant':role,'LOCAL-'+role.toUpperCase(),id]);
  }
+ if(secondMerchant)await db.query("update public.profiles set display_name=case when id=$1 then '测试客户 A / Pelanggan uji A' else '测试客户 B / Pelanggan uji B' end where id in ($1,$2)",[fixtureUsers.merchant,fixtureUsers.merchant2]);
  return db;
 }
 export async function withRole(db,role,fn){

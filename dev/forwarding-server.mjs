@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createForwardingDb,withRole,seedForwardingPreview,fixtureUsers} from './forwarding-db.mjs';
-const root=fileURLToPath(new URL('../',import.meta.url)),port=4175,db=await createForwardingDb();
+const root=fileURLToPath(new URL('../',import.meta.url)),port=4175,db=await createForwardingDb({secondMerchant:true});
 await seedForwardingPreview(db);
 const proofs=new Map();
 const tables=new Set(['profiles','orders','parcels','overseas_packages','forwarding_order_packages','overseas_warehouse_staff','overseas_warehouses','last_mile_zones','route_pricing','warehouses','support_tickets','payment_receipts','payment_receiving_accounts','payment_notifications','merchant_addresses','tracking_events','audit_logs','support_replies','support_contacts']);
@@ -46,9 +46,9 @@ const server=http.createServer(async(req,res)=>{
    if(url.pathname==='/api/write'){
     // Preview adapter only; keep RLS enabled and allow only the same account/address fields as the public client.
     const fields={merchant_addresses:['label','recipient_name','recipient_phone','country','province','city','address_line','postal_code','is_default'],profiles:['display_name','phone']}[body.table];
-    if(!fields||role!=='merchant')throw Error('Unsupported local write');
+    if(!fields||!['merchant','merchant2'].includes(role))throw Error('Unsupported local write');
     const data=Object.fromEntries(Object.entries(body.payload||{}).filter(([k])=>fields.includes(k)));
-    if(body.action==='insert'&&body.table==='merchant_addresses')data.merchant_id=fixtureUsers.merchant;
+    if(body.action==='insert'&&body.table==='merchant_addresses')data.merchant_id=fixtureUsers[role];
     else if(body.action!=='update'||!body.id)throw Error('Invalid local write');
     const keys=Object.keys(data),values=Object.values(data);if(!keys.length)throw Error('Empty update');
     const result=await withRole(db,role,tx=>tx.query(body.action==='insert'?
@@ -57,7 +57,7 @@ const server=http.createServer(async(req,res)=>{
     return json(res,{data:result.rows});
    }
    if(url.pathname==='/api/proof'){
-    if(role!=='merchant'||!body.path?.startsWith(fixtureUsers.merchant+'/'))throw Error('Invalid proof owner');
+    if(!['merchant','merchant2'].includes(role)||!body.path?.startsWith(fixtureUsers[role]+'/'))throw Error('Invalid proof owner');
     const bytes=Buffer.from(body.base64||'','base64');if(bytes.length<1||bytes.length>5242880||!['image/png','image/jpeg','image/webp'].includes(body.type))throw Error('Invalid proof image');
     await withRole(db,role,tx=>tx.query("insert into storage.objects(bucket_id,name,metadata) values('payment-proofs',$1,$2)",[body.path,{size:bytes.length,mimetype:body.type}]));proofs.set(body.path,{bytes,type:body.type});return json(res,{data:{path:body.path}});
    }
