@@ -45,3 +45,27 @@ test('initial script parsing does not invoke language markup before the language
  vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../bilingual-workspace.js'),'utf8'),context);
  assert.doesNotThrow(()=>callback());assert.equal(walked,0);vm.runInContext('function localeMarkup(){return ""}',context);callback();assert.equal(walked,1);assert.equal(observed,3);
 });
+
+test('confirmation return displays success only for a server-verified confirmed user, not a URL marker or existing unverified user',async()=>{
+ for(const kind of ['confirmed','unconfirmed','none','expired']){
+  const {run,document}=setup();run(`
+   state.auth.user=null;state.auth.role=null;state.auth.profile=null;state.page='dashboard';state.dbOrders=[];
+   registrationReturn.pending=true;registrationReturn.error=${kind==='expired'?"'otp_expired'":'null'};
+   returnUser=${kind==='none'?'null':`{id:'verified-user',email_confirmed_at:${kind==='unconfirmed'?'null':"'2026-10-29T09:14:00Z'"}}`};
+   clearedUrl=null;window.location={pathname:'/latest/',search:'?v=TEST'};window.history={replaceState:(a,b,url)=>{clearedUrl=url}};
+   window.MospaceSupabase={isConfigured:()=>true,currentUser:async()=>returnUser,currentProfile:async()=>({id:'verified-user',role:'merchant'}),myOrders:async()=>[],listAddresses:async()=>[]};loadMerchantWorkspace=async()=>{};
+  `);
+  await run('syncAuth()');const panel=document.querySelector('#registrationResult');assert.ok(panel);
+  if(kind==='confirmed'){assert.match(panel.textContent,/邮箱验证成功，注册已完成/);run("setUiLanguage('en')");assert.match(panel.textContent,/Email verified/)}
+  else {assert.doesNotMatch(panel.textContent,/注册已完成/);assert.match(panel.textContent,kind==='expired'?/已失效或已使用/:/暂时无法确认/)}
+  assert.equal(run('clearedUrl'),'/latest/?v=TEST');panel.querySelector('button').onclick();assert.equal(document.querySelector('#registrationResult'),null);run('render()');assert.equal(document.querySelector('#registrationResult'),null);
+ }
+});
+
+test('return parsing retains no credentials or raw descriptions and never treats a generic successful page as verification',()=>{
+ const {run}=setup();
+ const info=run(`JSON.stringify(registrationReturnInfo({hash:'#access_token=PRIVATE&refresh_token=PRIVATE&type=signup',search:''}))`);
+ assert.deepEqual(JSON.parse(info),{pending:true,error:null});assert.ok(!info.includes('PRIVATE'));
+ assert.equal(run(`registrationReturnInfo({hash:'',search:'?success=true'}).pending`),false);
+ assert.equal(run(`registrationReturnInfo({hash:'#error=access_denied&error_code=otp_expired&error_description=PRIVATE'}).error`),'otp_expired');
+});

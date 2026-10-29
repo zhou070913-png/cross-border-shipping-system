@@ -3,7 +3,7 @@ const {parseHTML}=require('linkedom');
 module.exports=function setup(){
  const root=path.join(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const {window,document}=parseHTML(html);
- const c=vm.createContext({console,document,window:{MospaceSupabase:{isConfigured:()=>true},scrollTo:()=>{},scrollY:0},NodeFilter:{SHOW_TEXT:4},localStorage:{getItem:()=>null,setItem:()=>{}},navigator:{onLine:true},crypto:require('node:crypto').webcrypto,URL,Blob,Uint8Array,setTimeout:()=>0,clearTimeout:()=>{},MutationObserver:undefined});
+ const c=vm.createContext({console,document,window:{MospaceSupabase:{isConfigured:()=>true},scrollTo:()=>{},scrollY:0},NodeFilter:{SHOW_TEXT:4},localStorage:{getItem:()=>null,setItem:()=>{}},navigator:{onLine:true},crypto:require('node:crypto').webcrypto,URL,URLSearchParams,Blob,Uint8Array,setTimeout:()=>0,clearTimeout:()=>{},MutationObserver:undefined});
  const run=s=>vm.runInContext(s,c);
  run([...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('const state =')));
  for(const f of ['merchant-workspace.js','warehouse-workspace.js','payment-workspace.js','transport-workspace.js','separate-settlement.js','overseas-addresses.js','calculator-workspace.js','last-mile-pricing.js','overall-orders.js','forwarding-workspace.js','combined-workspace.js','customer-workspace.js','locale-en.js','bilingual-workspace.js','locale-switch.js'])run(fs.readFileSync(path.join(root,f),'utf8'));

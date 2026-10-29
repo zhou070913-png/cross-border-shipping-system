@@ -88,3 +88,37 @@ const registrationBaseBind=bind;
 bind=function(){registrationBaseBind();$('#authResend').onclick=resendRegistration};
 const registrationBaseClose=closeAuth;
 closeAuth=function(){registrationBaseClose();clearTimeout(registration.timer);$('#authPassword').value='';$('#authCode').value=''};
+
+// Capture only confirmation metadata before the SDK consumes the URL fragment.
+// Access tokens stay with Supabase; never copy them into UI, logs or storage.
+function registrationReturnInfo(location){
+ const fragment=new URLSearchParams(location?.hash?.replace(/^#/,'')||'');
+ const query=new URLSearchParams(location?.search||'');
+ const error=fragment.get('error_code')||fragment.get('error')||query.get('error_code')||query.get('error');
+ return {pending:fragment.get('type')==='signup'||!!error,error:error||null};
+}
+const registrationReturn={...registrationReturnInfo(window.location),result:null};
+function showRegistrationResult(){
+ $('#registrationResult')?.remove();
+ if(!registrationReturn.result)return;
+ const success=registrationReturn.result==='success';
+ const title=success?registrationText('邮箱验证成功，注册已完成','Email terverifikasi, pendaftaran selesai','Email verified — registration complete'):registrationText('验证链接未完成确认','Tautan verifikasi belum dikonfirmasi','Email confirmation was not completed');
+ const detail=success?registrationText('你已进入商家端，之后可用邮箱或会员号和密码登录。','Anda telah masuk ke dasbor pelanggan. Selanjutnya masuk dengan email atau nomor anggota dan kata sandi.','You are signed in to your customer workspace. Next time, use your email or member number and password.'):registrationReturn.result==='expired'?registrationText('链接已失效或已使用。若之前已确认，可直接登录；尚未验证请重新发送邮件。','Tautan kedaluwarsa atau sudah digunakan. Masuk jika sudah diverifikasi, atau kirim ulang email.','This link has expired or was already used. Sign in if already verified; otherwise resend the email.'):registrationText('暂时无法确认邮箱状态，请检查网络后登录；尚未验证可重新发送邮件。','Status email belum dapat dikonfirmasi. Periksa koneksi dan masuk, atau kirim ulang jika belum diverifikasi.','We could not confirm your email status. Check your connection and sign in, or resend if not yet verified.');
+ const panel=document.createElement('section');panel.id='registrationResult';panel.className='notice';panel.setAttribute('role','status');panel.style.cssText='margin:16px 20px;display:flex;align-items:center;gap:12px';
+ panel.innerHTML=`<div><strong>${esc(title)}</strong><p>${esc(detail)}</p></div><button type="button" class="btn ghost small" style="margin-left:auto">${esc(registrationText('关闭','Tutup','Dismiss'))}</button>`;
+ const target=$('#content');if(!target)return;target.prepend(panel);panel.querySelector('button').onclick=()=>{registrationReturn.result=null;panel.remove()};
+}
+const registrationBaseRender=render;
+render=function(){registrationBaseRender();showRegistrationResult()};
+const registrationBaseSync=syncAuth;
+syncAuth=async function(options){
+ const handleReturn=registrationReturn.pending;registrationReturn.pending=false;
+ const loaded=await registrationBaseSync(options);
+ if(handleReturn){
+  registrationReturn.result=registrationReturn.error?(/expired|access_denied/.test(registrationReturn.error)?'expired':'failed'):loaded&&state.auth.user?.email_confirmed_at?'success':'failed';
+  showRegistrationResult();
+  // Remove consumed credentials/errors from the address bar without persisting them.
+  if(window.history?.replaceState&&window.location)window.history.replaceState(null,'',window.location.pathname+window.location.search);
+ }
+ return loaded;
+};

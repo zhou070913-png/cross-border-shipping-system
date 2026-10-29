@@ -26,4 +26,8 @@ link 模式保留注册弹窗，提示打开最新邮件，返回点击“已验
 
 用户后续选择保留第三种“邮件链接验证”，因此保持 link 模式，不配置 SMTP 或升级套餐。验证码模块和模板仅作为后续可选能力，不代表已启用。
 
+确认链接回跳捕获 signup 标记后，必须由 Supabase currentUser 验证已登录且 email_confirmed_at 有值，才显示“邮箱验证成功，注册已完成”。过期/已使用链接只提示登录或重新发信，不将 URL 参数当作注册成功凭据。
+
+默认发信限制（2026-10-29 查官方文档）：仅项目组织团队成员邮箱可接收，当前每项目每小时 2 封，限制可随时调整。即使保留链接验证，向普通客户开放邮件注册也需要可用的自定义 SMTP；验证码和链接只是邮件内容/交互的选择，与发信渠道独立。https://supabase.com/docs/guides/auth/auth-smtp
+
 官方参考：https://supabase.com/docs/reference/javascript/auth-verifyotp 、https://supabase.com/docs/guides/auth/auth-email-templates
