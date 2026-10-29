@@ -42,6 +42,7 @@ function showProgressSync(){
  if(!progressOwnerKey()){el?.remove();return}
  if(!el){const actions=document.querySelector('.top-actions');if(!actions)return;el=document.createElement('span');el.id='workspaceSyncStatus';el.className='muted';el.style.fontSize='12px';el.setAttribute('role','status');actions.prepend(el)}
  const label=progressLabel();
+ if(el.progressLabelValue===label)return;el.progressLabelValue=label;
  if(typeof localeMarkup==='function')el.innerHTML=localeMarkup(label,typeof indonesianFor==='function'?indonesianFor(label)||'':'');
  else el.textContent=label;
 }
@@ -89,14 +90,14 @@ function queueProgressRefresh(){
 }
 async function readProgressSnapshot(){
  const role=state.role,id=state.activeOrderId,trackingId=warehouseWorkspace.selectedId;
- const [orders,parcels,receipts,notices,events,warehouseEvents]=await Promise.all([
+ const [orders,parcels,receipts,notices,events,warehouseEvents,forwardingSnapshot,combinedSnapshot]=await Promise.all([
   window.MospaceSupabase.myOrders(),queryData('parcels'),
   role==='warehouse'?Promise.resolve(paymentWorkspace.receipts):paymentRows('payment_receipts'),paymentRows('payment_notifications'),
   ['tracking','fee','overall-order'].includes(state.page)&&id?window.MospaceSupabase.orderTracking(id):Promise.resolve(null),
-  state.page==='warehouse-tracking-detail'&&trackingId?window.MospaceSupabase.orderTracking(trackingId):Promise.resolve(null)
+  state.page==='warehouse-tracking-detail'&&trackingId?window.MospaceSupabase.orderTracking(trackingId):Promise.resolve(null),
+  typeof forwarding!=='undefined'&&forwarding.ready?readForwardingSnapshot():null,
+  typeof combined!=='undefined'&&combined.ready?readCombinedProgressSnapshot():null
  ]);
- const forwardingSnapshot=typeof forwarding!=='undefined'&&forwarding.ready?await readForwardingSnapshot():null;
- const combinedSnapshot=typeof combined!=='undefined'&&combined.ready?await readCombinedProgressSnapshot():null;
  return {orders,parcels,receipts,notices,events,warehouseEvents,forwardingSnapshot,combinedPending:combinedSnapshot?.pending??null,combinedSnapshot};
 }
 function progressTrackingFingerprint(events){return events===null?null:(events||[]).map(e=>[e.event_title??e.title,e.event_description??e.desc??'',e.occurred_at?new Date(e.occurred_at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):e.time])}

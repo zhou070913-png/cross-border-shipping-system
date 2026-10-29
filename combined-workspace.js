@@ -43,16 +43,17 @@ navs.merchant=[['dashboard','首页'],['rates','运输计算器'],['parcels','�
 navs.warehouse=[['dashboard','仓库工作台'],['inbound','收货管理'],['confirm','合包与费用复核'],['ship','出货与物流'],['support-warehouse','消息与客服']];
 const combinedLoadPrevious=loadMerchantWorkspace;
 loadMerchantWorkspace=async function(){
- const key=state.auth.user?.id+':'+state.role;await combinedLoadPrevious();if(key!==state.auth.user?.id+':'+state.role)return;
+ const key=state.auth.user?.id+':'+state.role,previous=combinedLoadPrevious();
  if(combined.owner!==key)Object.assign(combined,{owner:key,ready:false,error:null,pending:[],replies:[],contacts:null,filter:'all',warehouseFilter:'all',orderPage:1,orderPageSize:10,inboundTab:'pending',receiptQuery:'',receiptPage:1,warehouseReturnPage:null,receiptReturnId:null,inboundCustomer:null,customerQuery:'',customerPage:1,customers:[],requestId:null,draft:{},packOrder:null,replyDraft:{}});
- if(!state.auth.user)return;combined.loading=true;
+ const load=async()=>{if(!state.auth.user)return;combined.loading=true;
  try{
   const version=await rpcWorkspace('combined_capabilities',{});if(version==null)throw Object.assign(Error('capabilities'),{code:'42501'});if(version!==1)throw Object.assign(Error('capabilities'),{kind:'migration'});
   const [tickets,replies,contacts,pending,routes,profiles,customers]=await Promise.all([queryData('support_tickets'),queryData('support_replies'),queryData('support_contacts'),state.role==='merchant'?[]:rpcWorkspace('warehouse_pending_customers',{}),queryData('route_pricing'),state.role==='admin'?queryData('profiles'):[],state.role==='warehouse'?rpcWorkspace('warehouse_customer_directory',{}):[]]);
   if(key!==state.auth.user?.id+':'+state.role)return;
   Object.assign(combined,{ready:true,error:null,pending,replies,contacts:contacts[0]||null,profiles,customers});workspace.tickets=tickets;workspace.routes=routes;
  }catch(e){if(combined.owner===key&&key===state.auth.user?.id+':'+state.role)combined.error=combinedLoadError(e)}
- finally{if(combined.owner===key)combined.loading=false}
+ finally{if(combined.owner===key)combined.loading=false}};
+ await Promise.all([previous,load()]);
 };
 function combinedProgress(o){
  if(o.status==='cancelled')return ['cancelled','已取消','Dibatalkan'];
@@ -191,7 +192,7 @@ function combinedDetail(o,tracking=false){
  if(state.role==='merchant')body+=`<div class="form-actions">${cb('咨询此订单','Tanya tentang pesanan','support')}</div>`+(o.status==='awaiting_payment'?merchantPaymentSection(o):['paid','ready_to_ship','shipped','delivered'].includes(o.status)?cn('整单付款已确认，无需再次付款。','Pembayaran pesanan sudah dikonfirmasi. Tidak perlu membayar lagi.')+paymentHistory(o.id):cn('等待仓库收货、合包实测和费用复核。','Menunggu penerimaan, penggabungan, pengukuran, dan verifikasi biaya gudang.'));
  else if(state.role==='warehouse')body+=combinedWarehouseActions(o);
  else if(state.role==='admin')body+=`<div class="form-actions">${combinedReviewButton(o)||cn('客户尚未提交付款凭证，暂不能审核。','Pelanggan belum mengirim bukti pembayaran, sehingga belum dapat diverifikasi.')}</div>`;
- body+=`<div class="card section-space"><h3>${bi('物流信息','Informasi pengiriman')}</h3><div class="metric">${bi('头程承运商 / 运单号','Pengangkut / resi ke Indonesia')}<b>${raw(o.shipment_carrier)} · ${raw(o.shipment_tracking_no)}</b></div><div class="metric">${bi('尾程快递 / 运单号','Kurir / resi pengiriman akhir')}<b>${raw(o.tail_carrier)} · ${raw(o.tail_tracking_no)}</b></div>${o.tail_shipped_at?`<div class="metric">${bi('尾程派送登记时间','Waktu pencatatan pengiriman akhir')}<b>${raw(dateText(o.tail_shipped_at))}</b></div>`:''}${cn('显示仓库登记的节点，可复制尾程单号到快递官网查询。','Menampilkan pembaruan yang dicatat gudang. Salin resi akhir untuk melacak di situs kurir.')}<div class="timeline">${state.events?.length?state.events.map(e=>`<div class="event"><div></div><div><h4>${translatedText(e.title)}</h4><p>${translatedText(e.desc)}<br>${raw(e.time)}</p></div></div>`).join(''):ce()}</div></div>`;
+ body+=`<div class="card section-space"><h3>${bi('物流信息','Informasi pengiriman')}</h3><div class="metric">${bi('头程承运商 / 运单号','Pengangkut / resi ke Indonesia')}<b>${raw(o.shipment_carrier)} · ${raw(o.shipment_tracking_no)}</b></div><div class="metric">${bi('尾程快递 / 运单号','Kurir / resi pengiriman akhir')}<b>${raw(o.tail_carrier)} · ${raw(o.tail_tracking_no)}</b></div>${o.tail_shipped_at?`<div class="metric">${bi('尾程派送登记时间','Waktu pencatatan pengiriman akhir')}<b>${raw(dateText(o.tail_shipped_at))}</b></div>`:''}${cn('显示仓库登记的节点，可复制尾程单号到快递官网查询。','Menampilkan pembaruan yang dicatat gudang. Salin resi akhir untuk melacak di situs kurir.')}<div class="timeline" data-order-timeline>${selectedOrderTimeline()}</div></div>`;
  return body;
 }
 function combinedWarehouseDashboard(){
@@ -364,8 +365,7 @@ async function combinedSave(form,fn,page){
 }
 async function combinedOpen(id){
  const o=state.dbOrders.find(o=>o.id===id);if(!o)return;combined.warehouseReturnPage=state.role==='warehouse'&&['confirm','ship'].includes(state.page)?state.page:null;combined.receiptReturnId=state.role==='warehouse'&&state.page==='inbound'&&!!combined.inboundCustomer?id:null;applyDbOrder(o);workspace.supportOrderId=o.id;state.events=[];
- try{const events=await window.MospaceSupabase.orderTracking(id);if(state.activeOrderId!==id)return;applyTracking(events)}catch(e){if(state.activeOrderId!==id)return;toast('物流节点读取失败')}
- go(state.role==='merchant'?'fee':'overall-order',{role:state.role});
+ return loadSelectedOrderTracking(id,state.role==='merchant'?'fee':'overall-order');
 }
 function rememberCombinedRequest(){const f=$('#combinedRequest');if(!f)return;combined.draft={route:$('#crRoute').value,recipient:readRecipient(),note:$('#crNote').value};workspace.selected=new Set([...f.querySelectorAll('[name=combinedParcel]:checked')].map(p=>p.value))}
 const combinedBindPrevious=bind;

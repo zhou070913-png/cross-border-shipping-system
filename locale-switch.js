@@ -112,8 +112,12 @@ function updateUiElement(el){
 }
 localizeKnownDom=function(root=document.body){
  if(!root)return;
+ // Explicit page renders already localize synchronously. Do not observe our own text replacements.
+ const observer=typeof localeMutationObserver==='undefined'?null:localeMutationObserver;observer?.disconnect();
+ try{
  ensureLanguageControl();document.documentElement.lang=uiLangTag();
  const title=uiText('Eaztrans集运｜产品原型','Eaztrans Logistik · Demo','Eaztrans Logistics · Demo');if(document.title!==title)document.title=title;
+ if(root.matches?.('[data-i18n][data-zh]'))updateUiElement(root);
  for(const el of root.querySelectorAll('[data-i18n][data-zh]'))updateUiElement(el);
  const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[];
  while(walk.nextNode())nodes.push(walk.currentNode);
@@ -123,7 +127,8 @@ localizeKnownDom=function(root=document.body){
   const holder=document.createElement('span');holder.innerHTML=localeMarkup(pair.zh,pair.id);n.replaceWith(holder.firstChild);
  }
  // Attribute sources are remembered separately; values, option values and user content are never translated.
- for(const el of root.querySelectorAll('[placeholder],[aria-label],img[alt],option')){
+ const attributeSelector='[placeholder],[aria-label],img[alt],option';
+ for(const el of [...(root.matches?.(attributeSelector)?[root]:[]),...root.querySelectorAll(attributeSelector)]){
   if(el.closest('[data-user-content],[data-language-control]'))continue;
   let attrs=uiLanguage.attributes.get(el);if(!attrs){attrs={};uiLanguage.attributes.set(el,attrs)}
   for(const key of el.tagName==='OPTION'?['textContent']:['placeholder','aria-label','alt']){
@@ -134,6 +139,7 @@ localizeKnownDom=function(root=document.body){
    record.output=next;
   }
  }
+ }finally{observer?.observe(document.body,localeObserveOptions)}
 };
 function setUiLanguage(language){
  if(!['zh','en','id'].includes(language))return false;

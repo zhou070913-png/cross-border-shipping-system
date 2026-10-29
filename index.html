@@ -74,7 +74,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-client.js?v=registration-2"></script>
+  <script src="supabase-client.js?v=performance-1"></script>
   <script>
     const state = {
       role:'merchant', page:'dashboard',
@@ -255,37 +255,35 @@
     async function continuePendingNavigation(){
       const pending=state.auth.pending;
       state.auth.pending=null;state.auth.pendingRole=null;
-      const loaded=await syncAuth({renderView:false});
+      const loaded=await syncAuth({renderView:false,trackingPage:pending?.page});
       if(!loaded)return false;
       if(pending){const target=normalizedRole(state.auth.role);if(target!==pending.role)return false;state.role=target;state.page=pending.page;if(pending.parcelNo)state.selectedParcelNo=pending.parcelNo;if(pending.exceptionId)state.selectedException=pending.exceptionId}
       else state.page='dashboard';
       return true;
     }
-    async function syncAuth({renderView=true}={}){
+    async function syncAuth({renderView=true,trackingPage=null}={}){
       if(!window.MospaceSupabase.isConfigured())return false;
       const version=++authFlow.syncVersion,current=()=>version===authFlow.syncVersion;
       try{
         const user=await window.MospaceSupabase.currentUser();if(!current())return false;
-        const profile=user?await window.MospaceSupabase.currentProfile():null;if(!current())return false;
+        const profile=user?await window.MospaceSupabase.currentProfile(user):null;if(!current())return false;
         if(user&&!profile)throw Error('账号资料暂不可用');
         state.auth.user=user;state.auth.profile=profile;state.auth.role=profile?.role||null;
         state.role=normalizedRole(state.auth.role);
         if(user){
-          const orders=await window.MospaceSupabase.myOrders();if(!current())return false;
-          state.dbOrders=orders;
-          if(orders.length){
-            const latest=currentDbOrder(orders);applyDbOrder(latest);
-            try{const events=await window.MospaceSupabase.orderTracking(latest.id);if(!current())return false;applyTracking(events)}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
-          }
-          if(state.auth.role==='merchant'){
-            try{const addresses=await window.MospaceSupabase.listAddresses();if(!current())return false;state.addresses=addresses}catch(addressError){console.info('地址暂不可读',addressError.message)}
-          }
+          const ordersTask=window.MospaceSupabase.myOrders().then(async orders=>{
+            if(!current())return;state.dbOrders=orders;if(state.auth.role==='admin')state.adminOrders=orders;
+            if(orders.length){const latest=currentDbOrder(orders);applyDbOrder(latest);
+              if(['fee','tracking','overall-order'].includes(trackingPage||state.page))try{const events=await window.MospaceSupabase.orderTracking(latest.id);if(current())applyTracking(events)}catch(e){console.info('物流轨迹暂不可读',e.message)}
+            }else{state.activeOrderId=null;state.order={id:'',status:'draft',parcels:0,record:null};state.parcels=[];state.events=[]}
+          });
+          const jobs=[ordersTask,loadMerchantWorkspace()];
+          if(state.auth.role==='merchant')jobs.push(window.MospaceSupabase.listAddresses().then(addresses=>{if(current())state.addresses=addresses}).catch(e=>console.info('地址暂不可读',e.message)));
           if(state.auth.role==='admin'){
-            try{const orders=await window.MospaceSupabase.adminOrders();if(!current())return false;state.adminOrders=orders}catch(orderError){console.info('后台订单暂不可读',orderError.message)}
-            try{const logs=await window.MospaceSupabase.adminAuditLogs();if(!current())return false;state.auditLogs=logs}catch(auditError){console.info('审计日志暂不可读',auditError.message)}
-            try{const pricing=await window.MospaceSupabase.getRoutePricing('ID-AIR');if(!current())return false;state.pricing=pricing}catch(pricingError){console.info('运价配置暂不可读',pricingError.message)}
+            jobs.push(window.MospaceSupabase.adminAuditLogs().then(logs=>{if(current())state.auditLogs=logs}).catch(e=>console.info('审计日志暂不可读',e.message)));
+            jobs.push(window.MospaceSupabase.getRoutePricing('ID-AIR').then(pricing=>{if(current())state.pricing=pricing}).catch(e=>console.info('运价配置暂不可读',e.message)));
           }
-          if(!current())return false;await loadMerchantWorkspace();if(!current())return false;
+          await Promise.all(jobs);if(!current())return false;
         }
       }catch(error){
         if(!current())return false;
@@ -532,15 +530,16 @@
       bind();
     }
     async function refreshDbState(nextPage){
+      const owner=state.auth.user?.id,role=state.role;
       try{
-        const orders=await window.MospaceSupabase.myOrders();
+        const [orders]=await Promise.all([window.MospaceSupabase.myOrders(),loadMerchantWorkspace()]);
+        if(!owner||owner!==state.auth.user?.id||role!==state.role)return false;
         state.dbOrders=orders;
         if(orders.length){
           const latest=currentDbOrder(orders);
           applyDbOrder(latest);
-          try{applyTracking(await window.MospaceSupabase.orderTracking(latest.id));}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
-        }
-        await loadMerchantWorkspace();
+          if(['fee','tracking','overall-order'].includes(nextPage||state.page))try{const events=await window.MospaceSupabase.orderTracking(latest.id);if(owner!==state.auth.user?.id||role!==state.role)return false;applyTracking(events)}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
+        }else{state.activeOrderId=null;state.order={id:'',status:'draft',parcels:0,record:null};state.parcels=[];state.events=[]}
         if(nextPage)state.page=nextPage;
         render();
         return true;
@@ -625,23 +624,23 @@
     }
 
   </script>
-  <script src="merchant-workspace.js?v=20"></script>
+  <script src="merchant-workspace.js?v=21"></script>
   <script src="warehouse-workspace.js?v=5"></script>
-  <script src="payment-workspace.js?v=10"></script>
+  <script src="payment-workspace.js?v=11"></script>
   <script src="transport-workspace.js?v=3"></script>
   <script src="separate-settlement.js?v=5"></script>
   <script src="overseas-addresses.js?v=2"></script>
   <script src="calculator-workspace.js?v=2"></script>
   <script src="last-mile-pricing.js?v=2"></script>
   <script src="overall-orders.js?v=2"></script>
-  <script src="forwarding-workspace.js?v=1"></script>
-  <script src="combined-workspace.js?v=16"></script>
+  <script src="forwarding-workspace.js?v=2"></script>
+  <script src="combined-workspace.js?v=17"></script>
   <script src="customer-workspace.js?v=3"></script>
   <script src="locale-en.js?v=3"></script>
-  <script src="bilingual-workspace.js?v=5"></script>
-  <script src="locale-switch.js?v=3"></script>
+  <script src="bilingual-workspace.js?v=6"></script>
+  <script src="locale-switch.js?v=4"></script>
   <script src="registration-workspace.js?v=2"></script>
-  <script src="progress-sync.js?v=6"></script>
+  <script src="progress-sync.js?v=7"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>

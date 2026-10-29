@@ -35,9 +35,9 @@
     return data.user;
   }
 
-  async function currentProfile() {
+  async function currentProfile(verifiedUser) {
     const instance = await requireClient();
-    const user = await currentUser();
+    const user = verifiedUser || await currentUser();
     if (!user) return null;
     const { data, error } = await instance
       .from('profiles')

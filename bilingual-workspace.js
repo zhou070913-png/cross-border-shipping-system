@@ -145,9 +145,25 @@ function localizeKnownDom(root=document.body){
 const combinedOriginalToast=toast;
 toast=function(message,duration=2200){combinedOriginalToast(message,duration);const t=$('#toast'),id=indonesianFor(String(message));if(t&&id)t.innerHTML=bi(message,id)};
 // Observe dynamic payment panels, status, auth modal and toasts without altering input values.
+let localeMutationObserver=null;
+const localeObserveOptions={childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['placeholder','aria-label','alt']};
+function localizeMutationRecords(records=[]){
+ const roots=[];
+ for(const record of records){
+  const nodes=['characterData','attributes'].includes(record.type)?[record.target]:[...(record.addedNodes||[])];
+  for(const node of nodes){
+   const root=node.nodeType===1?node:node.parentElement;
+   if(!root?.isConnected||root.closest('[data-user-content],[data-language-control],script,style')||record.type!=='attributes'&&root.closest('[data-i18n],textarea,input,option'))continue;
+   if(roots.some(other=>other===root||other.contains(root)))continue;
+   for(let i=roots.length-1;i>=0;i--)if(root.contains(roots[i]))roots.splice(i,1);
+   roots.push(root);
+  }
+ }
+ for(const root of roots)localizeKnownDom(root);
+}
 if(typeof MutationObserver!=='undefined'){
- const localeObserver=new MutationObserver(()=>{localeObserver.disconnect();localizeKnownDom();localeObserver.observe(document.body,{childList:true,subtree:true,characterData:true})});
- localeObserver.observe(document.body,{childList:true,subtree:true,characterData:true});
+ localeMutationObserver=new MutationObserver(localizeMutationRecords);
+ localeMutationObserver.observe(document.body,localeObserveOptions);
 }
 const combinedLoginPrevious=loginPage;
 loginPage=function(){return combinedLoginPrevious().replace('头程付款出货，尾程独立结算、查询物流','头程尾程复核后一次付款，再出货与查询物流')};

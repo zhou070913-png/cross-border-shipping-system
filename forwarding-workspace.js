@@ -19,13 +19,15 @@ function applyForwardingSnapshot(snapshot){Object.assign(forwarding,snapshot);fo
 const forwardingLoad=loadMerchantWorkspace;
 loadMerchantWorkspace=async function(){
  const owner=forwardingOwner();if(forwarding.owner!==owner)resetForwarding();
- await forwardingLoad();if(owner!==forwardingOwner()||!state.auth.user)return;
+ const previous=forwardingLoad();
+ const load=async()=>{if(owner!==forwardingOwner()||!state.auth.user)return;
  try{
   const version=await rpcWorkspace('forwarding_capabilities',{});if(version!==1)throw Error('数据库尚未启用整包转寄');
   const snapshot=await readForwardingSnapshot();
   if(owner!==forwardingOwner())return;applyForwardingSnapshot(snapshot);forwarding.ready=true;
   if(state.role==='warehouse')workspace.overseasWarehouses=await queryData('overseas_warehouses');
- }catch(e){if(owner===forwardingOwner()){forwarding.ready=false;forwarding.error='整包转寄开发数据库尚未就绪，或读取失败。请核对开发环境配置后刷新。';forwarding.packages=[];forwarding.items=[];forwarding.staff=[]}}
+ }catch(e){if(owner===forwardingOwner()){forwarding.ready=false;forwarding.error='整包转寄开发数据库尚未就绪，或读取失败。请核对开发环境配置后刷新。';forwarding.packages=[];forwarding.items=[];forwarding.staff=[]}}};
+ await Promise.all([previous,load()]);
 };
 function forwardingGuard(){return !forwarding.ready?notice('海外仓数据暂不可用',forwarding.error||'请刷新数据后重试。'):''}
 function headPackages(head){return forwarding.packages.filter(p=>p.source_order_id===head?.id)}

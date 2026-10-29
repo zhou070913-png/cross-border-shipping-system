@@ -43,7 +43,7 @@ test('initial script parsing does not invoke language markup before the language
  const fs=require('node:fs'),vm=require('node:vm');let callback,observed=0,walked=0;
  const context=vm.createContext({toast:()=>{},loginPage:()=>'',NodeFilter:{SHOW_TEXT:4},document:{body:{},createTreeWalker:()=>{walked++;return {nextNode:()=>false}}},MutationObserver:class{constructor(fn){callback=fn}disconnect(){}observe(){observed++}}});
  vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../bilingual-workspace.js'),'utf8'),context);
- assert.doesNotThrow(()=>callback());assert.equal(walked,0);vm.runInContext('function localeMarkup(){return ""}',context);callback();assert.equal(walked,1);assert.equal(observed,3);
+ assert.doesNotThrow(()=>callback([]));vm.runInContext('localizeKnownDom()',context);assert.equal(walked,0);vm.runInContext('function localeMarkup(){return ""};localizeKnownDom()',context);assert.equal(walked,1);assert.equal(observed,1);
 });
 
 test('confirmation return displays success only for a server-verified confirmed user, not a URL marker or existing unverified user',async()=>{

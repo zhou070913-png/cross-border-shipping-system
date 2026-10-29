@@ -30,7 +30,7 @@ async function loadPaymentWorkspace(){
   finally{if(state.auth.user?.id===owner)paymentWorkspace.loading=false}
 }
 const beforePaymentLoad=loadMerchantWorkspace;
-loadMerchantWorkspace=async function(){await beforePaymentLoad();await loadPaymentWorkspace()};
+loadMerchantWorkspace=async function(){await Promise.all([beforePaymentLoad(),loadPaymentWorkspace()])};
 function receivingAccountHtml(a){
   if(!a)return notice('暂未启用收款账户','请联系运营配置收款账户，此时不能提交凭证。');
   return (a.mode==='test'?testPaymentNotice():notice('银行转账','请按本单最终金额转账一次，再提交凭证。运营核实到账后才确认付款成功。'))+

@@ -70,7 +70,14 @@ function icon(name){
   return `<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${paths[name]||paths.orders}"/></svg></span>`;
 }
 Object.assign(pageRoles,{'parcel-edit':'merchant','pre-advise':'merchant','packing-request':'merchant','packing-history':'merchant',receivers:'merchant','tracking-list':'merchant','sea-tracking':'merchant',rates:'merchant',messages:'merchant',support:'merchant',offers:'merchant',billing:'merchant',profile:'merchant','support-admin':'admin'});
+const workspaceReads=new Map();
 async function queryData(table,columns='*'){
+  const key=JSON.stringify([state.auth.user?.id,state.role,table,columns]);
+  if(workspaceReads.has(key))return workspaceReads.get(key);
+  const pending=queryDataRows(table,columns);workspaceReads.set(key,pending);
+  try{return await pending}finally{if(workspaceReads.get(key)===pending)workspaceReads.delete(key)}
+}
+async function queryDataRows(table,columns='*'){
   // 分批读取包裹和客服记录，避免接口默认行数上限截断列表与对话。
   if(['parcels','support_tickets','support_replies'].includes(table)){
     const rows=[],batchSize=500;
@@ -101,6 +108,8 @@ async function loadMerchantWorkspace(){
   if(state.role==='warehouse')jobs.parcels=()=>queryData('parcels');
   if(state.role==='admin')jobs.routes=()=>queryData('route_pricing');
   if(['merchant','admin'].includes(state.role)){jobs.tickets=()=>queryData('support_tickets');jobs.overseasWarehouses=()=>queryData('overseas_warehouses');}
+  // The combined loader owns these two collections when that module is installed.
+  if(typeof combined!=='undefined'){delete jobs.routes;delete jobs.tickets}
   await Promise.all(Object.entries(jobs).map(async([key,fn])=>{
     try{const rows=await fn();if(state.auth.user?.id!==owner||state.role!==role)return;workspace[key]=rows;delete workspace.errors[key]}catch(e){if(state.auth.user?.id!==owner||state.role!==role)return;workspace.errors[key]=e.message}
   }));
@@ -202,10 +211,26 @@ function parcelLinkedOrders(p){const tail=parcelTailOrder(p);return p.order?`${e
 async function selectWorkspaceOrder(id,page){
   const o=state.dbOrders.find(x=>x.id===id);
   if(!o){toast('未找到订单，请刷新列表');return}
-  applyDbOrder(o);state.events=[];
-  const selectedId=o.id;
-  try{const events=await window.MospaceSupabase.orderTracking(id);if(state.activeOrderId!==selectedId)return;applyTracking(events)}catch(e){toast('物流节点读取失败，请刷新重试')}
-  go(page,{role:'merchant'});
+  applyDbOrder(o);return loadSelectedOrderTracking(id,page);
+}
+let selectedTrackingRequest=0;
+function selectedOrderTimeline(){
+ const current=workspace.trackingLoad?.id===state.activeOrderId?workspace.trackingLoad:null;
+ if(current?.loading)return `<p role="status">${localeMarkup('物流加载中…','Memuat pelacakan…','Loading tracking…')}</p>`;
+ if(current?.error)return `<p role="status">${localeMarkup('物流读取失败，请重新打开订单重试。','Gagal memuat pelacakan. Buka kembali pesanan untuk mencoba lagi.','Tracking could not load. Reopen the order to try again.')}</p>`;
+ return state.events?.length?state.events.map(e=>`<div class="event"><div></div><div><h4>${translatedText(e.title)}</h4><p>${translatedText(e.desc)}<br>${raw(e.time)}</p></div></div>`).join(''):emptyState(uiText('暂无记录','Belum ada data','No records'),'', '');
+}
+async function loadSelectedOrderTracking(id,page){
+ const owner=state.auth.user?.id,role=state.role,request=++selectedTrackingRequest;
+ workspace.trackingLoad={id,request,loading:true,error:false};state.events=[];
+ if(go(page,{role})===false){workspace.trackingLoad=null;return false}
+ const current=()=>owner===state.auth.user?.id&&role===state.role&&id===state.activeOrderId&&page===state.page&&request===selectedTrackingRequest;
+ try{const events=await window.MospaceSupabase.orderTracking(id);if(!current())return false;applyTracking(events)}
+ catch(e){if(!current())return false;workspace.trackingLoad.error=true}
+ if(!current())return false;workspace.trackingLoad.loading=false;
+ const timeline=document.querySelector('#content [data-order-timeline],#content .timeline');
+ if(timeline){timeline.innerHTML=selectedOrderTimeline();localizeKnownDom(timeline)}
+ return true;
 }
 function orderAction(o,page,label){return `<button class="btn small ghost" data-order-target="${o.id}" data-order-page="${page}">${label}</button>`}
 function tabs(items,current,attribute){return `<div class="workspace-tabs" role="tablist">${items.map(([key,label,count])=>`<button role="tab" aria-selected="${key===current}" ${attribute}="${key}">${label}${count==null?'':`<small>${count}</small>`}</button>`).join('')}</div>`}
