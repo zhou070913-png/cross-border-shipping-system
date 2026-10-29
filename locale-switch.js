@@ -74,6 +74,7 @@ function knownUiPair(text){
  return null;
 }
 const extraIndonesian={
+ '登录成功':'Berhasil masuk','注册成功，已登录':'Akun dibuat. Berhasil masuk.','正在登录…':'Sedang masuk…',
  '商家填写的流水：':'Referensi pelanggan: ','备注：':'Catatan: ','无':'Tidak ada',
  '包裹预报已保存':'Informasi paket tersimpan','正在保存包裹，请稍候':'Menyimpan paket, mohon tunggu','正在保存付款资料，请稍候':'Menyimpan pembayaran, mohon tunggu','保存失败，请刷新核对后重试':'Gagal menyimpan. Muat ulang dan coba lagi','此包裹当前不能删除，请刷新后核对':'Paket ini belum dapat dihapus. Muat ulang dan periksa','未找到订单，请刷新列表':'Pesanan tidak ditemukan. Muat ulang daftar','物流节点读取失败，请刷新重试':'Gagal memuat riwayat. Muat ulang dan coba lagi','已退回凭证并通知商家':'Bukti dikembalikan dan pelanggan diberi tahu','凭证读取失败，请重新点击查看':'Gagal memuat bukti. Coba buka lagi','配置已保存，请刷新核对':'Pengaturan tersimpan. Muat ulang untuk memeriksa','收款配置已保存':'Pengaturan rekening tersimpan','工单已提交':'Tiket terkirim','回复已保存':'Balasan tersimpan','浏览器无法保存已读状态':'Gagal menyimpan status dibaca di peramban','请输入大于 0 的重量和尺寸':'Masukkan berat dan ukuran lebih besar dari nol',
  '印尼空运普货':'Udara Indonesia · barang umum','印尼海运普货':'Laut Indonesia · barang umum','印尼空运敏感货':'Udara Indonesia · barang sensitif','印尼海运敏感货':'Laut Indonesia · barang sensitif','印度尼西亚':'Indonesia','图片加载失败，请关闭后重新查看。':'Gagal memuat gambar. Tutup dan coba lagi.','测试凭证':'Bukti uji','转账凭证':'Bukti transfer',

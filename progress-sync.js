@@ -3,7 +3,7 @@
 const progressSync={key:null,client:null,channel:null,epoch:0,revision:0,busy:false,manual:0,timer:null,dirty:false,connected:false,error:false,lastSuccess:0,lastAttempt:0};
 function progressOwnerKey(){return state.auth.user?.id?`${state.auth.user.id}:${state.role}`:null}
 function progressOnline(){return typeof navigator==='undefined'||navigator.onLine!==false}
-function progressReady(){return !!(progressOwnerKey()&&window.MospaceSupabase.isConfigured()&&document.visibilityState==='visible'&&progressOnline())}
+function progressReady(){return !!(!authFlow.busy&&progressOwnerKey()&&window.MospaceSupabase.isConfigured()&&document.visibilityState==='visible'&&progressOnline())}
 function progressHasDraft(){
  const focused=document.activeElement;
  if(focused?.matches?.('input,textarea,select,[contenteditable="true"]'))return true;

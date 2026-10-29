@@ -678,3 +678,5 @@ Object.assign(enLocale,{
  '印尼仓已到货，请填写实际承运快递及尾程单号；保存后商家可查看派送信息。':'The shipment has arrived at the Indonesia warehouse. Enter the actual courier and last-mile tracking number so the customer can view delivery details.',
  '印尼仓确认到货后，订单进入待尾程登记；登记快递后自动转为尾程派送中。':'After the Indonesia warehouse confirms arrival, register the last-mile courier. The order then moves to last-mile delivery.'
 });
+
+Object.assign(enLocale,{'登录成功':'Signed in','注册成功，已登录':'Account created. Signed in.','正在登录…':'Signing in…'});

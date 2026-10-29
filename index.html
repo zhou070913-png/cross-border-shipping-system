@@ -190,24 +190,39 @@
       const registerHtml=target==='merchant'?'<div class="login-links"><span class="muted">还没有商家账号？</span><button id="loginRegister">注册商家账号</button></div>':'<div class="login-links"><span class="muted">内部账号由平台创建，请使用已分配的账号登录。</span></div>';
       return '<div class="login-page"><section class="login-intro"><div class="login-brand"><span class="brand-mark">E</span><span>Eaztrans集运</span></div><h1>跨境包裹，从深圳仓到目的地。</h1><p>登录后按你的角色进入专属工作台，系统会把每一步串起来，完成当前步骤后再进入下一步。</p><div class="login-flow"><div class="login-flow-item"><b>1</b><span>商家预报包裹，选择是否合包</span></div><div class="login-flow-item"><b>2</b><span>仓库入库确认，测量并生成费用</span></div><div class="login-flow-item"><b>3</b><span>头程付款出货，尾程独立结算、查询物流</span></div></div></section><section class="login-panel"><div class="login-card"><h2>登录系统</h2><p>请选择你的工作台，再输入会员号或邮箱和密码。</p><div class="login-roles"><button class="'+(target==='merchant'?'active':'')+'" data-login-role="merchant">商家端</button><button class="'+(target==='warehouse'?'active':'')+'" data-login-role="warehouse">仓库端</button><button class="'+(target==='admin'?'active':'')+'" data-login-role="admin">运营后台</button></div><div class="notice" style="margin:0 0 16px;padding:10px 12px"><div>→</div><div><strong>'+targetLabel+'登录</strong><p>登录成功后直接进入'+targetLabel+'控制台。</p></div></div><div class="field"><label>会员号 / 邮箱</label><input id="loginIdentifier" type="text" placeholder="M12345678 或 name@company.com" autocomplete="username" /></div><div class="field" style="margin-top:12px"><label>密码</label><input id="loginPassword" type="password" placeholder="至少 6 位" autocomplete="current-password" /></div><button class="btn primary login-submit" id="loginSubmit">登录并进入'+targetLabel+'</button>'+registerHtml+'<div class="login-note">仓库操作员和运营管理员账号由平台创建；注册入口仅开放给跨境商家。</div></div></section></div>';
     }
+    const authFlow={busy:false,syncVersion:0,controls:[]};
+    function setAuthBusy(busy){
+      authFlow.busy=busy;
+      if(busy){
+        authFlow.syncVersion++;
+        authFlow.controls=[...document.querySelectorAll('#content .login-card button,#content .login-card input,#authModal button,#authModal input')].map(el=>({el,disabled:el.disabled,html:el.innerHTML}));
+        for(const {el} of authFlow.controls){el.disabled=true;if(['loginSubmit','authSubmit'].includes(el.id)){el.setAttribute('aria-busy','true');el.innerHTML=typeof localeMarkup==='function'?localeMarkup('正在登录…','Sedang masuk…','Signing in…'):'正在登录…'}}
+      }else{
+        for(const {el,disabled,html} of authFlow.controls){if(!el.isConnected)continue;el.disabled=disabled;if(['loginSubmit','authSubmit'].includes(el.id)){el.removeAttribute('aria-busy');el.innerHTML=html}}
+        authFlow.controls=[];
+      }
+    }
     async function submitLandingAuth(){
+      if(authFlow.busy)return;
       const identifier=$('#loginIdentifier')?.value.trim(),password=$('#loginPassword')?.value||'',target=state.auth.loginTargetRole||'merchant';
       if(!identifier||password.length<6){toast('请输入会员号或邮箱和至少 6 位密码');return}
       if(!window.MospaceSupabase.isConfigured()){toast('数据库尚未配置，请先配置 anon key');return}
+      setAuthBusy(true);let entered=false;
       try{
-        const result=await window.MospaceSupabase.signInWithIdentifier(identifier,password);
-        state.auth.user=result.user;
-        await syncAuth();
+        await window.MospaceSupabase.signInWithIdentifier(identifier,password);
+        const loaded=await syncAuth({renderView:false});
         const actual=normalizedRole(state.auth.role);
-        if(!state.auth.user||actual!==target){
+        if(!loaded||!state.auth.user||actual!==target){
           try{await window.MospaceSupabase.signOut()}catch(signOutError){console.info('角色校验后的退出失败',signOutError.message)}
           state.auth.user=null;state.auth.profile=null;state.auth.role=null;state.role='merchant';
-          toast(actual===target?'账号资料暂不可用':`该账号属于${roleName(actual)}，请切换正确的登录入口`);render();return
+          toast(!loaded?'账号资料暂不可用':`该账号属于${roleName(actual)}，请切换正确的登录入口`);return;
         }
-        state.role=actual;state.page='dashboard';toast('登录成功，正在进入'+roleName(actual));render();
+        state.role=actual;state.page='dashboard';state.auth.pending=null;state.auth.pendingRole=null;entered=true;
       }catch(error){toast('登录失败：'+(error.message||'请检查会员号、邮箱和密码'))}
+      finally{setAuthBusy(false);if(entered){render();toast('登录成功')}}
     }
     function go(page,options={}){
+      if(authFlow.busy)return false;
       const targetRole=targetRoleFor(page,options.role);
       const currentRole=normalizedRole(state.auth.role);
       if(state.auth.user&&currentRole!==targetRole){toast(`当前账号没有${roleName(targetRole)}权限`);return false}
@@ -238,46 +253,55 @@
     }
     async function continuePendingNavigation(){
       const pending=state.auth.pending;
-      state.auth.pending=null;
-      state.auth.pendingRole=null;
-      await syncAuth();
-      if(pending)go(pending.page,{role:pending.role,parcelNo:pending.parcelNo,exceptionId:pending.exceptionId});
+      state.auth.pending=null;state.auth.pendingRole=null;
+      const loaded=await syncAuth({renderView:false});
+      if(!loaded)return false;
+      if(pending){const target=normalizedRole(state.auth.role);if(target!==pending.role)return false;state.role=target;state.page=pending.page;if(pending.parcelNo)state.selectedParcelNo=pending.parcelNo;if(pending.exceptionId)state.selectedException=pending.exceptionId}
+      else state.page='dashboard';
+      return true;
     }
-    async function syncAuth(){
-      if(!window.MospaceSupabase.isConfigured()) return;
+    async function syncAuth({renderView=true}={}){
+      if(!window.MospaceSupabase.isConfigured())return false;
+      const version=++authFlow.syncVersion,current=()=>version===authFlow.syncVersion;
       try{
-        state.auth.user=await window.MospaceSupabase.currentUser();
-        state.auth.profile=await window.MospaceSupabase.currentProfile();
-        state.auth.role=state.auth.profile?.role||'merchant';
-        state.role=state.auth.role==='warehouse_operator'?'warehouse':state.auth.role;
-        const orders=await window.MospaceSupabase.myOrders();
-        state.dbOrders=orders;
-        if(orders.length){
-          const latest=currentDbOrder(orders);
-          applyDbOrder(latest);
-          try{applyTracking(await window.MospaceSupabase.orderTracking(latest.id));}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
+        const user=await window.MospaceSupabase.currentUser();if(!current())return false;
+        const profile=user?await window.MospaceSupabase.currentProfile():null;if(!current())return false;
+        if(user&&!profile)throw Error('账号资料暂不可用');
+        state.auth.user=user;state.auth.profile=profile;state.auth.role=profile?.role||null;
+        state.role=normalizedRole(state.auth.role);
+        if(user){
+          const orders=await window.MospaceSupabase.myOrders();if(!current())return false;
+          state.dbOrders=orders;
+          if(orders.length){
+            const latest=currentDbOrder(orders);applyDbOrder(latest);
+            try{const events=await window.MospaceSupabase.orderTracking(latest.id);if(!current())return false;applyTracking(events)}catch(trackingError){console.info('物流轨迹暂不可读',trackingError.message)}
+          }
+          if(state.auth.role==='merchant'){
+            try{const addresses=await window.MospaceSupabase.listAddresses();if(!current())return false;state.addresses=addresses}catch(addressError){console.info('地址暂不可读',addressError.message)}
+          }
+          if(state.auth.role==='admin'){
+            try{const orders=await window.MospaceSupabase.adminOrders();if(!current())return false;state.adminOrders=orders}catch(orderError){console.info('后台订单暂不可读',orderError.message)}
+            try{const logs=await window.MospaceSupabase.adminAuditLogs();if(!current())return false;state.auditLogs=logs}catch(auditError){console.info('审计日志暂不可读',auditError.message)}
+            try{const pricing=await window.MospaceSupabase.getRoutePricing('ID-AIR');if(!current())return false;state.pricing=pricing}catch(pricingError){console.info('运价配置暂不可读',pricingError.message)}
+          }
+          if(!current())return false;await loadMerchantWorkspace();if(!current())return false;
         }
-        if(state.auth.role==='merchant'){
-          try{state.addresses=await window.MospaceSupabase.listAddresses()}catch(addressError){console.info('地址暂不可读',addressError.message)}
-        }
-        if(state.auth.role==='admin'){
-          try{state.adminOrders=await window.MospaceSupabase.adminOrders()}catch(orderError){console.info('后台订单暂不可读',orderError.message)}
-          try{state.auditLogs=await window.MospaceSupabase.adminAuditLogs()}catch(auditError){console.info('审计日志暂不可读',auditError.message)}
-          try{state.pricing=await window.MospaceSupabase.getRoutePricing('ID-AIR')}catch(pricingError){console.info('运价配置暂不可读',pricingError.message)}
-        }
-        await loadMerchantWorkspace();
       }catch(error){
-        state.auth.user=null;
-        state.auth.profile=null; state.auth.role=null;
+        if(!current())return false;
+        state.auth.user=null;state.auth.profile=null;state.auth.role=null;
         console.info('Supabase 尚未登录或暂无商家数据',error.message);
+        if(renderView&&!authFlow.busy)render();return false;
       }
-      render();
+      if(renderView&&!authFlow.busy)render();
+      return !!state.auth.user;
     }
     async function submitAuth(){
+      if(authFlow.busy)return;
       const identifier=$('#authIdentifier').value.trim(), password=$('#authPassword').value;
       if(!identifier||password.length<6){toast(state.auth.mode==='signup'?'请输入注册邮箱和至少 6 位密码':'请输入会员号或邮箱和至少 6 位密码');return}
+      const mode=state.auth.mode;setAuthBusy(true);let entered=false;
       try{
-        const result=state.auth.mode==='signup'
+        const result=mode==='signup'
           ? await window.MospaceSupabase.signUp(identifier,password)
           : await window.MospaceSupabase.signInWithIdentifier(identifier,password);
         if(state.auth.mode==='signup'&&!result.session){
@@ -287,8 +311,15 @@
           toast(memberNo?`注册成功，你的会员号是 ${memberNo}。请先完成邮箱验证，再用会员号登录。`:'注册成功，请查收邮箱完成验证；验证后可向管理员查询会员号。',7000);
           return;
         }
-        state.auth.user=result.user; closeAuth(); toast(state.auth.mode==='signup'?'注册成功，已登录':'登录成功'); await continuePendingNavigation();
+        entered=await continuePendingNavigation();
+        if(!entered){
+          try{await window.MospaceSupabase.signOut()}catch(error){console.info('登录校验后的退出失败',error.message)}
+          state.auth.user=null;state.auth.profile=null;state.auth.role=null;state.role='merchant';
+          throw Error('账号资料暂不可用或登录入口与账号权限不符');
+        }
+        closeAuth();
       }catch(error){toast('操作失败：'+(error.message||'请检查邮箱和密码'))}
+      finally{setAuthBusy(false);if(entered){render();toast(mode==='signup'?'注册成功，已登录':'登录成功')}}
     }
     function navActivePage(page,role){
       if(role==='merchant'){
@@ -605,10 +636,10 @@
   <script src="forwarding-workspace.js?v=1"></script>
   <script src="combined-workspace.js?v=15"></script>
   <script src="customer-workspace.js?v=3"></script>
-  <script src="locale-en.js?v=2"></script>
+  <script src="locale-en.js?v=3"></script>
   <script src="bilingual-workspace.js?v=4"></script>
-  <script src="locale-switch.js?v=2"></script>
-  <script src="progress-sync.js?v=4"></script>
+  <script src="locale-switch.js?v=3"></script>
+  <script src="progress-sync.js?v=5"></script>
   <script>render(); updateAuthMode(); syncAuth();</script>
 </body>
 </html>
