@@ -1,7 +1,7 @@
 /* Merchant H5 only. Reuse server authorization, business actions and data from the latest development site. */
 'use strict';
 document.body.classList.add('h5-mode');
-const mobile={owner:null,historyRoute:null,popping:false,navigating:false,renderedPage:null,signingOut:false,lists:{},observer:null,guideSeen:false,scrolls:{}};
+const mobile={owner:null,historyRoute:null,popping:false,navigating:false,renderedPage:null,signingOut:false,lists:{},addressBusy:false,observer:null,guideSeen:false,scrolls:{}};
 for(const [zh,id,en]of [['会员号或邮箱','Nomor anggota atau email','Member number or email'],['我的待办','Ringkasan saya','My tasks'],['主导航','Navigasi utama','Main navigation']]){enLocale[zh]=en;extraIndonesian[zh]=id}
 const mt=(zh,id,en)=>localeMarkup(zh,id,en);
 const mobileOrderListPages=new Set(['orders','tracking-list','sea-tracking','billing']);
@@ -45,7 +45,7 @@ combinedDashboard=function(){
 function mobileAccountLinks(){return `<section class="card h5-service-card h5-account-services"><h2>${mt('我的服务','Layanan saya','My services')}</h2>${mobileLink('account-details','账户及资料','Akun dan profil','Account & profile','profile')}${mobileLink('receivers','地址管理','Alamat penerima','Delivery addresses','address')}${mobileLink('rates','运输计算器','Kalkulator ongkir','Shipping calculator','rates')}${mobileLink('messages','消息与客服','Pesan dan bantuan','Messages & support','support')}${mobileLink('address','国内仓库地址','Alamat gudang domestik','Shenzhen warehouse','parcels')}<button type="button" class="h5-service" data-h5-guide>${mobileIcon('orders')}${mt('新人指南','Panduan pemula','Getting started')}<span class="h5-chevron">›</span></button><button type="button" class="h5-service" id="h5Shopping">${mobileIcon('parcels')}<span>${mt('代购产品','Belanja titipan','Product shopping')}<small>${mt('即将开放','Segera hadir','Coming soon')}</small></span><span class="h5-chevron">›</span></button><button type="button" class="h5-service" id="h5Refresh">${mobileIcon('refresh')}${mt('刷新业务数据','Muat ulang data','Refresh data')}<span aria-hidden="true">↻</span></button></section><div class="h5-account-actions"><button type="button" class="btn primary" data-h5-signout>${mt('切换账号','Ganti akun','Switch account')}</button><button type="button" class="btn ghost h5-signout" id="h5SignOut">${mt('退出登录','Keluar','Sign out')}</button></div>`}
 async function mobileSignOut(){
  if(mobile.signingOut)return false;
- if(authFlow.busy||combined.busy||paymentWorkspace.busy||workspace.parcelBusy){toast(uiText('正在保存，请稍候','Sedang menyimpan, mohon tunggu','Saving. Please wait.'));return false}
+ if(mobile.addressBusy||authFlow.busy||combined.busy||paymentWorkspace.busy||workspace.parcelBusy){toast(uiText('正在保存，请稍候','Sedang menyimpan, mohon tunggu','Saving. Please wait.'));return false}
  mobile.signingOut=true;setAuthBusy(true);
  const buttons=[...document.querySelectorAll('[data-h5-signout],#h5SignOut')];
  for(const b of buttons){b.disabled=true;b.setAttribute('aria-busy','true')}
@@ -95,6 +95,7 @@ const mobileOriginalGo=go;
 go=function(page,options={}){
  if(options.role&&options.role!=='merchant')return false;
  if(state.auth.user&&normalizedRole(state.auth.role)!=='merchant')return false;
+ if(mobile.addressBusy){toast(uiText('正在删除地址，请稍候','Menghapus alamat, mohon tunggu','Deleting address. Please wait.'));return false}
  if(paymentWorkspace.busy){toast(uiText('正在保存付款资料，请稍候','Menyimpan pembayaran, mohon tunggu','Saving payment details. Please wait.'));return false}
  let changed;mobile.navigating=true;
  try{changed=mobileOriginalGo(page,{...options,role:'merchant'})}finally{mobile.navigating=false}
@@ -189,11 +190,33 @@ const mobileBaseAddressList=combinedAddressList;
 combinedAddressList=function(){
  if(state.page!=='receivers')return mobileBaseAddressList();
  const p=combinedAddressPagination();
- return `<div class="card"><h2>${mt('收货地址列表','Daftar alamat penerima','Delivery addresses')}</h2><form id="addressListSearch" class="workspace-toolbar"><input id="addressListQuery" aria-label="${esc(uiText('查询地址','Cari alamat','Search addresses'))}" placeholder="${esc(uiText('收件人 / 电话 / 城市 / 地址','Penerima / telepon / kota / alamat','Recipient / phone / city / address'))}" value="${esc(addressList.query)}"><button class="btn ghost">${mt('查询','Cari','Search')}</button><button type="button" class="btn ghost" id="addressListReset">${mt('重置','Atur ulang','Reset')}</button></form></div>${p.rows.map(a=>`<article class="card section-space" data-address-row="${esc(a.id)}"><div class="card-title"><h3>${raw(a.label)}</h3>${a.is_default?`<span class="status green">${mt('默认地址','Alamat utama','Default address')}</span>`:''}</div><b>${raw(a.recipient_name)} · ${raw(a.recipient_phone)}</b><p>${raw(a.city)}<br>${raw(a.address_line)} ${raw(a.postal_code)}</p><button type="button" class="btn ghost" data-edit-address="${esc(a.id)}">${mt('编辑地址','Ubah alamat','Edit address')}</button></article>`).join('')||`<div class="card section-space">${addressList.query?mt('没有匹配的地址','Tidak ada alamat yang sesuai','No matching addresses'):mt('尚未保存收货地址','Belum ada alamat tersimpan','No saved delivery addresses')}</div>`}${mobileListFooter(p)}`;
+ return `<div class="card"><h2>${mt('收货地址列表','Daftar alamat penerima','Delivery addresses')}</h2><form id="addressListSearch" class="workspace-toolbar"><input id="addressListQuery" aria-label="${esc(uiText('查询地址','Cari alamat','Search addresses'))}" placeholder="${esc(uiText('收件人 / 电话 / 城市 / 地址','Penerima / telepon / kota / alamat','Recipient / phone / city / address'))}" value="${esc(addressList.query)}"><button class="btn ghost">${mt('查询','Cari','Search')}</button><button type="button" class="btn ghost" id="addressListReset">${mt('重置','Atur ulang','Reset')}</button></form></div>${p.rows.map(a=>`<article class="card section-space" data-address-row="${esc(a.id)}"><div class="card-title"><h3>${raw(a.label)}</h3>${a.is_default?`<span class="status green">${mt('默认地址','Alamat utama','Default address')}</span>`:''}</div><b>${raw(a.recipient_name)} · ${raw(a.recipient_phone)}</b><p>${raw(a.city)}<br>${raw(a.address_line)} ${raw(a.postal_code)}</p><div class="h5-address-actions"><button type="button" class="btn ghost" data-edit-address="${esc(a.id)}" ${mobile.addressBusy?'disabled':''}>${mt('编辑地址','Ubah alamat','Edit address')}</button><button type="button" class="btn ghost h5-address-delete" data-delete-address="${esc(a.id)}" ${mobile.addressBusy?'disabled':''}>${mt('删除','Hapus','Delete')}</button></div></article>`).join('')||`<div class="card section-space">${addressList.query?mt('没有匹配的地址','Tidak ada alamat yang sesuai','No matching addresses'):mt('尚未保存收货地址','Belum ada alamat tersimpan','No saved delivery addresses')}</div>`}${mobileListFooter(p)}`;
 };
 function mobileRefreshAddresses(){
  const root=document.getElementById('combinedAddressList');if(!root)return;
  root.innerHTML=combinedAddressList();bindCombinedAddressList();localizeKnownDom(root);mobileBindLazy();
+}
+async function mobileDeleteAddress(id){
+ if(mobile.addressBusy||state.role!=='merchant'||!state.auth.user||!state.addresses.some(a=>a.id===id))return false;
+ const form=document.getElementById('receiverForm');
+ if(form?.querySelector('[type=submit]')?.disabled){toast(uiText('正在保存地址，请稍候','Menyimpan alamat, mohon tunggu','Saving address. Please wait.'));return false}
+ if(!window.confirm(uiText('确定删除此收货地址？删除后无法恢复，已提交订单的收件信息不受影响。','Hapus alamat ini? Tidak dapat dipulihkan. Alamat pada pesanan yang sudah diajukan tetap tersimpan.','Delete this delivery address? This cannot be undone. Delivery details on submitted orders will stay unchanged.')))return false;
+ const owner=state.auth.user.id,version=authFlow.syncVersion;
+ const current=()=>state.auth.user?.id===owner&&authFlow.syncVersion===version;
+ const controls=[...document.querySelectorAll('#receiverForm input,#receiverForm textarea,#receiverForm button,[data-edit-address],[data-delete-address]')].map(el=>[el,el.disabled]);
+ mobile.addressBusy=true;for(const [el] of controls)el.disabled=true;
+ try{
+  const {data,error}=await window.MospaceSupabase.getClient().from('merchant_addresses').delete().eq('id',id).eq('merchant_id',owner).select('id');
+  if(error)throw error;
+  if(!data?.some(a=>a.id===id))throw Error(uiText('地址已不存在或无权删除，请刷新后核对','Alamat tidak ditemukan atau tidak dapat dihapus. Muat ulang untuk memeriksa.','Address missing or deletion not allowed. Refresh to check.'));
+  if(!current())return false;
+  state.addresses=state.addresses.filter(a=>a.id!==id);
+  const editing=workspace.editingAddress===id;if(editing)workspace.editingAddress=null;
+  mobile.addressBusy=false;
+  if(state.page==='receivers'){if(editing)render();else mobileRefreshAddresses()}
+  toast(uiText('地址已删除','Alamat dihapus','Address deleted'));return true;
+ }catch(e){if(current())toast(uiText('删除失败：','Gagal menghapus: ','Delete failed: ')+e.message,6000);return false}
+ finally{mobile.addressBusy=false;for(const [el,disabled] of controls)if(el.isConnected)el.disabled=disabled}
 }
 const mobileBaseAddressBind=bindCombinedAddressList;
 bindCombinedAddressList=function(){
@@ -201,7 +224,8 @@ bindCombinedAddressList=function(){
  const root=document.getElementById('combinedAddressList');if(!root)return;
  root.querySelector('#addressListSearch').onsubmit=e=>{e.preventDefault();addressList.query=root.querySelector('#addressListQuery').value.trim();mobileRefreshAddresses()};
  root.querySelector('#addressListReset').onclick=()=>{addressList.query='';mobileRefreshAddresses()};
- root.querySelectorAll('[data-edit-address]').forEach(b=>b.onclick=()=>{workspace.editingAddress=b.dataset.editAddress;render()});
+ root.querySelectorAll('[data-edit-address]').forEach(b=>b.onclick=()=>{if(mobile.addressBusy)return;workspace.editingAddress=b.dataset.editAddress;render()});
+ root.querySelectorAll('[data-delete-address]').forEach(b=>b.onclick=()=>mobileDeleteAddress(b.dataset.deleteAddress));
 };
 function mobileBindLazy(){
  mobile.observer?.disconnect();mobile.observer=null;

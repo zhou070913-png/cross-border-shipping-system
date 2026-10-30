@@ -184,3 +184,30 @@ test('account has only the top-bar title and address scrolling/search preserve t
  edit.dispatchEvent(new document.defaultView.Event('submit',{bubbles:true,cancelable:true}));await run('addressSaving');assert.equal(run('savedMobileAddress.id'),'a18');assert.equal(run('savedMobileAddress.recipient_name'),'EDIT DRAFT');assert.equal(document.querySelectorAll('[data-address-row]').length,29);
  run(`state.auth.user={id:'other'};state.addresses=[];render();observerCallbacks[0]([{isIntersecting:true}])`);assert.equal(run('addressList.query'),'');assert.equal(document.querySelectorAll('[data-address-row]').length,0);assert.equal(document.querySelector('[data-h5-load]'),null);assert.doesNotMatch(document.querySelector('#combinedAddressList').textContent,/第.*页/);
 });
+
+function addressDeleteSetup(){
+ const ctx=mobileSetup();ctx.run(`state.addresses=[{id:'a',label:'TEST',recipient_name:'TEST A',city:'Jakarta',address_line:'TEST ONLY',is_default:true},{id:'b',label:'TEST B',recipient_name:'TEST B'}];go('receivers');deleteCalls=[];confirmCalls=[];allowDelete=true;window.confirm=message=>{confirmCalls.push(message);return allowDelete};window.MospaceSupabase.getClient=()=>({from:table=>({delete:()=>{deleteCalls.push({table,filters:[]});return {eq(k,v){deleteCalls.at(-1).filters.push([k,v]);return this},select:()=>new Promise(r=>finishAddressDelete=r)}}})})`);return ctx;
+}
+test('H5 address deletion confirms, deletes only owned ID, preserves other drafts and submitted orders',async()=>{
+ const {run,document}=addressDeleteSetup();const form=document.querySelector('#receiverForm');document.querySelector('#receiverName').value='UNSAVED';
+ run('allowDelete=false');await document.querySelector('[data-delete-address="a"]').onclick();assert.equal(run('deleteCalls.length'),0);assert.equal(document.querySelectorAll('[data-address-row]').length,2);
+ run('allowDelete=true');const pending=document.querySelector('[data-delete-address="a"]').onclick();assert.equal(document.querySelector('[data-delete-address="b"]').disabled,true);assert.equal(document.querySelector('#receiverName').disabled,true);
+ await run(`mobileDeleteAddress('b')`);assert.equal(run('deleteCalls.length'),1);assert.equal(run(`JSON.stringify(deleteCalls[0])`),JSON.stringify({table:'merchant_addresses',filters:[['id','a'],['merchant_id','m']]}));
+ run(`finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,true);
+ assert.equal(document.querySelector('[data-address-row="a"]'),null);assert.ok(document.querySelector('[data-address-row="b"]'));assert.equal(document.querySelector('#receiverForm'),form);assert.equal(document.querySelector('#receiverName').value,'UNSAVED');assert.equal(document.querySelector('#receiverName').disabled,false);assert.equal(run('o.destination_address'),'TEST address');
+ run('setUiLanguage("en")');assert.equal(document.querySelector('[data-delete-address]').textContent,'Delete');run('setUiLanguage("id")');assert.equal(document.querySelector('[data-delete-address]').textContent,'Hapus');
+});
+test('H5 address deletion failure is retryable; deleting the edited last address clears the editor',async()=>{
+ const {run,document}=addressDeleteSetup();run(`state.addresses=state.addresses.slice(0,1);workspace.editingAddress='a';render()`);
+ let pending=document.querySelector('[data-delete-address="a"]').onclick();run(`finishAddressDelete({data:null,error:Error('offline')})`);assert.equal(await pending,false);assert.ok(document.querySelector('[data-address-row="a"]'));assert.equal(document.querySelector('[data-delete-address="a"]').disabled,false);assert.equal(run('workspace.editingAddress'),'a');
+ pending=document.querySelector('[data-delete-address="a"]').onclick();run(`finishAddressDelete({data:[],error:null})`);assert.equal(await pending,false);assert.equal(run('state.addresses.length'),1);
+ pending=document.querySelector('[data-delete-address="a"]').onclick();run(`finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,true);assert.equal(run('workspace.editingAddress'),null);assert.equal(document.querySelectorAll('[data-address-row]').length,0);assert.equal(document.querySelector('#receiverName').value,'');assert.equal(document.querySelector('#cancelAddressEdit'),null);
+});
+test('H5 ignores late deletion results after account change, and saving prevents delete',async()=>{
+ const {run,document}=addressDeleteSetup();document.querySelector('#receiverForm [type=submit]').disabled=true;assert.equal(await run(`mobileDeleteAddress('a')`),false);assert.equal(run('deleteCalls.length'),0);document.querySelector('#receiverForm [type=submit]').disabled=false;
+ const pending=run(`mobileDeleteAddress('a')`);run(`state.auth.user={id:'other'};state.addresses=[{id:'a',label:'OTHER ACCOUNT'}];render();finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,false);assert.equal(run('state.addresses[0].label'),'OTHER ACCOUNT');assert.ok(document.querySelector('[data-address-row="a"]'));
+});
+
+test('H5 old address deletion cannot mutate a new session for the same account',async()=>{
+ const {run}=addressDeleteSetup();const pending=run(`mobileDeleteAddress('a')`);run(`authFlow.syncVersion++;finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,false);assert.equal(run('state.addresses.length'),2);
+});

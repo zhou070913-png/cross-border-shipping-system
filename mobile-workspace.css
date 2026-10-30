@@ -178,3 +178,6 @@ body.h5-mode:has(#localPreviewBar){padding-bottom:0!important}
 .h5-guide-card li:before{content:counter(guide);position:absolute;left:0;top:0;width:26px;height:26px;display:grid;place-items:center;background:#edf2ff;color:#315efb;border-radius:9px;font-weight:700}
 .h5-guide-card li p{font-size:12px;color:#7d8ba2;line-height:1.8;margin:5px 0}
 .h5-guide-card>.btn{width:100%;font-size:14px}.h5-guide-card>small{display:block;text-align:center;font-size:10px;color:#96a0b2;margin-top:12px;line-height:1.7}
+
+.h5-address-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+body.h5-mode .h5-address-delete{color:#bc4b4b;border-color:#f0d7d7}

@@ -22,6 +22,12 @@ try{
  assert.equal(o.recipient_name,'TEST Alice');assert.equal((await rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',recipient,'TEST',request])).id,o.id);
  await assert.rejects(rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',{...recipient,city:'Bali'},'TEST',request]),/变化/);
  await assert.rejects(rpc('merchant','merchant_create_combined_order',[parcelArray,'ID-SEA',recipient,'TEST',randomUUID()]),/关联/);pass('one order snapshots consumer address; retries idempotent and parcels cannot be reused');
+ const savedAddress=(await withRole(db,'merchant',tx=>tx.query("insert into merchant_addresses(merchant_id,label,recipient_name,recipient_phone,country,city,address_line,is_default) values(auth.uid(),'TEST DELETE','TEST Alice','TEST','印度尼西亚','Jakarta','TEST address only',true) returning id"))).rows[0];
+ const addressBefore=await order(o.id);
+ const crossDelete=await withRole(db,'merchant2',tx=>tx.query('delete from merchant_addresses where id=$1 returning id',[savedAddress.id]));assert.equal(crossDelete.rows.length,0);
+ const ownDelete=await withRole(db,'merchant',tx=>tx.query('delete from merchant_addresses where id=$1 and merchant_id=auth.uid() returning id',[savedAddress.id]));assert.equal(ownDelete.rows.length,1);
+ assert.equal((await withRole(db,'merchant',tx=>tx.query('select id from merchant_addresses where id=$1',[savedAddress.id]))).rows.length,0);
+ assert.deepEqual(await order(o.id),addressBefore);pass('address delete persists, RLS denies other merchants and submitted order snapshots remain unchanged');
  await assert.rejects(rpc('warehouse','warehouse_pack_combined',[o.id,boxes,o.updated_at]),/收货/);
  await assert.rejects(rpc('warehouse','warehouse_receive_order',[o.id]),/逐件/);
  await assert.rejects(withRole(db,'warehouse',tx=>tx.query("update orders set status='paid' where id=$1",[o.id])),/permission denied/);
