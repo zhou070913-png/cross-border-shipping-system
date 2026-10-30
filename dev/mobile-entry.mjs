@@ -24,8 +24,8 @@ export function mobileHtml(html){
 <meta name="twitter:image" content="https://zhou070913-png.github.io/eaztrans-latest-development/h5/eaztrans-share.png?v=1" />
 </head>`)
   .replace(/supabase-client\.js\?v=[^"\s]+/, 'supabase-client.js?v=h5-4')
-  .replace('</style>','</style>\n<link rel="stylesheet" href="mobile-workspace.css?v=8" />\n<meta name="theme-color" content="#315efb" />\n<meta name="apple-mobile-web-app-capable" content="yes" />')
-  .replace(startup,'<script src="mobile-workspace.js?v=8"></script>\n<script src="mobile-flows.js?v=1"></script>\n'+startup);
+  .replace('</style>','</style>\n<link rel="stylesheet" href="mobile-workspace.css?v=9" />\n<meta name="theme-color" content="#315efb" />\n<meta name="apple-mobile-web-app-capable" content="yes" />')
+  .replace(startup,'<script src="mobile-workspace.js?v=8"></script>\n<script src="mobile-flows.js?v=2"></script>\n'+startup);
 }
 export function mobileAsset(name,text){
  if(name==='supabase-client.js'){

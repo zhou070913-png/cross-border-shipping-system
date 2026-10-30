@@ -25,6 +25,7 @@ combinedDashboard=function(){return mobileFlowBaseDashboard().replace(mt('可合
 const mobileFlowBaseLinks=mobileAccountLinks;
 mobileAccountLinks=function(){
  const root=document.createElement('div');root.innerHTML=mobileFlowBaseLinks();
+ root.querySelector('.h5-account-services>h2')?.remove();
  root.querySelector('[data-h5-signout]')?.remove();
  const signout=root.querySelector('#h5SignOut');signout?.setAttribute('class','btn ghost h5-signout');
  if(signout)signout.innerHTML=mt('退出 / 切换账号','Keluar / ganti akun','Sign out / switch account');
