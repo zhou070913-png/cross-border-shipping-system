@@ -54,6 +54,42 @@ test('mobile payment keeps the receipt uploader and payer draft while tracking f
  run(`mobileTrackingReady([])`);await opened;assert.equal(document.querySelector('input[type=file]'),upload);assert.equal(text.value,'MOBILE DRAFT');assert.equal(form.isConnected,true);
 });
 
+test('H5 switches accounts directly, clears the persisted session and cannot restore the previous customer',async()=>{
+ const {run,document}=mobileSetup();run(`
+  persistedUser={id:'m',email:'a@local.test'};logoutScopes=[];reloads=[];
+  window.location={pathname:'/h5/',search:'?v=test',replace:url=>reloads.push(url)};
+  window.MospaceSupabase.getClient=()=>({auth:{signOut:async options=>{logoutScopes.push(options.scope);persistedUser=null;return {error:null}}}});
+  window.MospaceSupabase.currentUser=async()=>persistedUser;
+  window.MospaceSupabase.currentProfile=async user=>({id:user.id,member_no:'CUSTOMER-B',role:'merchant'});
+  window.MospaceSupabase.myOrders=async()=>[];window.MospaceSupabase.listAddresses=async()=>[];
+  loadMerchantWorkspace=async()=>{combined.ready=true};
+  state.page='profile';render();document.getElementById('authBtn').onclick=()=>{throw Error('Hidden desktop button must not be used')};
+ `);
+ assert.ok(document.querySelector('#h5SwitchAccount'));assert.ok(document.querySelector('.h5-account-switch [data-h5-signout]'));
+ await document.querySelector('#h5SwitchAccount').onclick();
+ assert.equal(run('logoutScopes.join()'),'local');assert.equal(run('state.auth.user'),null);assert.equal(run('state.dbOrders.length'),0);assert.equal(run('workspace.parcels.length'),0);assert.equal(run('reloads[0]'),'/h5/?v=test');assert.ok(document.querySelector('#h5LoginForm'));
+ await run('syncAuth()');assert.equal(run('state.auth.user'),null);assert.ok(document.querySelector('#h5LoginForm'));
+ run(`window.MospaceSupabase.signInWithIdentifier=async identifier=>{persistedUser={id:'merchant-b',email:identifier}}`);
+ document.querySelector('#loginIdentifier').value='b@local.test';document.querySelector('#loginPassword').value='test-only-password';
+ await run('submitLandingAuth()');assert.equal(run('state.auth.user.id'),'merchant-b');assert.equal(run('state.page'),'dashboard');assert.equal(run('state.dbOrders.length'),0);assert.doesNotMatch(document.querySelector('#content').textContent,/TEST-ORDER/);
+});
+
+test('H5 logout failure stays retryable, prevents duplicate requests and blocks stale auth restoration',async()=>{
+ const {run,document}=mobileSetup();run(`state.page='profile';render();logoutCalls=0;window.MospaceSupabase.getClient=()=>({auth:{signOut:()=>{logoutCalls++;return new Promise(r=>releaseLogout=r)}}});window.MospaceSupabase.currentUser=()=>new Promise(r=>releaseOldAuth=r)`);
+ const staleAuth=run('syncAuth({renderView:false})');
+ const first=run('mobileSignOut()');assert.equal(document.querySelector('#h5SignOut').disabled,true);await run('mobileSignOut()');assert.equal(run('logoutCalls'),1);
+ run(`releaseLogout({error:Error('offline')})`);assert.equal(await first,false);assert.equal(run('state.auth.user.id'),'m');assert.equal(document.querySelector('#h5SignOut').disabled,false);assert.equal(run('authFlow.busy'),false);
+ run(`releaseOldAuth({id:'stale-customer'})`);await staleAuth;assert.equal(run('state.auth.user.id'),'m');
+ run(`window.MospaceSupabase.getClient=()=>({auth:{signOut:async()=>({error:null})}})`);assert.equal(await run('mobileSignOut()'),true);assert.ok(document.querySelector('#h5LoginForm'));
+});
+
+test('H5 staff handoff also offers a working switch to a customer account and saves block logout',async()=>{
+ const {run,document}=mobileSetup();run(`logoutCalls=0;window.MospaceSupabase.getClient=()=>({auth:{signOut:async()=>{logoutCalls++;return {error:null}}}});state.auth.role='warehouse_operator';state.role='warehouse';render()`);
+ assert.ok(document.querySelector('.h5-staff-handoff [data-h5-signout]'));
+ run('paymentWorkspace.busy=true');assert.equal(await run('mobileSignOut()'),false);assert.equal(run('logoutCalls'),0);
+ run('paymentWorkspace.busy=false');await document.querySelector('.h5-staff-handoff [data-h5-signout]').onclick();assert.ok(document.querySelector('#h5LoginForm'));assert.equal(run('logoutCalls'),1);
+});
+
 test('H5 release uses dedicated assets and link verification; desktop source entry stays byte-identical',async()=>{
  const fsp=require('node:fs/promises'),os=require('node:os');const {buildMobile}=await import('../dev/mobile-deployment.mjs');
  const tmp=await fsp.mkdtemp(path.join(os.tmpdir(),'eaztrans-h5-')),entry=path.join(__dirname,'../index.html'),before=await fsp.readFile(entry);

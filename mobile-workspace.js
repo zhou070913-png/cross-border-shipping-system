@@ -1,7 +1,7 @@
 /* Merchant H5 only. Reuse server authorization, business actions and data from the latest development site. */
 'use strict';
 document.body.classList.add('h5-mode');
-const mobile={owner:null,historyRoute:null,popping:false,navigating:false,renderedPage:null};
+const mobile={owner:null,historyRoute:null,popping:false,navigating:false,renderedPage:null,signingOut:false};
 for(const [zh,id,en]of [['会员号或邮箱','Nomor anggota atau email','Member number or email'],['我的待办','Ringkasan saya','My tasks'],['主导航','Navigasi utama','Main navigation']]){enLocale[zh]=en;extraIndonesian[zh]=id}
 const mt=(zh,id,en)=>localeMarkup(zh,id,en);
 const mobileIcon=name=>{
@@ -33,7 +33,31 @@ combinedDashboard=function(){
  const tasks=[['parcels','待入库','Belum diterima','Awaiting receipt',pending,'pre_advised'],['parcels','可合包','Siap digabung','To consolidate',available,'available'],['orders','待付款 / 审核','Pembayaran','Payment',due,'awaiting_payment'],['orders','全部订单','Semua pesanan','All orders',orders.length,'all']];
  return `<section class="h5-welcome"><span>${mt('我的集运工作台','Ruang pengiriman saya','My shipping workspace')}</span><h1>${mt('让每一件包裹，都有迹可循','Setiap paket, selalu terlacak','Every parcel, always in view')}</h1><p class="mono" data-user-content>${esc(state.auth.profile?.member_no||'')}</p></section><button type="button" class="h5-primary-action" data-page="pre-advise"><span class="h5-action-icon">${mobileIcon('plus')}</span><span><strong>${mt('预报包裹','Daftarkan paket','Declare a parcel')}</strong><small>${mt('填写国内单号和包裹品名','Isi resi domestik dan nama barang','Domestic tracking number and parcel contents')}</small></span>${mobileIcon('arrow')}</button><section class="h5-task-grid" aria-label="${esc(uiText('我的待办','Ringkasan saya','My tasks'))}">${tasks.map(([page,z,i,e,n,filter])=>`<button type="button" data-mobile-task="${page}" data-mobile-filter="${filter}"><strong>${n}</strong>${mt(z,i,e)}</button>`).join('')}</section>${reviewing?`<button type="button" class="h5-review-notice" data-mobile-task="orders" data-mobile-filter="awaiting_payment">${mt('付款凭证审核中','Bukti sedang diperiksa','Payment receipt under review')} <b>${reviewing}</b><span aria-hidden="true">›</span></button>`:''}<section class="card h5-service-card"><h2>${mt('常用服务','Layanan','Quick services')}</h2><div class="h5-shortcuts">${mobileLink('packing-request','申请合包','Gabungkan paket','Consolidate','parcels')}${mobileLink('tracking-list','查询物流','Lacak paket','Track shipment','tracking')}${mobileLink('rates','运输计算器','Kalkulator ongkir','Shipping calculator','rates')}${mobileLink('messages','联系客服','Bantuan','Contact support','support')}</div></section><section class="h5-info-note">${mobileIcon('parcels')}<p>${mt('仓库确认头程和尾程费用后，只需付款一次。','Bayar sekali setelah biaya awal dan akhir diverifikasi gudang.','Pay once after the warehouse confirms first-mile and last-mile fees.')}</p></section>`;
 };
-function mobileAccountLinks(){return `<section class="card h5-service-card h5-account-services"><h2>${mt('我的服务','Layanan saya','My services')}</h2>${mobileLink('receivers','地址管理','Alamat penerima','Delivery addresses','address')}${mobileLink('rates','运输计算器','Kalkulator ongkir','Shipping calculator','rates')}${mobileLink('messages','消息与客服','Pesan dan bantuan','Messages & support','support')}${mobileLink('address','国内仓库地址','Alamat gudang domestik','Shenzhen warehouse','parcels')}<button type="button" class="h5-service" id="h5Refresh">${mobileIcon('refresh')}${mt('刷新业务数据','Muat ulang data','Refresh data')}<span aria-hidden="true">↻</span></button></section><button type="button" class="btn ghost h5-signout" id="h5SignOut">${mt('退出登录','Keluar','Sign out')}</button>`}
+function mobileAccountLinks(){return `<section class="card h5-service-card h5-account-services"><h2>${mt('我的服务','Layanan saya','My services')}</h2>${mobileLink('receivers','地址管理','Alamat penerima','Delivery addresses','address')}${mobileLink('rates','运输计算器','Kalkulator ongkir','Shipping calculator','rates')}${mobileLink('messages','消息与客服','Pesan dan bantuan','Messages & support','support')}${mobileLink('address','国内仓库地址','Alamat gudang domestik','Shenzhen warehouse','parcels')}<button type="button" class="h5-service" id="h5Refresh">${mobileIcon('refresh')}${mt('刷新业务数据','Muat ulang data','Refresh data')}<span aria-hidden="true">↻</span></button></section><div class="h5-account-actions"><button type="button" class="btn primary" data-h5-signout>${mt('切换账号','Ganti akun','Switch account')}</button><button type="button" class="btn ghost h5-signout" id="h5SignOut">${mt('退出登录','Keluar','Sign out')}</button></div>`}
+async function mobileSignOut(){
+ if(mobile.signingOut)return false;
+ if(authFlow.busy||combined.busy||paymentWorkspace.busy||workspace.parcelBusy){toast(uiText('正在保存，请稍候','Sedang menyimpan, mohon tunggu','Saving. Please wait.'));return false}
+ mobile.signingOut=true;setAuthBusy(true);
+ const buttons=[...document.querySelectorAll('[data-h5-signout],#h5SignOut')];
+ for(const b of buttons){b.disabled=true;b.setAttribute('aria-busy','true')}
+ try{
+  const client=window.MospaceSupabase.getClient();
+  // End this browser session only; do not revoke the merchant's other devices.
+  if(client?.auth?.signOut){const {error}=await client.auth.signOut({scope:'local'});if(error)throw error}
+  else await window.MospaceSupabase.signOut();
+  if(typeof stopProgressChannel==='function')stopProgressChannel();
+  Object.assign(state.auth,{user:null,profile:null,role:null,pending:null,pendingRole:null,mode:'login',loginTargetRole:'merchant'});
+  Object.assign(state,{role:'merchant',page:'dashboard',dbOrders:[],addresses:[],parcels:[],events:[],activeOrderId:null,order:{id:'',status:'draft',record:null}});
+  combined.ready=false;combined.owner=null;combined.draft={};combined.replyDraft={};workspace.parcels=[];workspace.selected=new Set();
+  document.getElementById('paymentProofDialog')?.remove();closeAuth();
+  setAuthBusy(false);render();
+  // A fresh document clears all account-specific drafts, caches and pending UI jobs.
+  // The SDK has already removed its persisted session, so refresh cannot restore it.
+  if(window.location?.replace)window.location.replace(window.location.pathname+window.location.search);
+  return true;
+ }catch(error){toast(uiText('退出失败，请检查网络后重试','Gagal keluar. Periksa koneksi dan coba lagi.','Could not sign out. Check your connection and retry.'));return false}
+ finally{mobile.signingOut=false;setAuthBusy(false);for(const b of buttons){b.disabled=false;b.removeAttribute('aria-busy')}}
+}
 function mobilePrepareTables(root){
  for(const table of root.querySelectorAll('.table')){
   if(table.dataset.h5Cards)continue;
@@ -71,6 +95,7 @@ function mobileRenderChrome(){
  const logged=!!state.auth.user,merchant=logged&&normalizedRole(state.auth.role)==='merchant';
  document.body.classList.toggle('h5-authenticated',merchant);
  document.getElementById('h5BottomNav')?.remove();
+ document.getElementById('h5SwitchAccount')?.remove();
  if(!merchant)return;
  let heading=document.getElementById('h5Heading');
  if(!heading){heading=document.createElement('div');heading.id='h5Heading';heading.className='h5-heading';document.querySelector('.topbar')?.prepend(heading)}
@@ -80,8 +105,10 @@ function mobileRenderChrome(){
  const nav=document.createElement('nav');nav.id='h5BottomNav';nav.className='h5-bottom-nav';nav.setAttribute('aria-label',uiText('主导航','Navigasi utama','Main navigation'));
  const items=[['dashboard','首页','Beranda','Home','home'],['parcels','包裹','Paket','Parcels','parcels'],['orders','订单','Pesanan','Orders','orders'],['profile','我的','Akun','Account','profile']];
  nav.innerHTML=items.map(([page,z,i,e,symbol])=>`<button type="button" data-h5-nav="${page}" ${mobileSection()===page?'aria-current="page"':''}>${mobileIcon(symbol)}${mt(z,i,e)}</button>`).join('');document.body.append(nav);
+ const switcher=document.createElement('button');switcher.type='button';switcher.id='h5SwitchAccount';switcher.className='h5-switch-account';switcher.setAttribute('data-h5-signout','');switcher.innerHTML=mt('切换账号','Ganti akun','Switch account');document.querySelector('.top-actions')?.append(switcher);
  if(state.page==='profile'){
   document.querySelector('#content .head-actions')?.remove();
+  document.getElementById('content').insertAdjacentHTML('afterbegin',`<div class="h5-account-switch"><button type="button" class="btn ghost" data-h5-signout>${mt('切换账号','Ganti akun','Switch account')}</button></div>`);
   document.getElementById('content').insertAdjacentHTML('beforeend',mobileAccountLinks());
  }
  mobilePrepareTables(document.getElementById('content'));
@@ -94,7 +121,7 @@ function mobileRenderChrome(){
  // Profile services are appended after the existing bind pass.
  document.querySelectorAll('.h5-account-services [data-page]').forEach(button=>button.onclick=()=>go(button.dataset.page,{role:'merchant'}));
  document.getElementById('h5Back')?.addEventListener('click',()=>go(mobileParent(),{role:'merchant'}));
- document.getElementById('h5SignOut')?.addEventListener('click',()=>document.getElementById('authBtn')?.click());
+ document.querySelectorAll('[data-h5-signout],#h5SignOut').forEach(button=>button.onclick=mobileSignOut);
  document.getElementById('h5Refresh')?.addEventListener('click',()=>refreshDbState());
  mobileRememberRoute();
 }
@@ -102,7 +129,7 @@ const mobileOriginalRender=render;
 render=function(){
  if(state.auth.user&&normalizedRole(state.auth.role)!=='merchant'){
   $('#appShell').classList.add('login-mode');document.body.classList.remove('h5-authenticated');$('#h5BottomNav')?.remove();
-  $('#content').innerHTML=`<section class="h5-staff-handoff card"><span class="brand-mark">E</span><h1>${mt('此入口仅供商家使用','Halaman ini khusus pelanggan','This entry is for customers')}</h1><p>${mt('当前登录的是内部员工账号，请返回电脑端工作台。','Akun staf terdeteksi. Buka ruang kerja desktop.','You are signed in as staff. Please use the desktop workspace.')}</p><a class="btn primary" href="../">${mt('打开电脑端','Buka desktop','Open desktop')}</a></section>`;localizeKnownDom($('#content'));return;
+  $('#h5SwitchAccount')?.remove();$('#content').innerHTML=`<section class="h5-staff-handoff card"><span class="brand-mark">E</span><h1>${mt('此入口仅供商家使用','Halaman ini khusus pelanggan','This entry is for customers')}</h1><p>${mt('当前登录的是内部员工账号，请返回电脑端工作台。','Akun staf terdeteksi. Buka ruang kerja desktop.','You are signed in as staff. Please use the desktop workspace.')}</p><a class="btn primary" href="../">${mt('打开电脑端','Buka desktop','Open desktop')}</a><button type="button" class="btn ghost" data-h5-signout>${mt('切换商家账号','Ganti ke akun pelanggan','Switch to customer account')}</button></section>`;document.querySelector('[data-h5-signout]').onclick=mobileSignOut;localizeKnownDom($('#content'));return;
  }
  mobileOriginalRender();mobileRenderChrome();
  if(mobile.renderedPage!==state.page){window.scrollTo?.(0,0);mobile.renderedPage=state.page}
@@ -120,3 +147,4 @@ if(typeof window.addEventListener==='function')window.addEventListener('popstate
   mobile.historyRoute=JSON.stringify(route);
  }finally{mobile.popping=false}
 });
+if(typeof window.addEventListener==='function')window.addEventListener('pageshow',event=>{if(event.persisted)window.location?.reload?.()});
