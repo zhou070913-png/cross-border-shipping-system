@@ -8,7 +8,7 @@ const mobileOrderListPages=new Set(['orders','tracking-list','sea-tracking','bil
 const mobileTrackingPages=new Set(['tracking-list','sea-tracking']);
 pageRoles['account-details']='merchant';
 const mobileAccountDetails=combinedProfile;
-combinedProfile=function(){return ch('我的','Akun')};
+combinedProfile=function(){return ''};
 const mobileBaseView=combinedView;
 combinedView=function(){if(state.role==='merchant'&&state.page==='account-details')return mobileAccountDetails();return mobileBaseView()};
 enLocale['我的']='Account';extraIndonesian['我的']='Akun';
@@ -110,7 +110,7 @@ function mobileRenderChrome(){
  if(!heading){heading=document.createElement('div');heading.id='h5Heading';heading.className='h5-heading';document.querySelector('.topbar')?.prepend(heading)}
  const atRoot=['dashboard','parcels','orders','profile'].includes(state.page);
  const pageTitle=document.querySelector('#content h1');
- heading.innerHTML=`${atRoot?'<span class="brand-mark">E</span>':`<button type="button" id="h5Back" aria-label="${esc(uiText('返回','Kembali','Back'))}">${mobileIcon('back')}</button>`}<span class="h5-heading-title">${state.page==='dashboard'?'Eaztrans':pageTitle?.innerHTML||mt('商家端','Pelanggan','Customer')}</span>`;
+ heading.innerHTML=`${atRoot?'<span class="brand-mark">E</span>':`<button type="button" id="h5Back" aria-label="${esc(uiText('返回','Kembali','Back'))}">${mobileIcon('back')}</button>`}<span class="h5-heading-title">${state.page==='dashboard'?'Eaztrans':state.page==='profile'?mt('我的','Akun','Account'):pageTitle?.innerHTML||mt('商家端','Pelanggan','Customer')}</span>`;
  const nav=document.createElement('nav');nav.id='h5BottomNav';nav.className='h5-bottom-nav';nav.setAttribute('aria-label',uiText('主导航','Navigasi utama','Main navigation'));
  const items=[['dashboard','首页','Beranda','Home','home'],['parcels','包裹','Paket','Parcels','parcels'],['pre-advise','预报包裹','Daftarkan','Declare','plus'],['orders','订单','Pesanan','Orders','orders'],['profile','我的','Akun','Account','profile']];
  nav.innerHTML=items.map(([page,z,i,e,symbol])=>`<button type="button" data-h5-nav="${page}" class="${page==='pre-advise'?'h5-nav-declare':''}" ${((page==='pre-advise'&&state.page===page)||(page!=='pre-advise'&&mobileSection()===page&&state.page!=='pre-advise'))?'aria-current="page"':''}>${mobileIcon(symbol)}${mt(z,i,e)}</button>`).join('');document.body.append(nav);
@@ -154,7 +154,7 @@ combinedOpen=function(id){
  return mobileBaseOpen(id);
 };
 function mobileListPage(rows,kind){
- const key=[state.auth.user?.id,kind,combined.filter,kind==='parcels'?workspace.parcelQuery:workspace.orderQuery].join('|');
+ const key=[state.auth.user?.id,kind,kind==='receivers'?'':combined.filter,kind==='receivers'?addressList.query:kind==='parcels'?workspace.parcelQuery:workspace.orderQuery].join('|');
  let list=mobile.lists[kind];if(!list||list.key!==key)list=mobile.lists[kind]={key,limit:12};
  return {rows:rows.slice(0,list.limit),total:rows.length,to:Math.min(list.limit,rows.length),kind};
 }
@@ -177,11 +177,37 @@ combinedParcelList=function(){
  const cards=`<div class="h5-list">${p.rows.map(p=>`<article class="h5-list-card"><header><b class="mono" data-user-content>${esc(p.tracking_no)}</b><button type="button" class="btn small ghost" data-workspace-parcel="${esc(p.id)}">${mt('查看详情','Lihat detail','View details')}</button></header><p data-user-content>${esc(p.item_name)}</p><div class="h5-list-meta">${p.status==='pre_advised'?mt('待入库','Belum diterima','Awaiting receipt'):p.order&&isCombined(p.order)?cs(p.order):translatedText(parcelLabel(p))}</div>${p.order?`<footer>${mt('关联订单','Pesanan terkait','Linked order')} ${isCombined(p.order)?combinedOpenButton(p.order,p.order.order_no,p.order.order_no):overallOrderButton(p.order)}</footer>`:''}</article>`).join('')||ce()}</div>`;
  return mobileDesktopParcelList().replace(/<div class="table-wrap">[\s\S]*?<\/table><\/div>/,cards);
 };
+const mobileBaseAddressPagination=combinedAddressPagination;
+combinedAddressPagination=function(){
+ if(state.page!=='receivers')return mobileBaseAddressPagination();
+ const owner=state.auth.user?.id+':'+state.role;
+ if(addressList.owner!==owner)Object.assign(addressList,{owner,query:'',page:1,size:10});
+ const q=addressList.query.toLowerCase();
+ return mobileListPage(state.addresses.filter(a=>[a.label,a.recipient_name,a.recipient_phone,a.country,a.city,a.address_line,a.postal_code].join(' ').toLowerCase().includes(q)),'receivers');
+};
+const mobileBaseAddressList=combinedAddressList;
+combinedAddressList=function(){
+ if(state.page!=='receivers')return mobileBaseAddressList();
+ const p=combinedAddressPagination();
+ return `<div class="card"><h2>${mt('收货地址列表','Daftar alamat penerima','Delivery addresses')}</h2><form id="addressListSearch" class="workspace-toolbar"><input id="addressListQuery" aria-label="${esc(uiText('查询地址','Cari alamat','Search addresses'))}" placeholder="${esc(uiText('收件人 / 电话 / 城市 / 地址','Penerima / telepon / kota / alamat','Recipient / phone / city / address'))}" value="${esc(addressList.query)}"><button class="btn ghost">${mt('查询','Cari','Search')}</button><button type="button" class="btn ghost" id="addressListReset">${mt('重置','Atur ulang','Reset')}</button></form></div>${p.rows.map(a=>`<article class="card section-space" data-address-row="${esc(a.id)}"><div class="card-title"><h3>${raw(a.label)}</h3>${a.is_default?`<span class="status green">${mt('默认地址','Alamat utama','Default address')}</span>`:''}</div><b>${raw(a.recipient_name)} · ${raw(a.recipient_phone)}</b><p>${raw(a.city)}<br>${raw(a.address_line)} ${raw(a.postal_code)}</p><button type="button" class="btn ghost" data-edit-address="${esc(a.id)}">${mt('编辑地址','Ubah alamat','Edit address')}</button></article>`).join('')||`<div class="card section-space">${addressList.query?mt('没有匹配的地址','Tidak ada alamat yang sesuai','No matching addresses'):mt('尚未保存收货地址','Belum ada alamat tersimpan','No saved delivery addresses')}</div>`}${mobileListFooter(p)}`;
+};
+function mobileRefreshAddresses(){
+ const root=document.getElementById('combinedAddressList');if(!root)return;
+ root.innerHTML=combinedAddressList();bindCombinedAddressList();localizeKnownDom(root);mobileBindLazy();
+}
+const mobileBaseAddressBind=bindCombinedAddressList;
+bindCombinedAddressList=function(){
+ if(state.page!=='receivers')return mobileBaseAddressBind();
+ const root=document.getElementById('combinedAddressList');if(!root)return;
+ root.querySelector('#addressListSearch').onsubmit=e=>{e.preventDefault();addressList.query=root.querySelector('#addressListQuery').value.trim();mobileRefreshAddresses()};
+ root.querySelector('#addressListReset').onclick=()=>{addressList.query='';mobileRefreshAddresses()};
+ root.querySelectorAll('[data-edit-address]').forEach(b=>b.onclick=()=>{workspace.editingAddress=b.dataset.editAddress;render()});
+};
 function mobileBindLazy(){
  mobile.observer?.disconnect();mobile.observer=null;
  const button=document.querySelector('[data-h5-load]');if(!button)return;
  const owner=state.auth.user?.id,page=state.page,key=mobile.lists[button.dataset.h5Load]?.key;
- const load=()=>{if(!button.isConnected||button.disabled||state.auth.user?.id!==owner||state.page!==page)return;const list=mobile.lists[button.dataset.h5Load];if(list?.key!==key)return;button.disabled=true;list.limit+=12;render()};
+ const load=()=>{if(!button.isConnected||button.disabled||state.auth.user?.id!==owner||state.page!==page)return;const list=mobile.lists[button.dataset.h5Load];if(list?.key!==key)return;button.disabled=true;list.limit+=12;if(page==='receivers')mobileRefreshAddresses();else render()};
  button.onclick=load;
  if(window.IntersectionObserver){mobile.observer=new window.IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))load()},{rootMargin:'0px 0px 180px 0px'});mobile.observer.observe(button)}
 }

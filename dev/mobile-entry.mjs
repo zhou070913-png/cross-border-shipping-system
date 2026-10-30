@@ -4,8 +4,8 @@ export function mobileHtml(html){
  if(!html.includes(startup)||!html.includes('</style>'))throw Error('Unexpected desktop entry structure');
  return mobileAsset('locale-switch.js',html).replace('width=device-width, initial-scale=1','width=device-width, initial-scale=1, viewport-fit=cover')
   .replace(/supabase-client\.js\?v=[^"\s]+/, 'supabase-client.js?v=h5-4')
-  .replace('</style>','</style>\n<link rel="stylesheet" href="mobile-workspace.css?v=4" />\n<meta name="theme-color" content="#315efb" />\n<meta name="apple-mobile-web-app-capable" content="yes" />')
-  .replace(startup,'<script src="mobile-workspace.js?v=4"></script>\n'+startup);
+  .replace('</style>','</style>\n<link rel="stylesheet" href="mobile-workspace.css?v=5" />\n<meta name="theme-color" content="#315efb" />\n<meta name="apple-mobile-web-app-capable" content="yes" />')
+  .replace(startup,'<script src="mobile-workspace.js?v=5"></script>\n'+startup);
 }
 export function mobileAsset(name,text){
  if(name==='supabase-client.js'){

@@ -119,7 +119,7 @@ body.h5-mode .notice{font-size:12px;line-height:1.7;padding:12px}
 body.h5-mode .notice p{font-size:12px}
 body.h5-mode .account-facts{grid-template-columns:minmax(0,1fr);gap:16px}
 body.h5-mode .h5-signout{width:100%;margin-top:8px;color:#bc4b4b}
-.h5-account-services{margin-top:20px}
+.h5-account-services{margin-top:0}
 body.h5-mode .toast{left:50%;right:auto;bottom:calc(87px + env(safe-area-inset-bottom));transform:translate(-50%,10px);width:max-content;max-width:calc(min(100vw,560px) - 32px);font-size:12px;text-align:center;z-index:1400}
 body.h5-mode .toast.show{transform:translate(-50%,0)}
 body.h5-mode .modal{padding:16px;align-items:center;overflow-y:auto;z-index:1300}

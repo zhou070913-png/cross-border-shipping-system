@@ -162,3 +162,18 @@ test('H5 build creates an isolated ephemeral SDK session and preserves explicit 
  assert.doesNotMatch(clientSource,/persistSession:false/);
  const entry=mobileHtml(fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'));assert.match(entry,/supabase-client.js\?v=h5-4/);
 });
+
+test('account has only the top-bar title and address scrolling/search preserve the live add and edit form',async()=>{
+ const {run,document}=mobileSetup();run(`go('profile')`);assert.equal(document.querySelector('#content h1'),null);assert.equal(document.querySelector('.h5-heading-title').textContent,'我的');
+ run(`observerCallbacks=[];window.IntersectionObserver=class{constructor(cb){observerCallbacks.push(cb)}observe(){}disconnect(){}};state.addresses=Array.from({length:29},(_,i)=>({id:'a'+i,label:'Address '+i,recipient_name:'Receiver '+i,recipient_phone:'PHONE-'+i,city:i===28?'Bandung':'Jakarta',address_line:'Street '+i,postal_code:'ZIP-'+i}));go('receivers')`);
+ const form=document.querySelector('#receiverForm');document.querySelector('#receiverName').value='UNSAVED';document.querySelector('#receiverLine').value='DRAFT';
+ assert.equal(document.querySelectorAll('[data-address-row]').length,12);assert.equal(document.querySelector('#addressListSize'),null);assert.equal(document.querySelector('[data-address-page]'),null);
+ run(`observerCallbacks.at(-1)([{isIntersecting:true}])`);assert.equal(document.querySelectorAll('[data-address-row]').length,24);assert.equal(document.querySelector('#receiverForm'),form);assert.equal(document.querySelector('#receiverName').value,'UNSAVED');
+ document.querySelector('[data-h5-load]').click();assert.equal(document.querySelectorAll('[data-address-row]').length,29);assert.equal(document.querySelector('[data-h5-load]'),null);
+ document.querySelector('#addressListQuery').value='ZIP-28';document.querySelector('#addressListSearch').onsubmit({preventDefault(){}});assert.equal(document.querySelectorAll('[data-address-row]').length,1);assert.equal(document.querySelector('[data-address-row]').dataset.addressRow,'a28');assert.equal(document.querySelector('#receiverForm'),form);assert.equal(document.querySelector('#receiverLine').value,'DRAFT');
+ document.querySelector('#addressListReset').click();assert.equal(document.querySelectorAll('[data-address-row]').length,12);document.querySelector('[data-h5-load]').click();document.querySelector('[data-edit-address="a18"]').click();
+ assert.equal(document.querySelector('#receiverName').value,'Receiver 18');const edit=document.querySelector('#receiverForm');document.querySelector('#receiverName').value='EDIT DRAFT';document.querySelector('[data-h5-load]').click();assert.equal(document.querySelector('#receiverForm'),edit);assert.equal(document.querySelector('#receiverName').value,'EDIT DRAFT');
+ run(`busyForm=(form,fn)=>addressSaving=fn();window.MospaceSupabase.saveAddress=async payload=>{savedMobileAddress=payload;state.addresses=state.addresses.map(a=>a.id===payload.id?{...a,...payload}:a)};window.MospaceSupabase.listAddresses=async()=>state.addresses`);
+ edit.dispatchEvent(new document.defaultView.Event('submit',{bubbles:true,cancelable:true}));await run('addressSaving');assert.equal(run('savedMobileAddress.id'),'a18');assert.equal(run('savedMobileAddress.recipient_name'),'EDIT DRAFT');assert.equal(document.querySelectorAll('[data-address-row]').length,29);
+ run(`state.auth.user={id:'other'};state.addresses=[];render();observerCallbacks[0]([{isIntersecting:true}])`);assert.equal(run('addressList.query'),'');assert.equal(document.querySelectorAll('[data-address-row]').length,0);assert.equal(document.querySelector('[data-h5-load]'),null);assert.doesNotMatch(document.querySelector('#combinedAddressList').textContent,/第.*页/);
+});
