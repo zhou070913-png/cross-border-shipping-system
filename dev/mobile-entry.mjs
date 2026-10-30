@@ -3,9 +3,29 @@ export function mobileHtml(html){
  const startup='<script>render(); updateAuthMode(); syncAuth();</script>';
  if(!html.includes(startup)||!html.includes('</style>'))throw Error('Unexpected desktop entry structure');
  return mobileAsset('locale-switch.js',html).replace('width=device-width, initial-scale=1','width=device-width, initial-scale=1, viewport-fit=cover')
+  .replace(/locale-switch\.js\?v=[^\"\s]+/, 'locale-switch.js?v=h5-2')
+  .replace('</head>',`<meta name="description" content="Eaztrans集运系统，提供包裹预报、合包发货、费用查询与物流跟踪服务。" />
+<link rel="canonical" href="https://zhou070913-png.github.io/eaztrans-latest-development/h5/" />
+<link rel="icon" type="image/png" href="eaztrans-share.png?v=1" />
+<link rel="apple-touch-icon" href="eaztrans-share.png?v=1" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Eaztrans集运" />
+<meta property="og:title" content="Eaztrans集运系统" />
+<meta property="og:description" content="包裹预报、合包发货、费用查询与物流跟踪。" />
+<meta property="og:url" content="https://zhou070913-png.github.io/eaztrans-latest-development/h5/" />
+<meta property="og:image" content="https://zhou070913-png.github.io/eaztrans-latest-development/h5/eaztrans-share.png?v=1" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="512" />
+<meta property="og:image:height" content="512" />
+<meta property="og:image:alt" content="Eaztrans" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="Eaztrans集运系统" />
+<meta name="twitter:description" content="包裹预报、合包发货、费用查询与物流跟踪。" />
+<meta name="twitter:image" content="https://zhou070913-png.github.io/eaztrans-latest-development/h5/eaztrans-share.png?v=1" />
+</head>`)
   .replace(/supabase-client\.js\?v=[^"\s]+/, 'supabase-client.js?v=h5-4')
   .replace('</style>','</style>\n<link rel="stylesheet" href="mobile-workspace.css?v=5" />\n<meta name="theme-color" content="#315efb" />\n<meta name="apple-mobile-web-app-capable" content="yes" />')
-  .replace(startup,'<script src="mobile-workspace.js?v=5"></script>\n'+startup);
+  .replace(startup,'<script src="mobile-workspace.js?v=6"></script>\n'+startup);
 }
 export function mobileAsset(name,text){
  if(name==='supabase-client.js'){
@@ -17,7 +37,7 @@ export function mobileAsset(name,text){
   return text.replace(creation,"global.supabase.createClient(config.url, config.anonKey, {auth:{storageKey:'eaztrans-h5-auth-v1',persistSession:false,detectSessionInUrl:true}})");
  }
  if(name!=='locale-switch.js')return text;
- return text.replaceAll('Eaztrans集运｜产品原型','Eaztrans集运｜商家移动端').replaceAll('Eaztrans集运｜最新开发版','Eaztrans集运｜商家移动端')
-  .replaceAll('Eaztrans Logistik · Demo','Eaztrans Logistik · Pelanggan seluler').replaceAll('Eaztrans Logistik · Pengembangan terbaru','Eaztrans Logistik · Pelanggan seluler')
-  .replaceAll('Eaztrans Logistics · Demo','Eaztrans Logistics · Customer mobile').replaceAll('Eaztrans Logistics · Latest development','Eaztrans Logistics · Customer mobile');
+ return text.replaceAll('Eaztrans集运｜产品原型','Eaztrans集运系统').replaceAll('Eaztrans集运｜最新开发版','Eaztrans集运系统')
+  .replaceAll('Eaztrans Logistik · Demo','Eaztrans Logistik').replaceAll('Eaztrans Logistik · Pengembangan terbaru','Eaztrans Logistik')
+  .replaceAll('Eaztrans Logistics · Demo','Eaztrans Logistics').replaceAll('Eaztrans Logistics · Latest development','Eaztrans Logistics');
 }

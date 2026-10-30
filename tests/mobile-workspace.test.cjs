@@ -7,6 +7,7 @@ test('H5 home has five customer tabs, functional parcel filters and payment summ
  assert.equal(document.querySelectorAll('#h5BottomNav button').length,5);
  assert.match(document.querySelector('#h5BottomNav button:nth-child(3)').textContent,/预报包裹/);
  assert.equal(document.querySelector('#h5SwitchAccount'),null);
+ assert.equal(document.querySelector('.h5-welcome h1'),null);assert.doesNotMatch(document.querySelector('.h5-welcome').textContent,/让每一件包裹/);
  assert.ok(document.querySelector('.h5-service-card').compareDocumentPosition(document.querySelector('.h5-task-grid'))&4);
  document.querySelector('[data-mobile-task="parcels"]').onclick();assert.equal(run('state.page'),'parcels');assert.equal(run('combined.filter'),'pre_advised');
  document.querySelector('[data-h5-nav="orders"]').onclick();assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'all');assert.ok(document.querySelector('[data-h5-nav="orders"]').hasAttribute('aria-current'));
@@ -100,7 +101,13 @@ test('H5 release uses dedicated assets and link verification; desktop source ent
  try{
   const output=path.join(tmp,'h5');await buildMobile({url:'https://abcdefghijklmnopqrst.supabase.co',key:'sb_publishable_TEST',output});
   const html=await fsp.readFile(path.join(output,'index.html'),'utf8');assert.match(html,/mobile-workspace.css/);assert.ok(html.indexOf('mobile-workspace.js')<html.indexOf('<script>render();'));
-  assert.match(html,/viewport-fit=cover/);assert.match(html,/商家移动端/);assert.doesNotMatch(html,/forwarding-local-client/);
+  assert.match(html,/viewport-fit=cover/);assert.match(html,/<title>Eaztrans集运系统<\/title>/);
+  const {parseHTML}=require('linkedom'),head=parseHTML(html).document.head;
+  assert.equal(head.querySelector('meta[property="og:title"]').content,'Eaztrans集运系统');
+  const image=head.querySelector('meta[property="og:image"]').content;
+  assert.equal(image,'https://zhou070913-png.github.io/eaztrans-latest-development/h5/eaztrans-share.png?v=1');
+  assert.equal(head.querySelector('link[rel="canonical"]').getAttribute('href'),'https://zhou070913-png.github.io/eaztrans-latest-development/h5/');
+  const icon=await fsp.readFile(path.join(output,'eaztrans-share.png'));assert.equal(icon.subarray(1,4).toString(),'PNG');assert.equal(icon.readUInt32BE(16),512);assert.equal(icon.readUInt32BE(20),512);assert.doesNotMatch(html,/forwarding-local-client/);
   const client=await fsp.readFile(path.join(output,'supabase-client.js'),'utf8');assert.match(client,/"signupVerification":"link"/);assert.doesNotMatch(client,/bdxqphmzwojamyuboqmz/);
   assert.equal(JSON.parse(await fsp.readFile(path.join(output,'deployment.json'),'utf8')).surface,'merchant-h5');assert.deepEqual(await fsp.readFile(entry),before);
  }finally{await fsp.rm(tmp,{recursive:true,force:true})}
