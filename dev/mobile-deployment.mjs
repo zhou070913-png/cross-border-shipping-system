@@ -6,7 +6,7 @@ import {mobileHtml,mobileAsset} from './mobile-entry.mjs';
 export async function buildMobile(options){
  const result=await buildLatest({...options,signupVerification:'link'});
  const output=result.output;
- for(const name of ['mobile-workspace.css','mobile-workspace.js','eaztrans-share.png'])await fs.copyFile(path.join(root,name),path.join(output,name));
+ for(const name of ['mobile-workspace.css','mobile-workspace.js','mobile-flows.js','eaztrans-share.png'])await fs.copyFile(path.join(root,name),path.join(output,name));
  const html=await fs.readFile(path.join(output,'index.html'),'utf8');
  await fs.writeFile(path.join(output,'index.html'),mobileHtml(html));
  for(const name of ['locale-switch.js','supabase-client.js']){

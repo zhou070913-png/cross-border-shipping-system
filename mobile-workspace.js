@@ -6,6 +6,7 @@ for(const [zh,id,en]of [['会员号或邮箱','Nomor anggota atau email','Member
 const mt=(zh,id,en)=>localeMarkup(zh,id,en);
 const mobileOrderListPages=new Set(['orders','tracking-list','sea-tracking','billing']);
 const mobileTrackingPages=new Set(['tracking-list','sea-tracking']);
+const mobileEligibleParcel=p=>!p.order&&['pre_advised','received','measured'].includes(p.status);
 pageRoles['account-details']='merchant';
 const mobileAccountDetails=combinedProfile;
 combinedProfile=function(){return ''};
@@ -36,7 +37,7 @@ loginPage=function(){
 };
 combinedDashboard=function(){
  const parcels=allParcels(),orders=overallOrderRoots(state.dbOrders);
- const pending=parcels.filter(p=>p.status==='pre_advised').length,available=parcels.filter(p=>!p.order).length;
+ const pending=parcels.filter(p=>p.status==='pre_advised').length,available=parcels.filter(mobileEligibleParcel).length;
  const due=orders.filter(o=>o.status==='awaiting_payment').length;
  const reviewing=orders.filter(o=>o.status==='awaiting_payment'&&orderReceipt(o.id)?.status==='pending').length;
  const tasks=[['parcels','待入库','Belum diterima','Awaiting receipt',pending,'pre_advised'],['parcels','可合包','Siap digabung','To consolidate',available,'available'],['orders','待付款 / 审核','Pembayaran','Payment',due,'awaiting_payment'],['orders','全部订单','Semua pesanan','All orders',orders.length,'all']];
@@ -83,7 +84,7 @@ function mobilePrepareTables(root){
   }
  }
 }
-function mobileRoute(){return {h5:true,owner:state.auth.user?.id||null,page:state.page,order:state.activeOrderId||null,parcel:workspace.detailParcelId||null}}
+function mobileRoute(){return {h5:true,owner:state.auth.user?.id||null,page:state.page,order:state.activeOrderId||null,parcel:workspace.detailParcelId||null,address:workspace.editingAddress||null,step:typeof mobileFlow==='undefined'?1:mobileFlow.step}}
 function mobileRememberRoute(push=false){
  if(!window.history?.replaceState||mobile.popping||mobile.navigating)return;
  const route=mobileRoute(),key=JSON.stringify(route);
@@ -130,7 +131,7 @@ function mobileRenderChrome(){
  // Profile services are appended after the existing bind pass.
  document.querySelectorAll('.h5-account-services [data-page]').forEach(button=>button.onclick=()=>go(button.dataset.page,{role:'merchant'}));
  document.querySelectorAll('[data-combined-back-orders]').forEach(b=>b.onclick=()=>go(mobile.orderReturnPage||'orders',{role:'merchant'}));
- document.getElementById('h5Back')?.addEventListener('click',()=>go(mobileParent(),{role:'merchant'}));
+ const back=document.getElementById('h5Back');if(back)back.onclick=()=>go(mobileParent(),{role:'merchant'});
  document.querySelectorAll('[data-h5-signout],#h5SignOut').forEach(button=>button.onclick=mobileSignOut);
  document.getElementById('h5Refresh')?.addEventListener('click',()=>refreshDbState());
  mobileBindLazy();
@@ -173,7 +174,7 @@ combinedOrderTable=function(rows,warehouse=false){
 };
 const mobileDesktopParcelList=combinedParcelList;
 combinedParcelList=function(){
- const rows=allParcels().filter(p=>(combined.filter==='all'||p.status===combined.filter||combined.filter==='available'&&!p.order)&&[p.tracking_no,p.item_name].join(' ').toLowerCase().includes(workspace.parcelQuery.toLowerCase()));
+ const rows=allParcels().filter(p=>(combined.filter==='all'||p.status===combined.filter||combined.filter==='available'&&mobileEligibleParcel(p))&&[p.tracking_no,p.item_name].join(' ').toLowerCase().includes(workspace.parcelQuery.toLowerCase()));
  const p=mobileListPage(rows,'parcels');
  const cards=`<div class="h5-list">${p.rows.map(p=>`<article class="h5-list-card"><header><b class="mono" data-user-content>${esc(p.tracking_no)}</b><button type="button" class="btn small ghost" data-workspace-parcel="${esc(p.id)}">${mt('查看详情','Lihat detail','View details')}</button></header><p data-user-content>${esc(p.item_name)}</p><div class="h5-list-meta">${p.status==='pre_advised'?mt('待入库','Belum diterima','Awaiting receipt'):p.order&&isCombined(p.order)?cs(p.order):translatedText(parcelLabel(p))}</div>${p.order?`<footer>${mt('关联订单','Pesanan terkait','Linked order')} ${isCombined(p.order)?combinedOpenButton(p.order,p.order.order_no,p.order.order_no):overallOrderButton(p.order)}</footer>`:''}</article>`).join('')||ce()}</div>`;
  return mobileDesktopParcelList().replace(/<div class="table-wrap">[\s\S]*?<\/table><\/div>/,cards);
@@ -265,6 +266,8 @@ if(typeof window.addEventListener==='function')window.addEventListener('popstate
  try{
   if(route.order){const order=state.dbOrders.find(o=>o.id===route.order);if(order)applyDbOrder(order)}
   if(route.parcel)workspace.detailParcelId=route.parcel;
+  if(route.page==='address-edit')workspace.editingAddress=route.address||null;
+  if(['packing-request','consolidate','packing-history'].includes(route.page)&&typeof mobileFlow!=='undefined')mobileFlow.step=route.step||1;
   if(['fee','tracking','overall-order'].includes(route.page)&&state.activeOrderId)void loadSelectedOrderTracking(state.activeOrderId,route.page);
   else go(route.page,{role:'merchant'});
   mobile.historyRoute=JSON.stringify(route);

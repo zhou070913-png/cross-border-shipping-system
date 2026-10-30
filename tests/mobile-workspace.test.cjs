@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const setup=require('../dev/combined-ui-harness.cjs');
-function mobileSetup(){const context=setup();context.run(fs.readFileSync(path.join(__dirname,'../mobile-workspace.js'),'utf8'));return context}
+function mobileSetup(){const context=setup();for(const file of ['mobile-workspace.js','mobile-flows.js'])context.run(fs.readFileSync(path.join(__dirname,'../'+file),'utf8'));return context}
 
 test('H5 home has five customer tabs, functional parcel filters and payment summary',()=>{
  const {run,document}=mobileSetup();run(`workspace.parcels=[{id:'p',tracking_no:'TEST-MOBILE',item_name:'TEST',status:'pre_advised'}];state.page='dashboard';render()`);
@@ -16,9 +16,9 @@ test('H5 home has five customer tabs, functional parcel filters and payment summ
 test('mobile compact cards keep details out of list and retain working detail navigation',()=>{
  const {run,document}=mobileSetup();run(`state.page='orders';render()`);
  assert.ok(document.querySelector('.h5-list-card'));assert.equal(document.querySelector('.combined-order-address'),null);
- assert.equal(document.querySelector('.h5-list-card header button').textContent,'查看详情');
- run(`setUiLanguage('en')`);assert.equal(document.querySelector('.h5-list-card header button').textContent,'View details');
- assert.equal(typeof document.querySelector('[data-combined-open]').onclick,'function');
+ assert.equal(document.querySelector('.h5-list-card header button').textContent,'查看复核进度');
+ run(`setUiLanguage('en')`);assert.equal(document.querySelector('.h5-list-card header button').textContent,'View review progress');
+ assert.equal(typeof document.querySelector('[data-h5-order-action]').onclick,'function');
  run(`workspace.parcels=[{id:'p',tracking_no:'TEST-PARCEL',item_name:'ITEM',status:'pre_advised'}];state.page='parcels';render()`);
  document.querySelector('[data-workspace-parcel]').onclick();assert.equal(run('state.page'),'parcel-detail');assert.equal(run('workspace.detailParcelId'),'p');
 });
@@ -54,9 +54,9 @@ test('mobile history pushes navigation once and avoids duplicates during refresh
 
 test('mobile payment keeps the receipt uploader and payer draft while tracking finishes',async()=>{
  const {run,document}=mobileSetup();run(`o.status='awaiting_payment';o.fees=[{confirmed_at:'now',total_amount:108,shipping_fee:60,last_mile_fee:30,handling_fee:18}];paymentWorkspace.account={id:'a',bank_name:'TEST',account_holder:'TEST',account_number:'TEST',currency:'CNY',is_active:true,mode:'test',updated_at:'v1'};window.MospaceSupabase.orderTracking=()=>new Promise(r=>mobileTrackingReady=r)`);
- const opened=run(`combinedOpen('o')`),upload=document.querySelector('input[type=file]');assert.ok(upload);
+ const opened=run(`combinedOpen('o')`);assert.equal(document.querySelector('input[type=file]'),null);document.querySelector('[data-h5-payment]').click();const upload=document.querySelector('input[type=file]');assert.ok(upload);
  const form=upload.closest('form'),text=form.querySelector('input[type=text]');assert.ok(text);text.value='MOBILE DRAFT';
- run(`mobileTrackingReady([])`);await opened;assert.equal(document.querySelector('input[type=file]'),upload);assert.equal(text.value,'MOBILE DRAFT');assert.equal(form.isConnected,true);
+ run(`mobileTrackingReady([])`);await opened;run('render()');assert.equal(document.querySelector('input[type=file]'),upload);assert.equal(text.value,'MOBILE DRAFT');assert.equal(form.isConnected,true);assert.equal(run('state.page'),'payment');
 });
 
 test('H5 switches accounts directly, clears the persisted session and cannot restore the previous customer',async()=>{
@@ -70,8 +70,8 @@ test('H5 switches accounts directly, clears the persisted session and cannot res
   loadMerchantWorkspace=async()=>{combined.ready=true};
   state.page='profile';render();document.getElementById('authBtn').onclick=()=>{throw Error('Hidden desktop button must not be used')};
  `);
- assert.equal(document.querySelector('#h5SwitchAccount'),null);assert.ok(document.querySelector('.h5-account-actions [data-h5-signout]'));
- await document.querySelector('.h5-account-actions [data-h5-signout]').onclick();
+ assert.equal(document.querySelector('#h5SwitchAccount'),null);assert.equal(document.querySelectorAll('.h5-account-actions button').length,1);assert.ok(document.querySelector('#h5SignOut'));
+ await document.querySelector('#h5SignOut').onclick();
  assert.equal(run('logoutScopes.join()'),'local');assert.equal(run('state.auth.user'),null);assert.equal(run('state.dbOrders.length'),0);assert.equal(run('workspace.parcels.length'),0);assert.equal(run('reloads[0]'),'/h5/?v=test');assert.ok(document.querySelector('#h5LoginForm'));
  await run('syncAuth()');assert.equal(run('state.auth.user'),null);assert.ok(document.querySelector('#h5LoginForm'));
  run(`window.MospaceSupabase.signInWithIdentifier=async identifier=>{persistedUser={id:'merchant-b',email:identifier}}`);
@@ -141,11 +141,11 @@ test('mobile detail return restores list scroll while a new filter starts at the
 });
 
 test('tracking shortcuts use compact incremental lists, retain tracking filters and return from shipment details',async()=>{
- const {run,document}=mobileSetup();run(`state.dbOrders=Array.from({length:29},(_,i)=>({...o,id:'t'+i,order_no:'20261030000000'+i}));window.MospaceSupabase.orderTracking=async()=>[];go('dashboard')`);
+ const {run,document}=mobileSetup();run(`state.dbOrders=Array.from({length:29},(_,i)=>({...o,status:'shipped',id:'t'+i,order_no:'20261030000000'+i})).concat(Array.from({length:13},(_,i)=>({...o,id:'p'+i,order_no:'20261030100000'+i})));window.MospaceSupabase.orderTracking=async()=>[];go('dashboard')`);
  document.querySelector('[data-page="tracking-list"]').click();assert.equal(run('state.page'),'tracking-list');assert.equal(document.querySelectorAll('.h5-list-card').length,12);assert.equal(document.querySelector('.pagination-pages'),null);assert.equal(document.querySelector('h1').textContent,'物流查询');
  document.querySelector('[data-h5-load]').onclick();assert.equal(document.querySelectorAll('.h5-list-card').length,24);
  document.querySelector('[data-combined-filter="pending"]').click();assert.equal(run('state.page'),'tracking-list');assert.equal(document.querySelectorAll('.h5-list-card').length,12);
- assert.equal(document.querySelector('[data-combined-open]').textContent,'查看物流');await document.querySelector('[data-combined-open]').onclick();assert.equal(run('state.page'),'tracking');
+ assert.equal(run('combined.filter'),'pending');assert.equal(document.querySelector('[data-h5-order-action]').textContent,'查看物流');await document.querySelector('[data-h5-order-action]').onclick();assert.equal(run('state.page'),'tracking');
  document.querySelector('#h5Back').click();assert.equal(run('state.page'),'tracking-list');
  for(const page of ['sea-tracking','billing']){run(`go('${page}')`);assert.equal(document.querySelectorAll('.h5-list-card').length,12);assert.equal(document.querySelector('.pagination-pages'),null)}
 });
@@ -170,18 +170,19 @@ test('H5 build creates an isolated ephemeral SDK session and preserves explicit 
  const entry=mobileHtml(fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'));assert.match(entry,/supabase-client.js\?v=h5-4/);
 });
 
-test('account has only the top-bar title and address scrolling/search preserve the live add and edit form',async()=>{
+test('addresses load incrementally and edit on a separate screen; save returns and reveals the saved address',async()=>{
  const {run,document}=mobileSetup();run(`go('profile')`);assert.equal(document.querySelector('#content h1'),null);assert.equal(document.querySelector('.h5-heading-title').textContent,'我的');
  run(`observerCallbacks=[];window.IntersectionObserver=class{constructor(cb){observerCallbacks.push(cb)}observe(){}disconnect(){}};state.addresses=Array.from({length:29},(_,i)=>({id:'a'+i,label:'Address '+i,recipient_name:'Receiver '+i,recipient_phone:'PHONE-'+i,city:i===28?'Bandung':'Jakarta',address_line:'Street '+i,postal_code:'ZIP-'+i}));go('receivers')`);
- const form=document.querySelector('#receiverForm');document.querySelector('#receiverName').value='UNSAVED';document.querySelector('#receiverLine').value='DRAFT';
+ assert.equal(document.querySelector('#receiverForm'),null);
  assert.equal(document.querySelectorAll('[data-address-row]').length,12);assert.equal(document.querySelector('#addressListSize'),null);assert.equal(document.querySelector('[data-address-page]'),null);
- run(`observerCallbacks.at(-1)([{isIntersecting:true}])`);assert.equal(document.querySelectorAll('[data-address-row]').length,24);assert.equal(document.querySelector('#receiverForm'),form);assert.equal(document.querySelector('#receiverName').value,'UNSAVED');
+ run(`observerCallbacks.at(-1)([{isIntersecting:true}])`);assert.equal(document.querySelectorAll('[data-address-row]').length,24);
  document.querySelector('[data-h5-load]').click();assert.equal(document.querySelectorAll('[data-address-row]').length,29);assert.equal(document.querySelector('[data-h5-load]'),null);
- document.querySelector('#addressListQuery').value='ZIP-28';document.querySelector('#addressListSearch').onsubmit({preventDefault(){}});assert.equal(document.querySelectorAll('[data-address-row]').length,1);assert.equal(document.querySelector('[data-address-row]').dataset.addressRow,'a28');assert.equal(document.querySelector('#receiverForm'),form);assert.equal(document.querySelector('#receiverLine').value,'DRAFT');
+ document.querySelector('#addressListQuery').value='ZIP-28';document.querySelector('#addressListSearch').onsubmit({preventDefault(){}});assert.equal(document.querySelectorAll('[data-address-row]').length,1);assert.equal(document.querySelector('[data-address-row]').dataset.addressRow,'a28');
  document.querySelector('#addressListReset').click();assert.equal(document.querySelectorAll('[data-address-row]').length,12);document.querySelector('[data-h5-load]').click();document.querySelector('[data-edit-address="a18"]').click();
- assert.equal(document.querySelector('#receiverName').value,'Receiver 18');const edit=document.querySelector('#receiverForm');document.querySelector('#receiverName').value='EDIT DRAFT';document.querySelector('[data-h5-load]').click();assert.equal(document.querySelector('#receiverForm'),edit);assert.equal(document.querySelector('#receiverName').value,'EDIT DRAFT');
- run(`busyForm=(form,fn)=>addressSaving=fn();window.MospaceSupabase.saveAddress=async payload=>{savedMobileAddress=payload;state.addresses=state.addresses.map(a=>a.id===payload.id?{...a,...payload}:a)};window.MospaceSupabase.listAddresses=async()=>state.addresses`);
- edit.dispatchEvent(new document.defaultView.Event('submit',{bubbles:true,cancelable:true}));await run('addressSaving');assert.equal(run('savedMobileAddress.id'),'a18');assert.equal(run('savedMobileAddress.recipient_name'),'EDIT DRAFT');assert.equal(document.querySelectorAll('[data-address-row]').length,29);
+ assert.equal(run('state.page'),'address-edit');assert.equal(document.querySelector('#combinedAddressList'),null);assert.equal(document.querySelector('#h5BottomNav'),null);
+ assert.equal(document.querySelector('#receiverName').value,'Receiver 18');document.querySelector('#receiverName').value='EDIT DRAFT';document.querySelector('#receiverForm').oninput();run('render()');assert.equal(document.querySelector('#receiverName').value,'EDIT DRAFT');
+ run(`window.MospaceSupabase.saveAddress=async payload=>{savedMobileAddress=payload;state.addresses=state.addresses.map(a=>a.id===payload.id?{...a,...payload}:a);return payload};window.MospaceSupabase.listAddresses=async()=>state.addresses`);
+ await document.querySelector('#receiverForm').onsubmit({preventDefault(){}});assert.equal(run('savedMobileAddress.id'),'a18');assert.equal(run('savedMobileAddress.recipient_name'),'EDIT DRAFT');assert.equal(run('state.page'),'receivers');assert.ok(document.querySelector('[data-address-row="a18"].h5-saved-address'));assert.equal(document.querySelector('#receiverForm'),null);
  run(`state.auth.user={id:'other'};state.addresses=[];render();observerCallbacks[0]([{isIntersecting:true}])`);assert.equal(run('addressList.query'),'');assert.equal(document.querySelectorAll('[data-address-row]').length,0);assert.equal(document.querySelector('[data-h5-load]'),null);assert.doesNotMatch(document.querySelector('#combinedAddressList').textContent,/第.*页/);
 });
 
@@ -189,22 +190,22 @@ function addressDeleteSetup(){
  const ctx=mobileSetup();ctx.run(`state.addresses=[{id:'a',label:'TEST',recipient_name:'TEST A',city:'Jakarta',address_line:'TEST ONLY',is_default:true},{id:'b',label:'TEST B',recipient_name:'TEST B'}];go('receivers');deleteCalls=[];confirmCalls=[];allowDelete=true;window.confirm=message=>{confirmCalls.push(message);return allowDelete};window.MospaceSupabase.getClient=()=>({from:table=>({delete:()=>{deleteCalls.push({table,filters:[]});return {eq(k,v){deleteCalls.at(-1).filters.push([k,v]);return this},select:()=>new Promise(r=>finishAddressDelete=r)}}})})`);return ctx;
 }
 test('H5 address deletion confirms, deletes only owned ID, preserves other drafts and submitted orders',async()=>{
- const {run,document}=addressDeleteSetup();const form=document.querySelector('#receiverForm');document.querySelector('#receiverName').value='UNSAVED';
+ const {run,document}=addressDeleteSetup();run(`mobileFlow.addressDraft={id:'b',values:{receiverName:'UNSAVED'}}`);
  run('allowDelete=false');await document.querySelector('[data-delete-address="a"]').onclick();assert.equal(run('deleteCalls.length'),0);assert.equal(document.querySelectorAll('[data-address-row]').length,2);
- run('allowDelete=true');const pending=document.querySelector('[data-delete-address="a"]').onclick();assert.equal(document.querySelector('[data-delete-address="b"]').disabled,true);assert.equal(document.querySelector('#receiverName').disabled,true);
+ run('allowDelete=true');const pending=document.querySelector('[data-delete-address="a"]').onclick();assert.equal(document.querySelector('[data-delete-address="b"]').disabled,true);
  await run(`mobileDeleteAddress('b')`);assert.equal(run('deleteCalls.length'),1);assert.equal(run(`JSON.stringify(deleteCalls[0])`),JSON.stringify({table:'merchant_addresses',filters:[['id','a'],['merchant_id','m']]}));
  run(`finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,true);
- assert.equal(document.querySelector('[data-address-row="a"]'),null);assert.ok(document.querySelector('[data-address-row="b"]'));assert.equal(document.querySelector('#receiverForm'),form);assert.equal(document.querySelector('#receiverName').value,'UNSAVED');assert.equal(document.querySelector('#receiverName').disabled,false);assert.equal(run('o.destination_address'),'TEST address');
+ assert.equal(document.querySelector('[data-address-row="a"]'),null);assert.ok(document.querySelector('[data-address-row="b"]'));assert.equal(run('mobileFlow.addressDraft.values.receiverName'),'UNSAVED');assert.equal(run('o.destination_address'),'TEST address');
  run('setUiLanguage("en")');assert.equal(document.querySelector('[data-delete-address]').textContent,'Delete');run('setUiLanguage("id")');assert.equal(document.querySelector('[data-delete-address]').textContent,'Hapus');
 });
 test('H5 address deletion failure is retryable; deleting the edited last address clears the editor',async()=>{
  const {run,document}=addressDeleteSetup();run(`state.addresses=state.addresses.slice(0,1);workspace.editingAddress='a';render()`);
  let pending=document.querySelector('[data-delete-address="a"]').onclick();run(`finishAddressDelete({data:null,error:Error('offline')})`);assert.equal(await pending,false);assert.ok(document.querySelector('[data-address-row="a"]'));assert.equal(document.querySelector('[data-delete-address="a"]').disabled,false);assert.equal(run('workspace.editingAddress'),'a');
  pending=document.querySelector('[data-delete-address="a"]').onclick();run(`finishAddressDelete({data:[],error:null})`);assert.equal(await pending,false);assert.equal(run('state.addresses.length'),1);
- pending=document.querySelector('[data-delete-address="a"]').onclick();run(`finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,true);assert.equal(run('workspace.editingAddress'),null);assert.equal(document.querySelectorAll('[data-address-row]').length,0);assert.equal(document.querySelector('#receiverName').value,'');assert.equal(document.querySelector('#cancelAddressEdit'),null);
+ pending=document.querySelector('[data-delete-address="a"]').onclick();run(`finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,true);assert.equal(run('workspace.editingAddress'),null);assert.equal(document.querySelectorAll('[data-address-row]').length,0);assert.equal(document.querySelector('#receiverForm'),null);
 });
 test('H5 ignores late deletion results after account change, and saving prevents delete',async()=>{
- const {run,document}=addressDeleteSetup();document.querySelector('#receiverForm [type=submit]').disabled=true;assert.equal(await run(`mobileDeleteAddress('a')`),false);assert.equal(run('deleteCalls.length'),0);document.querySelector('#receiverForm [type=submit]').disabled=false;
+ const {run,document}=addressDeleteSetup();run(`mobileFlow.addressSaving=true`);assert.equal(await run(`mobileDeleteAddress('a')`),false);assert.equal(run('deleteCalls.length'),0);run(`mobileFlow.addressSaving=false`);
  const pending=run(`mobileDeleteAddress('a')`);run(`state.auth.user={id:'other'};state.addresses=[{id:'a',label:'OTHER ACCOUNT'}];render();finishAddressDelete({data:[{id:'a'}],error:null})`);assert.equal(await pending,false);assert.equal(run('state.addresses[0].label'),'OTHER ACCOUNT');assert.ok(document.querySelector('[data-address-row="a"]'));
 });
 

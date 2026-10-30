@@ -181,3 +181,33 @@ body.h5-mode:has(#localPreviewBar){padding-bottom:0!important}
 
 .h5-address-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 body.h5-mode .h5-address-delete{color:#bc4b4b;border-color:#f0d7d7}
+
+/* Task screens replace the bottom tabs with a reachable, safe-area-aware action bar. */
+body.h5-mode [hidden]{display:none!important}
+body.h5-mode .page-head:has(h1[hidden]){margin:0 0 12px}
+body.h5-mode .page-head:has(h1[hidden]):not(:has(p,.head-actions .btn:not([hidden]))){display:none}
+body.h5-mode .head-actions:has(>.btn[hidden]):not(:has(>.btn:not([hidden]))){display:none}
+.h5-stepper{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:0;gap:8px;list-style:none;margin:0 0 20px}
+.h5-stepper li{display:flex;align-items:center;gap:7px;font-size:11px;color:#8090a8;line-height:1.5}
+.h5-stepper b{display:grid;place-items:center;flex-shrink:0;width:25px;height:25px;border-radius:50%;background:#e7ecf4}
+.h5-stepper .active{color:#315efb;font-weight:700}.h5-stepper .active b{background:#315efb;color:white}
+body.h5-mode .h5-flow-bar{position:fixed;bottom:0;left:max(0px,calc((100vw - 560px)/2));width:min(100%,560px);z-index:12;background:#fffffff5;backdrop-filter:blur(12px);border-top:1px solid #e1e7f2;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));margin:0;box-sizing:border-box;box-shadow:0 -4px 16px #24376005}
+body.h5-mode .h5-flow-bar .btn{min-height:46px;font-size:13px;white-space:normal;flex:1;min-width:0;justify-content:center}
+.h5-flow-bar>#h5SelectedCount,.h5-flow-bar>small{font-size:11px;color:#6f7f98;flex:1;min-width:0;line-height:1.5}
+body.h5-in-flow .content{padding-bottom:calc(135px + env(safe-area-inset-bottom))}
+body.h5-mode .h5-review-fields{display:block}.h5-review-fields dt{font-size:11px;color:#8390a4;margin-top:17px}.h5-review-fields dd{margin:5px 0 0;font-size:14px;line-height:1.7;overflow-wrap:anywhere}
+.h5-selected-details{margin:20px 0;font-size:12px}.h5-selected-details p{font-size:12px}
+.h5-add-address{width:100%;margin-bottom:18px;min-height:47px}
+.h5-saved-address{outline:2px solid #315efb;outline-offset:2px;scroll-margin:90px 0 110px}
+.h5-pay-total>span,.h5-pay-total>small{display:block;color:#7a89a0;font-size:12px}.h5-pay-total>strong{display:block;font-size:31px;line-height:1.5;color:#315efb;margin:8px 0}.h5-pay-total p{font-size:12px;line-height:1.8;color:#6d7f98}
+.h5-account-copy{display:flex;gap:10px;margin-top:14px}.h5-account-copy .btn{flex:1;min-width:0;white-space:normal;font-size:12px;min-height:44px}
+.h5-payment-entry{width:100%;min-height:47px}
+.h5-current-tracking>span{font-size:11px;color:#7d8ba2}.h5-current-tracking>h2{margin:10px 0!important}.h5-current-tracking .status{font-size:17px;padding:8px 12px}.h5-current-tracking>p{font-size:12px}.h5-current-tracking time{font-size:12px;color:#7d8ba2}
+.h5-tracking-numbers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.h5-tracking-numbers>div{border:1px solid #e4eaf4;border-radius:13px;background:white;padding:13px;min-width:0}.h5-tracking-numbers span,.h5-tracking-numbers small{display:block;font-size:11px;color:#8090a8}.h5-tracking-numbers b{display:block;margin-top:10px;font-size:13px}.h5-tracking-numbers p{font-size:12px;overflow-wrap:anywhere}.h5-tracking-numbers .btn{width:100%;min-height:42px;font-size:12px}
+.h5-tracking-preview{margin:12px 0 0;font-size:12px}.h5-tracking-preview small{display:block;color:#8290a6;font-size:11px;margin-top:7px}
+.h5-tracking-fees{font-size:12px}.h5-tracking-fees>summary{padding:15px;background:#edf1f7;border-radius:12px}.h5-tracking-fees .combined-summary{margin-top:12px}
+.h5-success{text-align:center}.h5-success-mark{display:grid;place-items:center;width:56px;height:56px;background:#e6f6ed;color:#138657;border-radius:50%;margin:10px auto 20px;font-size:29px}.h5-success>p{line-height:1.8;color:#7b8aa0;font-size:13px}.h5-success>.mono{font-size:19px;font-weight:700;color:#263b60}.h5-success-actions{display:grid;gap:12px;margin-top:24px}.h5-success-actions .btn{width:100%;min-height:46px}
+.h5-coming-soon{opacity:.55}
+body.h5-mode .h5-heading-title .bi{white-space:nowrap}
+body.h5-mode .h5-flow-bar .btn .bi{overflow-wrap:normal;word-break:normal}
+@media(max-width:360px){body.h5-mode .h5-flow-bar{gap:8px;padding-left:12px;padding-right:12px}body.h5-mode .h5-flow-bar .btn{padding:9px 7px;font-size:12px;flex:1.2}.h5-flow-bar>#h5SelectedCount{flex:.65;min-width:48px}}
