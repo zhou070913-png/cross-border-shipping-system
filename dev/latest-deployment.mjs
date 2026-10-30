@@ -7,7 +7,7 @@ export const root=fileURLToPath(new URL('../',import.meta.url));
 export const firstProject='bdxqphmzwojamyuboqmz';
 export const firstRepository='zhou070913-png/cross-border-shipping-system';
 export const latestRepository='zhou070913-png/eaztrans-latest-development';
-export const migrations=['schema','member-login','warehouse-operations','admin-operations','merchant-workspace','parcel-maintenance','parcel-estimates','payment-review','sea-route','separate-settlement','overseas-addresses','cargo-channels','last-mile-pricing','overseas-forwarding','combined-delivery'];
+export const migrations=['schema','member-login','warehouse-operations','admin-operations','merchant-workspace','parcel-maintenance','parcel-estimates','payment-review','sea-route','separate-settlement','overseas-addresses','cargo-channels','last-mile-pricing','overseas-forwarding','combined-delivery','numeric-order-numbers'];
 export function validateTarget({url,key,repository=latestRepository}){
  const parsed=new URL(url);
  if(parsed.protocol!=='https:'||!/^[a-z]{20}\.supabase\.co$/.test(parsed.host)||parsed.pathname!=='/'||parsed.search||parsed.hash||parsed.username||parsed.password)throw Error('Use the dedicated Supabase project HTTPS URL');

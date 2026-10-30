@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.cjs",
-    "test:db": "node dev/test-forwarding-db.mjs && node dev/test-combined-db.mjs",
+    "test:db": "node dev/test-forwarding-db.mjs && node dev/test-combined-db.mjs && node dev/test-numeric-order-numbers.mjs",
     "dev:forwarding": "node dev/forwarding-server.mjs",
     "dev:h5": "node dev/mobile-preview.mjs"
   },

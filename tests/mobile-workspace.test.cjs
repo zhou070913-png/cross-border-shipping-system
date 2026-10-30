@@ -2,20 +2,24 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const setup=require('../dev/combined-ui-harness.cjs');
 function mobileSetup(){const context=setup();context.run(fs.readFileSync(path.join(__dirname,'../mobile-workspace.js'),'utf8'));return context}
 
-test('H5 home has four customer tabs, functional parcel filters and payment summary',()=>{
+test('H5 home has five customer tabs, functional parcel filters and payment summary',()=>{
  const {run,document}=mobileSetup();run(`workspace.parcels=[{id:'p',tracking_no:'TEST-MOBILE',item_name:'TEST',status:'pre_advised'}];state.page='dashboard';render()`);
- assert.equal(document.querySelectorAll('#h5BottomNav button').length,4);
- assert.match(document.querySelector('.h5-primary-action').textContent,/预报包裹/);
+ assert.equal(document.querySelectorAll('#h5BottomNav button').length,5);
+ assert.match(document.querySelector('#h5BottomNav button:nth-child(3)').textContent,/预报包裹/);
+ assert.equal(document.querySelector('#h5SwitchAccount'),null);
+ assert.ok(document.querySelector('.h5-service-card').compareDocumentPosition(document.querySelector('.h5-task-grid'))&4);
  document.querySelector('[data-mobile-task="parcels"]').onclick();assert.equal(run('state.page'),'parcels');assert.equal(run('combined.filter'),'pre_advised');
  document.querySelector('[data-h5-nav="orders"]').onclick();assert.equal(run('state.page'),'orders');assert.equal(run('combined.filter'),'all');assert.ok(document.querySelector('[data-h5-nav="orders"]').hasAttribute('aria-current'));
 });
 
-test('mobile card conversion keeps business buttons and unsaved input nodes intact and is idempotent',()=>{
+test('mobile compact cards keep details out of list and retain working detail navigation',()=>{
  const {run,document}=mobileSetup();run(`state.page='orders';render()`);
- const table=document.querySelector('.h5-card-table');assert.ok(table);assert.equal(table.dataset.h5Cards,'true');
- const action=table.querySelector('[data-combined-open]')||table.querySelector('button');assert.equal(typeof action.onclick,'function');
- const input=document.createElement('input');input.value='UNSAVED';table.querySelector('td').append(input);
- run('mobilePrepareTables(document.getElementById("content"))');assert.equal(table.querySelector('input'),input);assert.equal(input.value,'UNSAVED');assert.equal(table.querySelectorAll('.h5-cell-label').length,7);
+ assert.ok(document.querySelector('.h5-list-card'));assert.equal(document.querySelector('.combined-order-address'),null);
+ assert.equal(document.querySelector('.h5-list-card header button').textContent,'查看详情');
+ run(`setUiLanguage('en')`);assert.equal(document.querySelector('.h5-list-card header button').textContent,'View details');
+ assert.equal(typeof document.querySelector('[data-combined-open]').onclick,'function');
+ run(`workspace.parcels=[{id:'p',tracking_no:'TEST-PARCEL',item_name:'ITEM',status:'pre_advised'}];state.page='parcels';render()`);
+ document.querySelector('[data-workspace-parcel]').onclick();assert.equal(run('state.page'),'parcel-detail');assert.equal(run('workspace.detailParcelId'),'p');
 });
 
 test('phone order detail and back navigation work without waiting for tracking or losing draft',async()=>{
@@ -65,8 +69,8 @@ test('H5 switches accounts directly, clears the persisted session and cannot res
   loadMerchantWorkspace=async()=>{combined.ready=true};
   state.page='profile';render();document.getElementById('authBtn').onclick=()=>{throw Error('Hidden desktop button must not be used')};
  `);
- assert.ok(document.querySelector('#h5SwitchAccount'));assert.ok(document.querySelector('.h5-account-switch [data-h5-signout]'));
- await document.querySelector('#h5SwitchAccount').onclick();
+ assert.equal(document.querySelector('#h5SwitchAccount'),null);assert.ok(document.querySelector('.h5-account-actions [data-h5-signout]'));
+ await document.querySelector('.h5-account-actions [data-h5-signout]').onclick();
  assert.equal(run('logoutScopes.join()'),'local');assert.equal(run('state.auth.user'),null);assert.equal(run('state.dbOrders.length'),0);assert.equal(run('workspace.parcels.length'),0);assert.equal(run('reloads[0]'),'/h5/?v=test');assert.ok(document.querySelector('#h5LoginForm'));
  await run('syncAuth()');assert.equal(run('state.auth.user'),null);assert.ok(document.querySelector('#h5LoginForm'));
  run(`window.MospaceSupabase.signInWithIdentifier=async identifier=>{persistedUser={id:'merchant-b',email:identifier}}`);
@@ -100,4 +104,31 @@ test('H5 release uses dedicated assets and link verification; desktop source ent
   const client=await fsp.readFile(path.join(output,'supabase-client.js'),'utf8');assert.match(client,/"signupVerification":"link"/);assert.doesNotMatch(client,/bdxqphmzwojamyuboqmz/);
   assert.equal(JSON.parse(await fsp.readFile(path.join(output,'deployment.json'),'utf8')).surface,'merchant-h5');assert.deepEqual(await fsp.readFile(entry),before);
  }finally{await fsp.rm(tmp,{recursive:true,force:true})}
+});
+
+test('scroll loading grows in batches, resets for filters, preserves limit on return and rejects stale observer',()=>{
+ const {run,document}=mobileSetup();run(`observerCallbacks=[];window.IntersectionObserver=class {constructor(cb){observerCallbacks.push(cb)}observe(){}disconnect(){}};state.dbOrders=Array.from({length:31},(_,i)=>({...o,id:'o'+i,order_no:'2026103000000000'+i}));state.page='orders';render()`);
+ assert.equal(document.querySelectorAll('.h5-list-card').length,12);assert.equal(document.querySelector('.pagination-pages'),null);
+ run(`observerCallbacks.at(-1)([{isIntersecting:true}])`);assert.equal(document.querySelectorAll('.h5-list-card').length,24);
+ run(`go('profile');go('orders')`);assert.equal(document.querySelectorAll('.h5-list-card').length,24);
+ document.querySelector('[data-h5-load]').onclick();assert.equal(document.querySelectorAll('.h5-list-card').length,31);assert.equal(document.querySelector('[data-h5-load]'),null);
+ run(`combined.filter='pending';render()`);assert.equal(document.querySelectorAll('.h5-list-card').length,12);
+ run(`workspace.orderQuery='NO-MATCH';render();observerCallbacks[0]([{isIntersecting:true}])`);assert.equal(document.querySelectorAll('.h5-list-card').length,0);
+ run(`workspace.parcels=Array.from({length:27},(_,i)=>({id:'p'+i,tracking_no:'TEST-'+i,item_name:'ITEM',status:'pre_advised'}));combined.filter='all';state.page='parcels';render()`);
+ assert.equal(document.querySelectorAll('.h5-list-card').length,12);document.querySelector('[data-h5-load]').onclick();assert.equal(document.querySelectorAll('.h5-list-card').length,24);
+ run(`state.auth.user={id:'second'};render()`);assert.equal(document.querySelectorAll('.h5-list-card').length,12);
+});
+test('newcomer guide appears once, persists dismissal and can be reopened from account; shopping remains a placeholder',()=>{
+ const {run,document}=mobileSetup();run(`guideStore={};localStorage.getItem=k=>guideStore[k]||null;localStorage.setItem=(k,v)=>guideStore[k]=v;render()`);
+ assert.ok(document.querySelector('#h5Guide'));document.querySelector('#h5GuideClose').click();run('render()');assert.equal(document.querySelector('#h5Guide'),null);
+ run(`mobile.guideSeen=false;render()`);assert.equal(document.querySelector('#h5Guide'),null);
+ run(`state.page='profile';render()`);document.querySelector('[data-h5-guide]').click();assert.ok(document.querySelector('#h5Guide'));document.querySelector('#h5GuideClose').click();
+ assert.match(document.querySelector('#h5Shopping').textContent,/即将开放/);document.querySelector('#h5Shopping').click();assert.equal(run('state.page'),'profile');
+ run(`setUiLanguage('en');mobileGuide(true)`);assert.match(document.querySelector('#h5Guide').textContent,/Welcome to Eaztrans/);assert.doesNotMatch(document.querySelector('#h5Guide').textContent,/预报包裹/);
+});
+
+test('mobile detail return restores list scroll while a new filter starts at the top',()=>{
+ const {run}=mobileSetup();run(`positions=[];window.scrollTo=(x,y)=>positions.push(y);state.page='orders';render();window.scrollY=640;go('profile');window.scrollY=0;go('orders')`);
+ assert.equal(run('positions.at(-1)'),640);
+ run(`combined.filter='pending';render()`);assert.equal(run('positions.at(-1)'),0);
 });

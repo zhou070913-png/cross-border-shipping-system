@@ -3,8 +3,8 @@ export function mobileHtml(html){
  const startup='<script>render(); updateAuthMode(); syncAuth();</script>';
  if(!html.includes(startup)||!html.includes('</style>'))throw Error('Unexpected desktop entry structure');
  return mobileAsset('locale-switch.js',html).replace('width=device-width, initial-scale=1','width=device-width, initial-scale=1, viewport-fit=cover')
-  .replace('</style>','</style>\n<link rel="stylesheet" href="mobile-workspace.css?v=2" />\n<meta name="theme-color" content="#315efb" />\n<meta name="apple-mobile-web-app-capable" content="yes" />')
-  .replace(startup,'<script src="mobile-workspace.js?v=2"></script>\n'+startup);
+  .replace('</style>','</style>\n<link rel="stylesheet" href="mobile-workspace.css?v=3" />\n<meta name="theme-color" content="#315efb" />\n<meta name="apple-mobile-web-app-capable" content="yes" />')
+  .replace(startup,'<script src="mobile-workspace.js?v=3"></script>\n'+startup);
 }
 export function mobileAsset(name,text){
  if(name!=='locale-switch.js')return text;
