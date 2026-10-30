@@ -4,6 +4,14 @@ document.body.classList.add('h5-mode');
 const mobile={owner:null,historyRoute:null,popping:false,navigating:false,renderedPage:null,signingOut:false,lists:{},observer:null,guideSeen:false,scrolls:{}};
 for(const [zh,id,en]of [['会员号或邮箱','Nomor anggota atau email','Member number or email'],['我的待办','Ringkasan saya','My tasks'],['主导航','Navigasi utama','Main navigation']]){enLocale[zh]=en;extraIndonesian[zh]=id}
 const mt=(zh,id,en)=>localeMarkup(zh,id,en);
+const mobileOrderListPages=new Set(['orders','tracking-list','sea-tracking','billing']);
+const mobileTrackingPages=new Set(['tracking-list','sea-tracking']);
+pageRoles['account-details']='merchant';
+const mobileAccountDetails=combinedProfile;
+combinedProfile=function(){return ch('我的','Akun')};
+const mobileBaseView=combinedView;
+combinedView=function(){if(state.role==='merchant'&&state.page==='account-details')return mobileAccountDetails();return mobileBaseView()};
+enLocale['我的']='Account';extraIndonesian['我的']='Akun';
 const mobileIcon=name=>{
  const paths={home:'M3 10.5 12 3l9 7.5M5 9v12h5v-7h4v7h5V9',parcels:'m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 4 9-4M12 11v10M7.5 5l9 4',orders:'M7 3h10v3H7zM7 5H4v16h16V5h-3M8 11h8M8 16h8',profile:'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-2a8 8 0 0 1 16 0v2',back:'m14 5-7 7 7 7',arrow:'M5 12h14m-6-6 6 6-6 6',plus:'M12 4v16M4 12h16',rates:'M5 3h14v18H5zM8 7h8M8 11h1M12 11h1M16 11h1M8 15h1M12 15h1M16 15h1M8 18h1M12 18h1M16 18h1',support:'M4 14v-3a8 8 0 0 1 16 0v3M4 12H2v6h4v-6H4Zm16 0h2v6h-4v-6h2ZM18 18v3h-6',address:'M19 9c0 5-7 12-7 12S5 14 5 9a7 7 0 1 1 14 0ZM15 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0',tracking:'M3 6h12v12H3zM15 10h4l3 4v4h-7M5 18a2 2 0 1 0 4 0M16 18a2 2 0 1 0 4 0',refresh:'M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6'};
  return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[name]||paths.arrow}"/></svg>`;
@@ -17,13 +25,14 @@ function mobileSection(){
 }
 function mobileParent(){
  if(['parcel-detail','parcel-edit','pre-advise','packing-request','packing-history','order-create','consolidate'].includes(state.page))return 'parcels';
- if(['fee','tracking','tracking-list','sea-tracking','overall-order'].includes(state.page))return 'orders';
- if(['receivers','address','messages','support','rates','billing','offers'].includes(state.page))return 'profile';
+ if(['fee','tracking','overall-order'].includes(state.page))return mobile.orderReturnPage||'orders';
+ if(['tracking-list','sea-tracking'].includes(state.page))return 'dashboard';
+ if(['account-details','receivers','address','messages','support','rates','billing','offers'].includes(state.page))return 'profile';
  return 'dashboard';
 }
 loginPage=function(){
  state.auth.loginTargetRole='merchant';
- return `<div class="login-page"><section class="login-intro"><div class="login-brand"><span class="brand-mark">E</span><span>Eaztrans</span></div><h1>${mt('跨境集运，随时掌握','Pengiriman lintas negara, selalu terpantau','Cross-border shipping, at your fingertips')}</h1><p>${mt('深圳到印尼，预报、合包与物流一站查看。','Shenzhen ke Indonesia. Daftarkan, gabungkan, dan lacak paket.','Shenzhen to Indonesia. Declare, consolidate and track your parcels.')}</p><span class="h5-login-route">SHENZHEN <span aria-hidden="true">→</span> INDONESIA</span></section><section class="login-panel"><div class="login-card"><h2>${mt('商家登录','Masuk pelanggan','Customer sign in')}</h2><p>${mt('使用已有会员号或邮箱登录','Masuk dengan nomor anggota atau email','Use your member number or email')}</p><form id="h5LoginForm"><div class="field"><label for="loginIdentifier">${mt('会员号 / 邮箱','Nomor anggota / email','Member number / email')}</label><input id="loginIdentifier" name="username" placeholder="${esc(uiText('会员号或邮箱','Nomor anggota atau email','Member number or email'))}" autocomplete="username" autocapitalize="none" spellcheck="false" required></div><div class="field"><label for="loginPassword">${mt('密码','Kata sandi','Password')}</label><input id="loginPassword" name="password" type="password" placeholder="${esc(uiText('至少 6 位','Minimal 6 karakter','At least 6 characters'))}" autocomplete="current-password" required minlength="6"></div><button type="submit" class="btn primary login-submit" id="loginSubmit">${mt('登录','Masuk','Sign in')}</button></form><div class="login-links"><span>${mt('还没有账号？','Belum punya akun?','New customer?')}</span><button type="button" id="loginRegister">${mt('注册商家账号','Daftar akun pelanggan','Create customer account')}</button></div><div class="login-note">${mt('与电脑端共用账号，包裹与订单同步。','Akun, paket, dan pesanan sama dengan versi desktop.','Your account, parcels and orders are shared with desktop.')}</div></div></section></div>`;
+ return `<div class="login-page"><section class="login-intro"><div class="login-brand"><span class="brand-mark">E</span><span>Eaztrans</span></div><h1>${mt('跨境集运，随时掌握','Pengiriman lintas negara, selalu terpantau','Cross-border shipping, at your fingertips')}</h1><p>${mt('深圳到印尼，预报、合包与物流一站查看。','Shenzhen ke Indonesia. Daftarkan, gabungkan, dan lacak paket.','Shenzhen to Indonesia. Declare, consolidate and track your parcels.')}</p><span class="h5-login-route">SHENZHEN <span aria-hidden="true">→</span> INDONESIA</span></section><section class="login-panel"><div class="login-card"><h2>${mt('商家登录','Masuk pelanggan','Customer sign in')}</h2><p>${mt('使用已有会员号或邮箱登录','Masuk dengan nomor anggota atau email','Use your member number or email')}</p><form id="h5LoginForm"><div class="field"><label for="loginIdentifier">${mt('会员号 / 邮箱','Nomor anggota / email','Member number / email')}</label><input id="loginIdentifier" name="username" placeholder="${esc(uiText('会员号或邮箱','Nomor anggota atau email','Member number or email'))}" autocomplete="username" autocapitalize="none" spellcheck="false" required></div><div class="field"><label for="loginPassword">${mt('密码','Kata sandi','Password')}</label><input id="loginPassword" name="password" type="password" placeholder="${esc(uiText('至少 6 位','Minimal 6 karakter','At least 6 characters'))}" autocomplete="current-password" required minlength="6"></div><button type="submit" class="btn primary login-submit" id="loginSubmit">${mt('登录','Masuk','Sign in')}</button></form><div class="login-links"><span>${mt('还没有账号？','Belum punya akun?','New customer?')}</span><button type="button" id="loginRegister">${mt('注册商家账号','Daftar akun pelanggan','Create customer account')}</button></div><div class="login-note">${mt('重新打开或刷新后需登录，包裹与订单和电脑端同步。','Masuk kembali setelah membuka ulang atau memuat ulang. Data tersinkron dengan desktop.','Sign in after reopening or refreshing. Parcels and orders stay in sync with desktop.')}</div></div></section></div>`;
 };
 combinedDashboard=function(){
  const parcels=allParcels(),orders=overallOrderRoots(state.dbOrders);
@@ -33,7 +42,7 @@ combinedDashboard=function(){
  const tasks=[['parcels','待入库','Belum diterima','Awaiting receipt',pending,'pre_advised'],['parcels','可合包','Siap digabung','To consolidate',available,'available'],['orders','待付款 / 审核','Pembayaran','Payment',due,'awaiting_payment'],['orders','全部订单','Semua pesanan','All orders',orders.length,'all']];
  return `<section class="h5-welcome"><span>${mt('我的集运工作台','Ruang pengiriman saya','My shipping workspace')}</span><h1>${mt('让每一件包裹，都有迹可循','Setiap paket, selalu terlacak','Every parcel, always in view')}</h1><p class="mono" data-user-content>${esc(state.auth.profile?.member_no||'')}</p></section><section class="card h5-service-card"><h2>${mt('常用服务','Layanan','Quick services')}</h2><div class="h5-shortcuts">${mobileLink('packing-request','申请合包','Gabungkan paket','Consolidate','parcels')}${mobileLink('tracking-list','查询物流','Lacak paket','Track shipment','tracking')}${mobileLink('rates','运输计算器','Kalkulator ongkir','Shipping calculator','rates')}${mobileLink('messages','联系客服','Bantuan','Contact support','support')}</div></section><section class="h5-task-grid" aria-label="${esc(uiText('我的待办','Ringkasan saya','My tasks'))}">${tasks.map(([page,z,i,e,n,filter])=>`<button type="button" data-mobile-task="${page}" data-mobile-filter="${filter}"><strong>${n}</strong>${mt(z,i,e)}</button>`).join('')}</section>${reviewing?`<button type="button" class="h5-review-notice" data-mobile-task="orders" data-mobile-filter="awaiting_payment">${mt('付款凭证审核中','Bukti sedang diperiksa','Payment receipt under review')} <b>${reviewing}</b><span aria-hidden="true">›</span></button>`:''}<section class="h5-info-note">${mobileIcon('parcels')}<p>${mt('仓库确认头程和尾程费用后，只需付款一次。','Bayar sekali setelah biaya awal dan akhir diverifikasi gudang.','Pay once after the warehouse confirms first-mile and last-mile fees.')}</p></section>`;
 };
-function mobileAccountLinks(){return `<section class="card h5-service-card h5-account-services"><h2>${mt('我的服务','Layanan saya','My services')}</h2>${mobileLink('receivers','地址管理','Alamat penerima','Delivery addresses','address')}${mobileLink('rates','运输计算器','Kalkulator ongkir','Shipping calculator','rates')}${mobileLink('messages','消息与客服','Pesan dan bantuan','Messages & support','support')}${mobileLink('address','国内仓库地址','Alamat gudang domestik','Shenzhen warehouse','parcels')}<button type="button" class="h5-service" data-h5-guide>${mobileIcon('orders')}${mt('新人指南','Panduan pemula','Getting started')}<span class="h5-chevron">›</span></button><button type="button" class="h5-service" id="h5Shopping">${mobileIcon('parcels')}<span>${mt('代购产品','Belanja titipan','Product shopping')}<small>${mt('即将开放','Segera hadir','Coming soon')}</small></span><span class="h5-chevron">›</span></button><button type="button" class="h5-service" id="h5Refresh">${mobileIcon('refresh')}${mt('刷新业务数据','Muat ulang data','Refresh data')}<span aria-hidden="true">↻</span></button></section><div class="h5-account-actions"><button type="button" class="btn primary" data-h5-signout>${mt('切换账号','Ganti akun','Switch account')}</button><button type="button" class="btn ghost h5-signout" id="h5SignOut">${mt('退出登录','Keluar','Sign out')}</button></div>`}
+function mobileAccountLinks(){return `<section class="card h5-service-card h5-account-services"><h2>${mt('我的服务','Layanan saya','My services')}</h2>${mobileLink('account-details','账户及资料','Akun dan profil','Account & profile','profile')}${mobileLink('receivers','地址管理','Alamat penerima','Delivery addresses','address')}${mobileLink('rates','运输计算器','Kalkulator ongkir','Shipping calculator','rates')}${mobileLink('messages','消息与客服','Pesan dan bantuan','Messages & support','support')}${mobileLink('address','国内仓库地址','Alamat gudang domestik','Shenzhen warehouse','parcels')}<button type="button" class="h5-service" data-h5-guide>${mobileIcon('orders')}${mt('新人指南','Panduan pemula','Getting started')}<span class="h5-chevron">›</span></button><button type="button" class="h5-service" id="h5Shopping">${mobileIcon('parcels')}<span>${mt('代购产品','Belanja titipan','Product shopping')}<small>${mt('即将开放','Segera hadir','Coming soon')}</small></span><span class="h5-chevron">›</span></button><button type="button" class="h5-service" id="h5Refresh">${mobileIcon('refresh')}${mt('刷新业务数据','Muat ulang data','Refresh data')}<span aria-hidden="true">↻</span></button></section><div class="h5-account-actions"><button type="button" class="btn primary" data-h5-signout>${mt('切换账号','Ganti akun','Switch account')}</button><button type="button" class="btn ghost h5-signout" id="h5SignOut">${mt('退出登录','Keluar','Sign out')}</button></div>`}
 async function mobileSignOut(){
  if(mobile.signingOut)return false;
  if(authFlow.busy||combined.busy||paymentWorkspace.busy||workspace.parcelBusy){toast(uiText('正在保存，请稍候','Sedang menyimpan, mohon tunggu','Saving. Please wait.'));return false}
@@ -119,6 +128,7 @@ function mobileRenderChrome(){
  });
  // Profile services are appended after the existing bind pass.
  document.querySelectorAll('.h5-account-services [data-page]').forEach(button=>button.onclick=()=>go(button.dataset.page,{role:'merchant'}));
+ document.querySelectorAll('[data-combined-back-orders]').forEach(b=>b.onclick=()=>go(mobile.orderReturnPage||'orders',{role:'merchant'}));
  document.getElementById('h5Back')?.addEventListener('click',()=>go(mobileParent(),{role:'merchant'}));
  document.querySelectorAll('[data-h5-signout],#h5SignOut').forEach(button=>button.onclick=mobileSignOut);
  document.getElementById('h5Refresh')?.addEventListener('click',()=>refreshDbState());
@@ -127,22 +137,38 @@ function mobileRenderChrome(){
  document.getElementById('h5Shopping')?.addEventListener('click',()=>toast(uiText('代购产品即将开放，当前暂不支持选购。','Belanja titipan segera hadir; pembelian belum tersedia.','Product shopping is coming soon and is not available yet.')));
  mobileRememberRoute();
 }
+const mobileBaseOrderList=combinedOrderList;
+combinedOrderList=function(warehouse=false,customerId=null){
+ let html=mobileBaseOrderList(warehouse,customerId);
+ if(!warehouse&&mobileOrderListPages.has(state.page))html=html.replaceAll('data-target-page="orders"',`data-target-page="${state.page}"`);
+ if(!warehouse&&mobileTrackingPages.has(state.page))html=html.replace(ch('我的订单','Pesanan saya'),`<div class="page-head"><h1>${mt('物流查询','Lacak pengiriman','Track shipments')}</h1></div>`);
+ return html;
+};
+const mobileBaseOpen=combinedOpen;
+combinedOpen=function(id){
+ if(mobileOrderListPages.has(state.page))mobile.orderReturnPage=state.page;
+ if(state.role==='merchant'&&mobileTrackingPages.has(state.page)){
+  const o=state.dbOrders.find(o=>o.id===id);if(!o)return;applyDbOrder(o);workspace.supportOrderId=o.id;state.events=[];
+  return loadSelectedOrderTracking(id,'tracking');
+ }
+ return mobileBaseOpen(id);
+};
 function mobileListPage(rows,kind){
- const key=[state.auth.user?.id,kind,combined.filter,kind==='orders'?workspace.orderQuery:workspace.parcelQuery].join('|');
+ const key=[state.auth.user?.id,kind,combined.filter,kind==='parcels'?workspace.parcelQuery:workspace.orderQuery].join('|');
  let list=mobile.lists[kind];if(!list||list.key!==key)list=mobile.lists[kind]={key,limit:12};
  return {rows:rows.slice(0,list.limit),total:rows.length,to:Math.min(list.limit,rows.length),kind};
 }
 const mobileDesktopParcelPagination=parcelPagination,mobileDesktopOrderPagination=combinedOrderPagination;
 parcelPagination=function(rows){return state.page==='parcels'?mobileListPage(rows,'parcels'):mobileDesktopParcelPagination(rows)};
-combinedOrderPagination=function(rows){return state.page==='orders'?mobileListPage(rows,'orders'):mobileDesktopOrderPagination(rows)};
+combinedOrderPagination=function(rows){return mobileOrderListPages.has(state.page)?mobileListPage(rows,state.page):mobileDesktopOrderPagination(rows)};
 function mobileListFooter(p){return `<div class="h5-load-footer" role="status">${mt(`已显示 ${p.to} / ${p.total} 条`,`Ditampilkan ${p.to} / ${p.total}`,`Showing ${p.to} / ${p.total}`)}${p.to<p.total?`<button type="button" class="btn ghost" data-h5-load="${p.kind}">${mt('加载更多','Muat lebih banyak','Load more')}</button>`:`<p>${mt(p.total?'已显示全部':'暂无记录',p.total?'Semua telah ditampilkan':'Belum ada data',p.total?'You’re all caught up':'No records yet')}</p>`}</div>`}
 const mobileDesktopParcelPager=parcelPager,mobileDesktopOrderPager=combinedOrderPager;
 parcelPager=function(p){return p.kind?mobileListFooter(p):mobileDesktopParcelPager(p)};
 combinedOrderPager=function(p){return p.kind?mobileListFooter(p):mobileDesktopOrderPager(p)};
 const mobileDesktopOrderTable=combinedOrderTable;
 combinedOrderTable=function(rows,warehouse=false){
- if(warehouse||state.page!=='orders')return mobileDesktopOrderTable(rows,warehouse);
- return `<div class="h5-list">${rows.map(o=>{const f=feeRecord(o);return `<article class="h5-list-card" data-combined-order-row="${esc(o.id)}"><header><b class="mono" data-user-content>${esc(o.order_no)}</b>${isCombined(o)?`<button type="button" class="btn small ghost" data-combined-open="${esc(o.id)}">${mt('查看详情','Lihat detail','View details')}</button>`:overallOrderButton(o,mt('查看详情','Lihat detail','View details'))}</header><div class="h5-list-meta">${isCombined(o)?cs(o):translatedText(orderProgress(o).label)}<span>${translatedText(o.route_name)} · ${mt(`${o.parcel_count||0} 个包裹`,`${o.parcel_count||0} paket`,`${o.parcel_count||0} parcels`)}</span></div><div class="h5-list-fees"><span>${mt('头程','Awal','First mile')}<b>${combinedMoney(combinedHeadAmount(o))}</b></span><span>${mt('尾程','Akhir','Last mile')}<b>${combinedMoney(f?.last_mile_fee,mt('待复核费用','Menunggu verifikasi','Awaiting quote'))}</b></span></div><footer><span data-user-content>${esc(o.recipient_name||'—')} · ${esc(o.destination_city||'—')}</span><strong>${mt('合计','Total','Total')} ${combinedMoney(f?.confirmed_at?f.total_amount:null,mt('待复核','Menunggu verifikasi','Awaiting quote'))}</strong></footer></article>`}).join('')||ce()}</div>`;
+ if(warehouse||!mobileOrderListPages.has(state.page))return mobileDesktopOrderTable(rows,warehouse);
+ return `<div class="h5-list">${rows.map(o=>{const f=feeRecord(o);return `<article class="h5-list-card" data-combined-order-row="${esc(o.id)}"><header><b class="mono" data-user-content>${esc(o.order_no)}</b>${isCombined(o)?`<button type="button" class="btn small ghost" data-combined-open="${esc(o.id)}">${mobileTrackingPages.has(state.page)?mt('查看物流','Lacak pengiriman','Track shipment'):mt('查看详情','Lihat detail','View details')}</button>`:overallOrderButton(o,mt('查看详情','Lihat detail','View details'))}</header><div class="h5-list-meta">${isCombined(o)?cs(o):translatedText(orderProgress(o).label)}<span>${translatedText(o.route_name)} · ${mt(`${o.parcel_count||0} 个包裹`,`${o.parcel_count||0} paket`,`${o.parcel_count||0} parcels`)}</span></div><div class="h5-list-fees"><span>${mt('头程','Awal','First mile')}<b>${combinedMoney(combinedHeadAmount(o))}</b></span><span>${mt('尾程','Akhir','Last mile')}<b>${combinedMoney(f?.last_mile_fee,mt('待复核费用','Menunggu verifikasi','Awaiting quote'))}</b></span></div><footer><span data-user-content>${esc(o.recipient_name||'—')} · ${esc(o.destination_city||'—')}</span><strong>${mt('合计','Total','Total')} ${combinedMoney(f?.confirmed_at?f.total_amount:null,mt('待复核','Menunggu verifikasi','Awaiting quote'))}</strong></footer></article>`}).join('')||ce()}</div>`;
 };
 const mobileDesktopParcelList=combinedParcelList;
 combinedParcelList=function(){

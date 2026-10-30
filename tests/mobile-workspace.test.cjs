@@ -132,3 +132,33 @@ test('mobile detail return restores list scroll while a new filter starts at the
  assert.equal(run('positions.at(-1)'),640);
  run(`combined.filter='pending';render()`);assert.equal(run('positions.at(-1)'),0);
 });
+
+test('tracking shortcuts use compact incremental lists, retain tracking filters and return from shipment details',async()=>{
+ const {run,document}=mobileSetup();run(`state.dbOrders=Array.from({length:29},(_,i)=>({...o,id:'t'+i,order_no:'20261030000000'+i}));window.MospaceSupabase.orderTracking=async()=>[];go('dashboard')`);
+ document.querySelector('[data-page="tracking-list"]').click();assert.equal(run('state.page'),'tracking-list');assert.equal(document.querySelectorAll('.h5-list-card').length,12);assert.equal(document.querySelector('.pagination-pages'),null);assert.equal(document.querySelector('h1').textContent,'物流查询');
+ document.querySelector('[data-h5-load]').onclick();assert.equal(document.querySelectorAll('.h5-list-card').length,24);
+ document.querySelector('[data-combined-filter="pending"]').click();assert.equal(run('state.page'),'tracking-list');assert.equal(document.querySelectorAll('.h5-list-card').length,12);
+ assert.equal(document.querySelector('[data-combined-open]').textContent,'查看物流');await document.querySelector('[data-combined-open]').onclick();assert.equal(run('state.page'),'tracking');
+ document.querySelector('#h5Back').click();assert.equal(run('state.page'),'tracking-list');
+ for(const page of ['sea-tracking','billing']){run(`go('${page}')`);assert.equal(document.querySelectorAll('.h5-list-card').length,12);assert.equal(document.querySelector('.pagination-pages'),null)}
+});
+test('account overview is a service row; profile details open progressively and the original save still works',async()=>{
+ const {run,document}=mobileSetup();run(`go('profile');saveWorkspaceTable=async(table,payload,id)=>({...state.auth.profile,...payload})`);
+ assert.equal(document.querySelector('#profileForm'),null);assert.equal(document.querySelector('.account-facts'),null);
+ const entry=document.querySelector('[data-page="account-details"]');assert.equal(entry.parentElement,document.querySelector('.h5-account-services'));entry.click();assert.equal(run('state.page'),'account-details');assert.ok(document.querySelector('#profileForm'));assert.equal(document.querySelector('.h5-account-services'),null);
+ document.querySelector('#profileName').value='TEST CHANGED';document.querySelector('#profilePhone').value='TEST';
+ document.querySelector('#profileForm').dispatchEvent(new document.defaultView.Event('submit',{bubbles:true,cancelable:true}));
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(run('state.auth.profile.display_name'),'TEST CHANGED');
+ document.querySelector('#h5Back').click();assert.equal(run('state.page'),'profile');assert.equal(document.querySelector('#profileForm'),null);
+});
+test('H5 build creates an isolated ephemeral SDK session and preserves explicit email confirmation handling',async()=>{
+ const {mobileAsset,mobileHtml}=await import('../dev/mobile-entry.mjs');
+ const clientSource=fs.readFileSync(path.join(__dirname,'../supabase-client.js'),'utf8');
+ let options,creates=0;const sdk={auth:{getUser:async()=>({data:{user:null},error:null})}};
+ const global={supabase:{createClient:(url,key,opts)=>{creates++;options=opts;return sdk}}};
+ vm.runInNewContext(mobileAsset('supabase-client.js',clientSource),{window:global});
+ assert.equal(global.MospaceSupabase.getClient(),sdk);assert.equal(global.MospaceSupabase.getClient(),sdk);assert.equal(creates,1);
+ assert.equal(options.auth.persistSession,false);assert.equal(options.auth.storageKey,'eaztrans-h5-auth-v1');assert.equal(options.auth.detectSessionInUrl,true);assert.equal(await global.MospaceSupabase.currentUser(),null);
+ assert.doesNotMatch(clientSource,/persistSession:false/);
+ const entry=mobileHtml(fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'));assert.match(entry,/supabase-client.js\?v=h5-4/);
+});
