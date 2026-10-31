@@ -8,6 +8,8 @@ function mobileResetFlows(){
  const owner=mobileFlowOwner();if(mobileFlow.owner===owner)return;
  Object.assign(mobileFlow,{owner,step:1,success:null,pendingAdvice:null,addressDraft:null,addressSaving:false,paymentDraft:null,trackingVisited:false,trackingCache:new Map()});
  workspace.editingAddress=null;
+ mobile.selectingParcels=false;
+ workspace.selected.clear();
 }
 const mobileFlowBaseSection=mobileSection,mobileFlowBaseParent=mobileParent;
 mobileSection=function(){if(state.page==='payment')return 'orders';if(state.page==='submission-success')return mobileFlow.success?.kind==='order'?'orders':'parcels';return mobileFlowBaseSection()};
@@ -18,6 +20,7 @@ mobileSignOut=async function(){if(mobileFlow.addressSaving){toast(uiText('正在
 go=function(page,options={}){
  if(mobileFlow.addressSaving){toast(uiText('正在保存地址，请稍候','Menyimpan alamat, mohon tunggu','Saving address. Please wait.'));return false}
  if(mobileTrackingPages.has(page)&&!mobileFlow.trackingVisited){combined.filter='shipped';workspace.orderQuery='';mobileFlow.trackingVisited=true}
+ if(!['parcels','parcel-detail','packing-request'].includes(page))mobile.selectingParcels=false;
  return mobileFlowBaseGo(page,options);
 };
 const mobileFlowBaseDashboard=combinedDashboard;
@@ -30,6 +33,18 @@ mobileAccountLinks=function(){
  const signout=root.querySelector('#h5SignOut');signout?.setAttribute('class','btn ghost h5-signout');
  if(signout)signout.innerHTML=mt('退出 / 切换账号','Keluar / ganti akun','Sign out / switch account');
  root.querySelector('#h5Shopping')?.classList.add('h5-coming-soon');return root.innerHTML;
+};
+
+// Only customer-facing labels change; business state keys and staff workflows stay shared.
+const mobileFlowBaseProgress=combinedProgress;
+combinedProgress=function(o){const result=mobileFlowBaseProgress(o);if(result[1]==='待合包实测')return [result[0],'仓库测量中','Pengukuran oleh gudang'];if(result[1]==='待收货 / 合包')return [result[0],'等待包裹收齐','Menunggu semua paket tiba'];return result};
+enLocale['仓库测量中']='Warehouse measuring';enLocale['等待包裹收齐']='Awaiting all parcels';
+const mobileFlowBaseParcelDetail=merchantParcelDetail;
+merchantParcelDetail=function(){
+ const p=allParcels().find(p=>p.id===workspace.detailParcelId);if(!p)return mobileFlowBaseParcelDetail();
+ const metric=(z,i,e,v)=>v?`<div class="metric"><span>${mt(z,i,e)}</span><b data-user-content>${esc(v)}</b></div>`:'';
+ const weight=p.actual_weight_kg!=null?formatWeight(p.actual_weight_kg):null,size=p.length_cm&&p.width_cm&&p.height_cm?formatSize(p):null;
+ return ch('包裹详情','Rincian paket',parcelMaintenanceActions(p))+`<section class="card"><h2 data-user-content>${esc(p.item_name)}</h2><p class="mono" data-user-content>${esc(p.tracking_no)}</p>${p.order&&isCombined(p.order)?cs(p.order):status(parcelLabel(p))}${metric('快递公司','Kurir','Carrier',p.carrier)}${metric('仓库实际重量','Berat aktual gudang','Warehouse weight',weight)}${metric('仓库实测尺寸','Ukuran gudang','Warehouse dimensions',size)}${metric('预报时间','Waktu pendaftaran','Declared at',p.created_at?dateText(p.created_at):null)}${metric('收货时间','Waktu diterima','Received at',p.received_at?dateText(p.received_at):null)}${!weight&&!size?`<p class="h5-selection-note">${mt('仓库收货后将更新实测信息。','Pengukuran diperbarui setelah paket diterima gudang.','Measurements will appear after warehouse receipt.')}</p>`:''}${p.exception_reason?`<p role="alert" data-user-content>${esc(p.exception_reason)}</p>`:''}<div class="form-actions">${p.order?isCombined(p.order)?combinedOpenButton(p.order):overallOrderButton(p.order):mobileEligibleParcel(p)?`<button type="button" class="btn primary" data-h5-consolidate-one="${esc(p.id)}">${mt('申请合包','Gabungkan paket','Consolidate')}</button>`:''}</div></section><section class="card section-space"><h3>${mt('包裹照片','Foto paket','Parcel photos')}</h3><p>${mt('暂无照片','Belum ada foto','No photos yet')}</p></section>`;
 };
 
 // Keep every input in the same form: step changes do not throw away selections or drafts.
@@ -136,8 +151,12 @@ const mobileFlowBaseTimeline=selectedOrderTimeline;
 selectedOrderTimeline=function(){
  if(state.page!=='tracking'||!isCombined(state.order.record))return mobileFlowBaseTimeline();
  const o=state.order.record,current=workspace.trackingLoad?.id===o.id?workspace.trackingLoad:null,events=[...(state.events||[])].sort((a,b)=>new Date(b.occurredAt||0)-new Date(a.occurredAt||0)),latest=events[0];
- return `<section class="card h5-current-tracking"><span>${mt('当前运输状态','Status pengiriman','Current shipping status')}</span><h2>${cs(o)}</h2><p class="mono" data-user-content>${esc(o.order_no)}</p>${current?.loading?`<p role="status">${mt('物流加载中…','Memuat pelacakan…','Loading tracking…')}</p>`:current?.error?`<p role="alert">${mt('物流读取失败，请重试','Gagal memuat pelacakan. Coba lagi.','Tracking could not load. Please retry.')}</p><button type="button" class="btn ghost" id="h5TrackingRetry">${mt('重新加载','Muat ulang','Retry')}</button>`:latest?`<h3>${translatedText(latest.title)}</h3><p>${translatedText(latest.desc)}</p><time>${esc(latest.occurredAt?dateText(latest.occurredAt):latest.time)}</time>`:`<p>${mt('暂无物流节点，等待仓库更新。','Belum ada pembaruan. Menunggu gudang.','No tracking events yet. Awaiting a warehouse update.')}</p>`}</section>${mobileTrackingNumbers(o)}<section class="card section-space"><h2>${mt('物流记录 · 最新在前','Riwayat · terbaru dahulu','Tracking history · newest first')}</h2><div class="timeline">${!current?.loading&&!current?.error&&events.length?events.map(e=>`<div class="event"><div></div><div><h4>${translatedText(e.title)}</h4><p>${translatedText(e.desc)}<br><time>${esc(e.occurredAt?dateText(e.occurredAt):e.time)}</time></p></div></div>`).join(''):mt('暂无可显示记录','Belum ada riwayat','No history to display')}</div></section>`;
+ return `<section class="card h5-current-tracking"><span>${mt('当前运输状态','Status pengiriman','Current shipping status')}</span><h2>${cs(o)}</h2><p class="mono" data-user-content>${esc(o.order_no)}</p>${current?.loading?`<p role="status">${mt('物流加载中…','Memuat pelacakan…','Loading tracking…')}</p>`:current?.error?`<p role="alert">${mt('物流读取失败，请重试','Gagal memuat pelacakan. Coba lagi.','Tracking could not load. Please retry.')}</p><button type="button" class="btn ghost" id="h5TrackingRetry">${mt('重新加载','Muat ulang','Retry')}</button>`:latest?`${latest.title!==combinedProgress(o)[1]?`<h3>${translatedText(latest.title)}</h3>`:''}${latest.desc&&latest.desc!==latest.title?`<p>${translatedText(latest.desc)}</p>`:''}<time>${esc(latest.occurredAt?dateText(latest.occurredAt):latest.time)}</time>`:`<p>${mt('暂无物流节点，等待仓库更新。','Belum ada pembaruan. Menunggu gudang.','No tracking events yet. Awaiting a warehouse update.')}</p>`}</section>${mobileTrackingNumbers(o)}<section class="card section-space"><h2>${mt('物流记录 · 最新在前','Riwayat · terbaru dahulu','Tracking history · newest first')}</h2><div class="timeline">${!current?.loading&&!current?.error&&events.length?mobileTrackingHistory(events):mt('暂无可显示记录','Belum ada riwayat','No history to display')}</div></section>`;
 };
+function mobileTrackingHistory(events){
+ const event=e=>`<div class="event"><div></div><div><h4>${translatedText(e.title)}</h4><p>${e.desc&&e.desc!==e.title?translatedText(e.desc)+'<br>':''}<time>${esc(e.occurredAt?dateText(e.occurredAt):e.time)}</time></p></div></div>`;
+ return events.slice(0,3).map(event).join('')+(events.length>3?`<details class="h5-older-events"><summary>${mt(`查看其余 ${events.length-3} 条记录`,`Lihat ${events.length-3} riwayat lainnya`,`Show ${events.length-3} earlier events`)}</summary>${events.slice(3).map(event).join('')}</details>`:'');
+}
 // Tracking completes with a partial DOM update. Bind copy/retry controls again without replacing payment forms.
 const mobileFlowBaseLoadTracking=loadSelectedOrderTracking;
 loadSelectedOrderTracking=async function(id,page){const result=await mobileFlowBaseLoadTracking(id,page);if(result)mobileBindCopies();return result};
@@ -146,9 +165,17 @@ function mobileFlowLabels(){
  $('#h5Back')?.setAttribute('aria-label',uiText('返回','Kembali','Back'));
  $('.h5-stepper')?.setAttribute('aria-label',uiText('合包步骤','Langkah penggabungan','Consolidation steps'));
  $('#h5BottomNav')?.setAttribute('aria-label',uiText('主导航','Navigasi utama','Main navigation'));
+ for(const [id,z,i,e]of [['parcelSearchText','快递单号 / 品名','Resi / nama barang','Tracking number / contents'],['orderSearchText','订单号 / 收件人 / 运单号','Pesanan / penerima / resi','Order / recipient / tracking']]){const input=$('#'+id),label=uiText(z,i,e);if(input){if(input.placeholder!==label)input.placeholder=label;if(input.getAttribute('aria-label')!==label)input.setAttribute('aria-label',label)}}
+ document.querySelectorAll('.h5-list-card[tabindex]').forEach(card=>{const label=card.querySelector('header button')?.textContent+' · '+card.querySelector('header b')?.textContent;if(card.getAttribute('aria-label')!==label)card.setAttribute('aria-label',label)});
 }
 const mobileFlowBaseLanguage=setUiLanguage;
 setUiLanguage=function(language){const result=mobileFlowBaseLanguage(language);mobileFlowLabels();return result};
+const mobileFlowBaseLanguageControl=ensureLanguageControl;
+ensureLanguageControl=function(){
+ const brand=$('#h5LoginForm')?$('.login-brand'):null,control=$('#languageControl');
+ if(brand&&control?.parentElement===brand){const select=control.querySelector('select'),label=uiText('语言','Bahasa','Language');if(select.getAttribute('aria-label')!==label)select.setAttribute('aria-label',label);if(select.value!==uiLanguage.current)for(const option of select.options)option.selected=option.value===uiLanguage.current;return}
+ mobileFlowBaseLanguageControl();if(brand)brand.append($('#languageControl'));
+};
 const mobileFlowBaseDetail=combinedDetail;
 combinedDetail=function(o,tracking=false){
  if(tracking&&state.role==='merchant'&&isCombined(o))return ch('物流详情','Pelacakan pengiriman')+`<div data-order-timeline>${selectedOrderTimeline()}</div><details class="h5-tracking-fees section-space"><summary>${mt('订单费用与收件地址','Biaya dan alamat penerima','Order fees & delivery address')}</summary>${combinedSummary(o)}</details>`;
@@ -166,6 +193,7 @@ combinedOrderTable=function(rows,warehouse=false){
   else if(o.status==='awaiting_payment')label=mt('查看审核进度','Lihat pemeriksaan','View payment review');
   else if(['paid','ready_to_ship'].includes(o.status))label=mt('查看出货进度','Lihat pengiriman','View dispatch');
   button.removeAttribute('data-combined-open');button.dataset.h5OrderAction=o.id;button.dataset.h5OrderPage=target;button.innerHTML=label;if(target==='payment')button.classList.add('primary');
+  if(o.created_at)card.insertAdjacentHTML('beforeend',`<time class="h5-order-time">${mt('创建于','Dibuat','Created')} ${esc(dateText(o.created_at))}</time>`);
   if(mobileTrackingPages.has(state.page)){
    card.querySelector('.h5-list-fees')?.remove();card.querySelector('footer')?.remove();
    const cached=mobileFlow.trackingCache.get(o.id),event=cached?.version===o.updated_at?cached.events[0]:null;
@@ -174,6 +202,66 @@ combinedOrderTable=function(rows,warehouse=false){
   }
  }return root.innerHTML;
 };
+
+function mobileUpdateParcelSelection(){
+ const valid=new Set(allParcels().filter(mobileEligibleParcel).map(p=>p.id));
+ for(const id of workspace.selected)if(!valid.has(id))workspace.selected.delete(id);
+ document.querySelectorAll('[data-h5-select-parcel]').forEach(input=>{input.checked=workspace.selected.has(input.dataset.h5SelectParcel);input.closest('.h5-list-card')?.classList.toggle('h5-selected',input.checked)});
+ const count=$('#h5ParcelCount');if(count)count.innerHTML=mt(`已选 ${workspace.selected.size} 件`,`${workspace.selected.size} paket dipilih`,`${workspace.selected.size} selected`);
+ const submit=$('#h5ConsolidateSelected');if(submit)submit.disabled=!workspace.selected.size;
+}
+function mobileBindListActions(){
+ document.querySelectorAll('[data-h5-parcel-card],[data-combined-order-row]').forEach(card=>{
+  if(!card.matches('.h5-list-card'))return;
+  const button=card.querySelector('header button');if(!button)return;
+  card.tabIndex=0;card.setAttribute('role','group');card.setAttribute('aria-label',button.textContent+' · '+card.querySelector('header b').textContent);
+  const open=e=>{if(e.target!==card&&e.target.closest('button,a,input,label,select,textarea,summary'))return;return button.onclick?.(e)};
+  card.onclick=open;card.onkeydown=e=>{if(e.target===card&&['Enter',' '].includes(e.key)){e.preventDefault();return button.onclick?.(e)}};
+ });
+ $('#h5SelectParcels')?.addEventListener('click',()=>{const active=combined.filter==='available'||mobile.selectingParcels;mobile.selectingParcels=!active;if(active){combined.filter='all';workspace.selected.clear()}render()});
+ document.querySelectorAll('[data-h5-select-parcel]').forEach(input=>input.onchange=()=>{if(input.checked)workspace.selected.add(input.dataset.h5SelectParcel);else workspace.selected.delete(input.dataset.h5SelectParcel);mobileUpdateParcelSelection()});
+ $('#h5ConsolidateSelected')?.addEventListener('click',()=>{mobileUpdateParcelSelection();if(!workspace.selected.size)return;mobileFlow.step=1;go('packing-request')});
+ document.querySelectorAll('[data-h5-consolidate-one]').forEach(b=>b.onclick=()=>{const p=allParcels().find(p=>p.id===b.dataset.h5ConsolidateOne);if(!p||!mobileEligibleParcel(p))return;workspace.selected.add(p.id);mobileFlow.step=1;go('packing-request')});
+ mobileUpdateParcelSelection();
+}
+
+// Keep a readable error in the login form until the customer edits or retries.
+let mobileLoginIssue=null;
+function mobileLoginError(issue,fields=[]){
+ mobileLoginIssue={issue,fields};
+ const form=$('#h5LoginForm');if(!form)return;
+ let error=$('#h5LoginError');if(!error){error=document.createElement('p');error.id='h5LoginError';error.className='h5-login-error';error.setAttribute('role','alert');form.querySelector('[type=submit]').before(error)}
+ error.hidden=false;error.innerHTML=mt(...issue);
+ for(const id of ['loginIdentifier','loginPassword']){const input=$('#'+id);if(fields.includes(id)){input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby','h5LoginError')}else{input.removeAttribute('aria-invalid');input.removeAttribute('aria-describedby')}}
+}
+function mobileClearLoginError(){mobileLoginIssue=null;$('#h5LoginError')?.remove();document.querySelectorAll('#h5LoginForm [aria-invalid]').forEach(el=>{el.removeAttribute('aria-invalid');el.removeAttribute('aria-describedby')})}
+const mobileFlowBaseToast=toast;
+toast=function(message,...args){
+ if($('#h5LoginForm')&&!state.auth.user&&/^(登录失败：|账号资料暂不可用|该账号属于)/.test(message)){
+  const issue=/network|fetch|网络|timeout/i.test(message)?['连接失败，请检查网络后重试。','Koneksi gagal. Periksa jaringan dan coba lagi.','Connection failed. Check your network and retry.']:/confirm|验证/i.test(message)?['邮箱尚未验证，请先打开最新验证邮件。','Email belum diverifikasi. Buka email verifikasi terbaru.','Email is not verified. Open the latest verification email.']:/账号资料|该账号属于/.test(message)?['该账号暂时无法进入商家端，请联系客服。','Akun ini belum dapat masuk ke halaman pelanggan. Hubungi bantuan.','This account cannot access the customer workspace. Contact support.']:['登录失败，请检查会员号或邮箱及密码。','Gagal masuk. Periksa nomor anggota atau email dan kata sandi.','Sign-in failed. Check your member number or email and password.'];
+  mobileLoginError(issue,['loginIdentifier','loginPassword']);return;
+ }return mobileFlowBaseToast(message,...args);
+};
+const mobileFlowBaseSubmitLogin=submitLandingAuth;
+submitLandingAuth=async function(){
+ if(authFlow.busy)return;
+ const identifier=$('#loginIdentifier'),password=$('#loginPassword');
+ if(!identifier?.value.trim()){mobileLoginError(['请输入会员号或邮箱。','Masukkan nomor anggota atau email.','Enter your member number or email.'],['loginIdentifier']);identifier?.focus();return}
+ if((password?.value||'').length<6){mobileLoginError(['请输入至少 6 位密码。','Masukkan kata sandi minimal 6 karakter.','Enter a password of at least 6 characters.'],['loginPassword']);password?.focus();return}
+ mobileClearLoginError();return mobileFlowBaseSubmitLogin();
+};
+function mobileRefineLogin(){
+ const form=$('#h5LoginForm');if(!form)return;
+ form.noValidate=true;
+ if(mobileLoginIssue)mobileLoginError(mobileLoginIssue.issue,mobileLoginIssue.fields);
+ form.oninput=mobileClearLoginError;
+ ensureLanguageControl();
+}
+
+const mobileFlowBaseAdvice=combinedAdvice;
+combinedAdvice=function(edit=false){const root=document.createElement('div');root.innerHTML=mobileFlowBaseAdvice(edit);const note=root.querySelector('.grid>.card:last-child');if(note){note.classList.add('h5-advice-help');const title=note.querySelector('h3');if(title)title.innerHTML=mt('提交后如何寄送','Cara mengirim setelah mendaftar','How to send after declaring')}return root.innerHTML};
+const mobileFlowBaseWarehouseAddress=merchantAddress;
+merchantAddress=function(){const root=document.createElement('div');root.innerHTML=mobileFlowBaseWarehouseAddress();root.querySelectorAll('.workspace-list .page-note').forEach(el=>el.remove());return root.innerHTML};
 
 function mobileSuccessPage(){
  const s=mobileFlow.success;if(!s)return ch('提交结果','Hasil pengiriman')+cb('返回首页','Kembali ke beranda','dashboard');
@@ -185,6 +273,8 @@ const mobileFlowBaseView=combinedView;
 combinedView=function(){if(state.role==='merchant'){if(state.page==='address-edit')return mobileAddressEditor();if(state.page==='payment')return mobilePaymentPage(state.dbOrders.find(o=>o.id===state.activeOrderId));if(state.page==='submission-success')return mobileSuccessPage()}return mobileFlowBaseView()};
 
 function mobileBindFlows(){
+ document.querySelectorAll('[data-copy-warehouse]').forEach(b=>b.onclick=()=>{const w=workspace.warehouses.find(w=>w.id===b.dataset.copyWarehouse);if(w)return mobileCopy(`${w.address}\n${w.contact_name||''} ${w.contact_phone||''}\n${state.auth.profile?.member_no||''}`)});
+ const shopping=$('#h5Shopping');if(shopping){shopping.disabled=true;shopping.querySelector('.h5-chevron')?.remove()}
  const form=$('#combinedRequest');if(form){
   $('.h5-heading-title').innerHTML=mt('申请合包','Gabungkan paket','Consolidate');
   const remember=()=>{rememberCombinedRequest();mobilePackingStep(mobileFlow.step,false)};
@@ -224,13 +314,15 @@ function mobileBindFlows(){
  $('[data-h5-success-order]')?.addEventListener('click',()=>{combined.requestId=null;return combinedOpen(mobileFlow.success.id)});
  $('#h5CopyShenzhen')?.addEventListener('click',()=>{const w=workspace.warehouses?.[0];if(!w){go('address');return}return mobileCopy(`${w.address}\n${w.contact_name||''} ${w.contact_phone||''}\n${state.auth.profile?.member_no||''}`)});
  mobileBindCopies();
+ mobileBindListActions();
  mobileFlowLabels();
- const flow=!!form||state.page==='address-edit'||state.page==='payment'&&!!payment;
- document.body.classList.toggle('h5-in-flow',flow);if(flow)$('#h5BottomNav')?.remove();
+ for(const tabs of document.querySelectorAll('.workspace-tabs')){const update=()=>{tabs.classList.toggle('h5-more-right',tabs.scrollWidth-tabs.clientWidth-tabs.scrollLeft>2);tabs.classList.toggle('h5-more-left',tabs.scrollLeft>2)};tabs.onscroll=update;update();tabs.querySelector('.active')?.scrollIntoView?.({block:'nearest',inline:'nearest'})}
+ const flow=!!form||state.page==='address-edit'||state.page==='payment'&&!!payment||!!$('#h5ConsolidateSelected');
+ document.body.classList.toggle('h5-in-flow',flow);if(flow||document.body.classList.contains('h5-subpage'))$('#h5BottomNav')?.remove();
  if(form)$('#h5Back').onclick=()=>{if(mobileFlow.step>1)mobilePackingStep(mobileFlow.step-1);else go('parcels')};
  // The topbar owns titles and back navigation. Preserve useful header action buttons.
  document.querySelectorAll('#content .page-head h1,#content [data-combined-back-orders]').forEach(el=>el.hidden=true);
- document.querySelectorAll('#content .head-actions [data-page]').forEach(el=>{if(el.dataset.page===mobileParent())el.hidden=true});
+ document.querySelectorAll('#content :is(.head-actions,.page-actions) [data-page]').forEach(el=>{if(el.dataset.page===mobileParent())el.hidden=true});
 }
 const mobileFlowBaseRender=render;
 render=function(){
@@ -239,6 +331,7 @@ render=function(){
  if(liveForm&&liveForm.dataset.h5Owner===liveOwner&&mobileFlow.paymentDraft?.form!==liveForm)mobileFlow.paymentDraft={owner:liveOwner,order:liveForm.dataset.orderId,account:liveForm.dataset.accountVersion,form:liveForm};
  const cached=mobileFlow.paymentDraft;
  mobileFlowBaseRender();
+ mobileRefineLogin();
  if(!state.auth.user||state.role!=='merchant'){document.body.classList.remove('h5-in-flow');return}
  const fresh=$('#paymentReceiptForm');
  if(fresh&&state.page==='payment'&&cached?.owner===liveOwner&&cached.order===fresh.dataset.orderId&&cached.account===fresh.dataset.accountVersion){fresh.replaceWith(cached.form)}

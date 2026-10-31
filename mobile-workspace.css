@@ -185,7 +185,7 @@ body.h5-mode .h5-address-delete{color:#bc4b4b;border-color:#f0d7d7}
 /* Task screens replace the bottom tabs with a reachable, safe-area-aware action bar. */
 body.h5-mode [hidden]{display:none!important}
 body.h5-mode .page-head:has(h1[hidden]){margin:0 0 12px}
-body.h5-mode .page-head:has(h1[hidden]):not(:has(p,.head-actions .btn:not([hidden]))){display:none}
+body.h5-mode .page-head:has(h1[hidden]):not(:has(p,:is(.head-actions,.page-actions) .btn:not([hidden]))){display:none}
 body.h5-mode .head-actions:has(>.btn[hidden]):not(:has(>.btn:not([hidden]))){display:none}
 .h5-stepper{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:0;gap:8px;list-style:none;margin:0 0 20px}
 .h5-stepper li{display:flex;align-items:center;gap:7px;font-size:11px;color:#8090a8;line-height:1.5}
@@ -211,3 +211,37 @@ body.h5-mode .h5-review-fields{display:block}.h5-review-fields dt{font-size:11px
 body.h5-mode .h5-heading-title .bi{white-space:nowrap}
 body.h5-mode .h5-flow-bar .btn .bi{overflow-wrap:normal;word-break:normal}
 @media(max-width:360px){body.h5-mode .h5-flow-bar{gap:8px;padding-left:12px;padding-right:12px}body.h5-mode .h5-flow-bar .btn{padding:9px 7px;font-size:12px;flex:1.2}.h5-flow-bar>#h5SelectedCount{flex:.65;min-width:48px}}
+
+/* Lists lead into tasks; secondary screens keep only their own actions. */
+body.h5-mode:not(.h5-home) .h5-nav-declare svg{width:23px;height:23px;margin:0;padding:0;border:0;border-radius:0;background:none;color:inherit;box-shadow:none;box-sizing:border-box}
+body.h5-mode .content{padding-bottom:calc(135px + env(safe-area-inset-bottom))}
+body.h5-mode.h5-subpage:not(.h5-in-flow) .content{padding-bottom:calc(36px + env(safe-area-inset-bottom))}
+.h5-list-card[tabindex]{cursor:pointer;transition:border-color .15s,background .15s}
+.h5-list-card[tabindex]:active{background:#f0f4ff;border-color:#9cb0ff}
+.h5-list-card[tabindex]:focus-visible{outline:3px solid #829dff;outline-offset:2px}
+body.h5-mode .h5-list-card header .btn{min-height:44px}
+.h5-parcel-select{display:flex;align-items:center;gap:10px;min-height:44px;margin:-4px 0 10px;font-size:12px;color:#61718c}
+body.h5-mode .h5-selected{border-color:#315efb;background:#f4f7ff}
+.h5-selection-note{font-size:12px;line-height:1.7;color:#73829a;margin:12px 0}
+.h5-parcel-bar>span{flex:1;font-size:13px;color:#475b7a}
+.h5-parcel-bar .btn:disabled{opacity:.45}
+body.h5-mode .workspace-toolbar{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:16px}
+body.h5-mode .workspace-toolbar input{grid-column:1/-1;width:100%;box-sizing:border-box}
+body.h5-mode .workspace-toolbar button{min-height:44px}
+body.h5-mode .page-actions{display:flex;gap:10px;margin-bottom:16px}
+body.h5-mode .page-actions>.btn{flex:1;min-width:0;min-height:44px;white-space:normal;justify-content:center}
+body.h5-mode .workspace-tabs{padding-bottom:8px;scroll-padding-inline:12px;scrollbar-width:thin}
+body.h5-mode .workspace-tabs button{min-height:44px;flex-shrink:0}
+body.h5-mode .workspace-tabs.h5-more-right{mask-image:linear-gradient(to right,#000 90%,transparent)}
+body.h5-mode .workspace-tabs.h5-more-left{mask-image:linear-gradient(to right,transparent,#000 8%)}
+body.h5-mode .workspace-tabs.h5-more-left.h5-more-right{mask-image:linear-gradient(to right,transparent,#000 8%,#000 90%,transparent)}
+.h5-order-time{display:block;font-size:11px;color:#8290a5;margin-top:12px}
+.h5-older-events>summary{padding:14px 0;font-size:13px;color:#315efb;cursor:pointer;min-height:44px;box-sizing:border-box}
+body.h5-mode .h5-advice-help h3{font-size:13px;font-weight:600;color:#73829a}
+body.h5-mode .h5-advice-help p{font-size:12px;color:#73829a;line-height:1.8}
+body.h5-mode .login-brand{display:flex;align-items:center;gap:10px;width:100%}
+body.h5-mode .login-brand .login-language-control{position:static;margin-left:auto;padding:0;background:transparent;right:auto;top:auto}
+body.h5-mode .login-brand .login-language-control select{max-width:125px;min-height:44px}
+.h5-login-error{padding:12px;border-radius:9px;color:#a52b32;background:#fff1f2;font-size:13px;line-height:1.7;margin:12px 0}
+body.h5-mode #h5LoginForm [aria-invalid=true]{border-color:#c74650;box-shadow:0 0 0 1px #c7465020}
+@media(prefers-reduced-motion:reduce){.h5-list-card[tabindex]{transition:none}}

@@ -66,3 +66,37 @@ test('home consolidation count, available filter and wizard use the same eligibl
  const {run,document}=flow();run(`workspace.parcels=[{id:'p1',tracking_no:'EARLY',status:'pre_advised'},{id:'p2',tracking_no:'ARRIVED',status:'received'},{id:'p3',tracking_no:'MEASURED',status:'measured'},{id:'bad',tracking_no:'EXCEPTION',status:'exception'}];go('dashboard')`);
  assert.match(document.querySelector('[data-mobile-filter="available"]').textContent,/3.*可申请合包/);document.querySelector('[data-mobile-filter="available"]').click();assert.equal(document.querySelectorAll('.h5-list-card').length,3);run(`go('packing-request')`);assert.equal(document.querySelectorAll('[name=combinedParcel]').length,3);assert.equal(document.querySelector('[name=combinedParcel][value="bad"]'),null);
 });
+
+test('whole cards open details by click or keyboard while selection controls do not navigate',()=>{
+ const {run,document}=flow();run(`workspace.parcels=[{id:'p',tracking_no:'TRACK-123',item_name:'ITEM',status:'pre_advised'}];go('parcels')`);
+ document.querySelector('.h5-list-card p').click();assert.equal(run('state.page'),'parcel-detail');assert.ok(document.querySelector('[data-h5-consolidate-one="p"]'));
+ document.querySelector('[data-h5-consolidate-one]').click();assert.equal(run('state.page'),'packing-request');assert.equal(document.querySelector('[name=combinedParcel]').hasAttribute('checked'),true);
+ run(`go('parcels');combined.filter='available';render()`);const input=document.querySelector('[data-h5-select-parcel]');input.checked=false;input.onchange();input.click();assert.equal(run('state.page'),'parcels');
+ run(`combined.filter='all';go('orders')`);const card=document.querySelector('.h5-list-card');card.onkeydown({target:card,key:'Enter',preventDefault(){}});assert.equal(run('state.page'),'fee');assert.equal(document.querySelector('#h5BottomNav'),null);
+});
+
+test('parcel selection survives lazy loading and searches, and invalidated parcels cannot be submitted',()=>{
+ const {run,document}=flow();run(`workspace.parcels=Array.from({length:27},(_,i)=>({id:'p'+i,tracking_no:'TRACK-'+i,item_name:'ITEM',status:'pre_advised'}));go('parcels');combined.filter='available';render()`);
+ assert.equal(document.querySelector('#h5ConsolidateSelected').disabled,true);let input=document.querySelector('[data-h5-select-parcel="p0"]');input.checked=true;input.onchange();document.querySelector('[data-h5-load]').click();
+ assert.equal(document.querySelectorAll('.h5-list-card').length,24);assert.equal(document.querySelector('[data-h5-select-parcel="p0"]').checked,true);
+ run(`setUiLanguage('id');setUiLanguage('zh')`);assert.equal(document.querySelector('#parcelSearchText').placeholder,'快递单号 / 品名');assert.equal(document.querySelector('[data-h5-select-parcel="p0"]').checked,true);
+ run(`workspace.parcelQuery='TRACK-26';render()`);input=document.querySelector('[data-h5-select-parcel="p26"]');input.checked=true;input.onchange();assert.equal(run('workspace.selected.size'),2);
+ document.querySelector('#h5ConsolidateSelected').click();assert.equal(document.querySelectorAll('[name=combinedParcel][checked]').length,2);assert.equal(run('mobileFlow.step'),1);
+ run(`go('parcels');workspace.parcels[0].status='exception';workspace.parcels[26].status='exception';render()`);assert.equal(run('workspace.selected.size'),0);assert.equal(document.querySelector('#h5ConsolidateSelected').disabled,true);
+});
+
+test('root tabs have no dead back button, detail pages have no global tabs, and login errors remain inline in three languages',async()=>{
+ const {run,document}=flow();for(const page of ['dashboard','parcels','orders','profile','pre-advise']){run(`go('${page}')`);assert.equal(document.querySelector('#h5Back'),null);assert.ok(document.querySelector('#h5BottomNav'))}
+ run(`state.auth.user=null;state.auth.role=null;render();window.MospaceSupabase.signInWithIdentifier=async()=>{throw Error('Invalid login credentials')}`);
+ await run('submitLandingAuth()');assert.equal(document.querySelector('#loginIdentifier').getAttribute('aria-invalid'),'true');assert.match(document.querySelector('#h5LoginError').textContent,/会员号或邮箱/);
+ document.querySelector('#loginIdentifier').value='M88000001';document.querySelector('#loginPassword').value='test-only-password';await run('submitLandingAuth()');assert.ok(document.querySelector('#h5LoginError'));assert.equal(run('state.auth.user'),null);assert.equal(run('authFlow.busy'),false);
+ run(`setUiLanguage('en')`);assert.match(document.querySelector('#h5LoginError').textContent,/Sign-in failed/);run(`render();setUiLanguage('id')`);assert.match(document.querySelector('#h5LoginError').textContent,/Gagal masuk/);assert.ok(document.querySelector('.login-brand #languageControl'));
+ document.querySelector('#h5LoginForm').oninput();assert.equal(document.querySelector('#h5LoginError'),null);assert.equal(document.querySelector('[aria-invalid]'),null);
+});
+
+test('parcel details omit absent measurements and tracking collapses older duplicate descriptions',()=>{
+ const {run,document}=flow();run(`workspace.parcels=[{id:'p',tracking_no:'TRACK-123',item_name:'ITEM',status:'pre_advised'}];workspace.detailParcelId='p';go('parcel-detail')`);
+ assert.equal(document.querySelectorAll('#content .metric').length,0);assert.doesNotMatch(document.querySelector('#content').textContent,/未填写|此处不展示|申请打包/);
+ run(`o.status='delivered';state.events=Array.from({length:9},(_,i)=>({title:'EVENT '+i,desc:'EVENT '+i,occurredAt:'2026-10-'+String(29-i).padStart(2,'0')+'T12:00:00Z'}));state.page='tracking';render()`);
+ assert.equal(document.querySelectorAll('.timeline>.event').length,3);assert.equal(document.querySelectorAll('.h5-older-events .event').length,6);assert.equal(document.querySelector('.h5-older-events').hasAttribute('open'),false);assert.doesNotMatch(document.querySelector('.event p').textContent,/EVENT/);
+});
