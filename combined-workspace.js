@@ -39,7 +39,7 @@ function currentCombinedProgressSnapshot(){return {tickets:workspace.tickets,rep
 function applyCombinedProgressSnapshot(s){workspace.tickets=s.tickets;delete workspace.errors.tickets;Object.assign(combined,{replies:s.replies,customers:s.customers,profiles:s.profiles});if(s.pending!==null)combined.pending=s.pending}
 const isCombined=o=>o?.fulfillment_mode==='combined_delivery';
 Object.assign(pageRoles,{'support-warehouse':'warehouse','overall-order':'warehouse'});
-navs.merchant=[['dashboard','首页'],['rates','运输计算器'],['parcels','我的包裹'],['orders','我的订单'],['receivers','地址管理'],['messages','消息与客服'],['profile','我的账户']];
+navs.merchant=[['dashboard','首页'],['parcels','我的包裹'],['orders','我的订单'],['receivers','地址管理'],['messages','消息与客服'],['profile','我的账户']];
 navs.warehouse=[['dashboard','仓库工作台'],['inbound','收货管理'],['confirm','合包与费用复核'],['ship','出货与物流'],['support-warehouse','消息与客服']];
 const combinedLoadPrevious=loadMerchantWorkspace;
 loadMerchantWorkspace=async function(){
@@ -124,7 +124,7 @@ function combinedReviewButton(o){
 function combinedOrders(rows){return rows.length?`<div class="combined-order-list">${rows.map(o=>isCombined(o)?`<div class="combined-order-row">${combinedSummary(o)}<div class="combined-order-actions">${combinedReviewButton(o)}${combinedOpenButton(o)}</div></div>`:`<div class="card"><b class="mono">${esc(o.order_no)}</b> ${bi('历史订单 · 保留原流程','Pesanan lama · alur sebelumnya')} ${overallOrderButton(o,'查看历史订单 / Lihat riwayat')}</div>`).join('')}</div>`:ce()}
 function combinedDashboard(){
  const ps=workspace.parcels,orders=overallOrderRoots(state.dbOrders);
- return ch('商家首页','Beranda pelanggan')+
+ return ch('商家首页','Beranda pelanggan',cb('运输计算器','Kalkulator pengiriman','rates',true))+
  `<section class="combined-home-actions"><h2>${bi('快捷入口','Akses cepat')}</h2><div class="combined-flow combined-shortcuts">${[['pre-advise','预报包裹','Daftarkan paket','parcels'],['parcels','选择包裹合包','Gabungkan paket','orders'],['orders','确认费用并付款','Periksa biaya dan bayar','billing'],['tracking-list','查询物流','Lacak pengiriman','tracking']].map(([p,z,i,symbol])=>`<button type="button" class="quick-link ${p==='pre-advise'?'combined-shortcut-primary':''}" data-page="${p}">${icon(symbol)}${bi(z,i)}</button>`).join('')}</div></section><div class="combined-home-entries">${[['parcels','我的包裹','Paket saya',ps.length+' 个包裹',ps.length+' paket','查看包裹详情、入库状态与合包','Lihat rincian paket, penerimaan, dan penggabungan','parcels'],['orders','我的订单','Pesanan saya',orders.length+' 个订单',orders.length+' pesanan','查看费用、付款、出货与物流','Lihat biaya, pembayaran, pengiriman, dan pelacakan','orders']].map(([page,z,i,count,countId,desc,descId,symbol])=>`<button type="button" class="combined-home-entry" data-page="${page}"><span class="combined-entry-heading">${icon(symbol)}<strong>${bi(z,i)}</strong><span class="combined-entry-count">${bi(count,countId)}</span></span><span class="combined-entry-description">${bi(desc,descId)}</span><span class="combined-entry-link">${bi('进入查看','Lihat selengkapnya')}<span aria-hidden="true">→</span></span></button>`).join('')}</div>`;
 }
 function combinedAdvice(edit=false){

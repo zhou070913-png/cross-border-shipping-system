@@ -319,6 +319,7 @@
     }
     function navActivePage(page,role){
       if(role==='merchant'){
+        if(page==='rates')return 'dashboard';
         if(page==='order-create')return 'parcels';
         if(page==='consolidate')return 'parcels';
         if(['parcel-detail','parcel-edit'].includes(page))return 'parcels';
@@ -632,7 +633,7 @@
   <script src="last-mile-pricing.js?v=2"></script>
   <script src="overall-orders.js?v=2"></script>
   <script src="forwarding-workspace.js?v=2"></script>
-  <script src="combined-workspace.js?v=17"></script>
+  <script src="combined-workspace.js?v=18"></script>
   <script src="customer-workspace.js?v=3"></script>
   <script src="locale-en.js?v=3"></script>
   <script src="bilingual-workspace.js?v=6"></script>
