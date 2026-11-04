@@ -29,10 +29,30 @@ test('failed login permits retry without losing credentials or emitting success'
  await run('submitLandingAuth()');assert.equal(run('authFlow.busy'),false);assert.equal(document.querySelector('#loginSubmit').disabled,false);assert.equal(document.querySelector('#loginPassword').value,'testing-password');assert.equal(run('views.length'),0);assert.match(run('messages[0]'),/登录失败/);
  run(`window.MospaceSupabase.signInWithIdentifier=async()=>{signIns++;return {user:{id:'login-user'}}}`);await run('submitLandingAuth()');assert.equal(run('signIns'),2);assert.equal(run(`messages.filter(m=>m==='登录成功').length`),1);assert.equal(run('views.length'),1);
 });
-test('wrong role never renders a privileged workbench before rejecting the login',async()=>{
- const {run,document}=login();run(`window.MospaceSupabase.currentProfile=async()=>({id:'login-user',role:'admin'})`);
- const pending=run('submitLandingAuth()');run('releaseSignIn()');await pending;
- assert.equal(run('signOuts'),1);assert.equal(run('state.auth.user'),null);assert.equal(run('views.length'),0);assert.match(run('messages[0]'),/切换正确的登录入口/);assert.equal(document.querySelector('#loginSubmit').disabled,false);
+test('one login entry routes by the server profile, ignoring stale role selection or member prefix',async()=>{
+ for(const role of ['merchant','warehouse_operator','admin']){
+  const {run,document}=login('merchant');run(`state.auth.loginTargetRole='warehouse';window.MospaceSupabase.currentProfile=async()=>({id:'login-user',role:'${role}',is_active:true})`);
+  document.querySelector('#loginIdentifier').value='M-NOT-A-ROLE-ASSIGNMENT';
+  assert.equal(document.querySelectorAll('[data-login-role]').length,0);assert.equal(document.querySelector('.login-roles'),null);assert.ok(document.querySelector('#desktopLoginForm'));
+  const pending=run('submitLandingAuth()');run('releaseSignIn()');await pending;
+  assert.equal(run('signOuts'),0);assert.equal(run('state.role'),role==='warehouse_operator'?'warehouse':role);assert.equal(run('views.length'),1);
+  const forbidden=role==='merchant'?['warehouse','ship']:['merchant','parcels'];assert.equal(run(`go('${forbidden[1]}',{role:'${forbidden[0]}'})`),false);assert.equal(run('state.page'),'dashboard');
+ }
+});
+
+test('missing, disabled or unsupported server profiles never enter a workbench and can retry',async()=>{
+ for(const profile of [null,{role:'unexpected',is_active:true},{role:'admin',is_active:false}]){
+  const {run,document}=login();run(`window.MospaceSupabase.currentProfile=async()=>(${JSON.stringify(profile)})`);
+  const pending=run('submitLandingAuth()');run('releaseSignIn()');await pending;
+  assert.equal(run('signOuts'),1);assert.equal(run('state.auth.user'),null);assert.equal(run('views.length'),0);assert.match(run('messages[0]'),/账号资料暂不可用/);assert.equal(document.querySelector('#loginSubmit').disabled,false);
+ }
+});
+
+test('unified login text switches languages while keeping the entered credentials',()=>{
+ const {run,document}=login();for(const lang of ['en','id','zh']){
+  run(`setUiLanguage('${lang}')`);assert.equal(document.querySelector('#loginIdentifier').value,'TEST-LOGIN');assert.equal(document.querySelector('#loginPassword').value,'testing-password');assert.equal(document.querySelectorAll('[data-login-role]').length,0);
+  if(lang!=='zh')assert.doesNotMatch(document.querySelector('.login-card>p').textContent,/[\u4e00-\u9fff]/);
+ }
 });
 test('stale startup session restoration cannot replace a completed login or reset subsequent navigation',async()=>{
  const {run}=login();run(`window.MospaceSupabase.currentUser=()=>new Promise(r=>releaseStartup=r)`);const startup=run('syncAuth()');

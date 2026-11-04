@@ -91,6 +91,16 @@ const extraIndonesian={
  '没有匹配的收货记录':'Tidak ada riwayat yang sesuai','暂无已收货记录':'Belum ada riwayat penerimaan',
  '订单列表分页':'Halaman daftar pesanan','包裹列表分页':'Halaman daftar paket'
 };
+if(typeof enLocale!=='undefined')Object.assign(enLocale,{
+ '输入会员号或邮箱和密码，系统将根据账号权限进入对应工作台。':'Enter your member number or email and password. Your account permissions determine your workspace.',
+ '会员号或邮箱':'Member number or email',
+ '该账号属于内部员工，请使用网页版登录':'This is a staff account. Please sign in on the desktop site.'
+});
+Object.assign(extraIndonesian,{
+ '输入会员号或邮箱和密码，系统将根据账号权限进入对应工作台。':'Masukkan nomor anggota atau email dan kata sandi. Ruang kerja ditentukan oleh hak akses akun.',
+ '会员号或邮箱':'Nomor anggota atau email',
+ '该账号属于内部员工，请使用网页版登录':'Ini akun staf. Silakan masuk melalui situs desktop.'
+});
 Object.assign(idLocale,extraIndonesian);
 function ensureLanguageControl(){
  let el=document.getElementById('languageControl');
